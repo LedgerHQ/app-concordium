@@ -20,7 +20,7 @@ You can use for this the container `ghcr.io/ledgerhq/ledger-app-builder/ledger-a
 docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
 cd <your app repository>                        # replace <appname> with the name of your app, (eg concordium)
 docker run --user "$(id -u)":"$(id -g)" --rm -ti -v "$(realpath .):/app" --privileged -v "/dev/bus/usb:/dev/bus/usb" ledger-app-builder-lite:latest
-make clean && make BOLOS_SDK=$<device>_SDK      # replace <device> with one of [NANOX, NANOSP, STAX, FLEX]
+make clean && make BOLOS_SDK=$<device>_SDK      # replace <device> with target device name in capital letters
 exit
 ```
 
@@ -41,7 +41,7 @@ You can use for this the container `ghcr.io/ledgerhq/ledger-app-builder/ledger-a
 docker pull ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
 cd app-<appname>/                                   # replace <appname> with the name of your app, (eg concordium)
 docker run --user "$(id -u)":"$(id -g)" --rm -ti -v "$(realpath .):/app" --privileged -v "/dev/bus/usb:/dev/bus/usb" ledger-app-builder-lite:latest
-make clean && make BOLOS_SDK=$<device>_SDK load     # replace <device> with one of [NANOX, NANOSP, STAX, FLEX]
+make clean && make BOLOS_SDK=$<device>_SDK load     # replace <device> with target device name in capital letters
 exit
 ```
 
@@ -61,14 +61,14 @@ Standard useful pytest options
     -s              enable logs for successful tests, on Speculos it will enable app logs if compiled with DEBUG=1
     -k <testname>   only run the tests that contain <testname> in their names
     --tb=short      in case of errors, formats the test traceback in a readable way
-``` 
+```
 
 Custom pytest options
 ```
-    --device <device>           run the test on the specified device [nanox,nanosp,stax,flex,all]. This parameter is mandatory
+    --device <device>           run the test on the specified device [target device name or all]. This parameter is mandatory
     --backend <backend>         run the tests against the backend [speculos, ledgercomm, ledgerwallet]. Speculos is the default
     --display                   on Speculos, enables the display of the app screen using QT
     --golden_run                on Speculos, screen comparison functions will save the current screen instead of comparing
     --log_apdu_file <filepath>  log all apdu exchanges to the file in parameter. The previous file content is erased
-``` 
+```
 

@@ -293,6 +293,8 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
         screenshots_so_far = 11
     elif firmware.is_nano:
         screenshots_so_far = 7
+    elif firmware.name == "apex_p":
+        screenshots_so_far = 4
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
