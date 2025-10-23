@@ -1,5 +1,11 @@
 #pragma once
 
+#if defined(TARGET_STAX) || defined(TARGET_FLEX)
+#define ICON_APP_HOME C_app_concordium_64px
+#elif defined(TARGET_APEX_P)
+#define ICON_APP_HOME C_app_concordium_48px
+#endif
+
 #ifdef HAVE_BAGL
 
 extern const ux_flow_step_t ux_display_memo_step_nocb;

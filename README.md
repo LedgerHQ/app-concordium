@@ -73,11 +73,9 @@ From inside the container, use the following command to build the app :
 make DEBUG=1  # compile optionally with PRINTF
 ```
 
-You can choose which device to compile and load for by setting the `BOLOS_SDK` environment variable to the following values :
+You can choose which device to compile and load for by setting the `BOLOS_SDK` replacing <device> with target device name in capital letters:
 
-* `BOLOS_SDK=$NANOX_SDK`
-* `BOLOS_SDK=$NANOSP_SDK`
-* `BOLOS_SDK=$STAX_SDK`
+* `BOLOS_SDK=$<device>_SDK`
 
 By default this variable is set to build/load for Nano S+.
 
@@ -94,7 +92,7 @@ First make sure you have the proper udev rules added on your host :
 ```shell
 # Run these commands on your host, from the app's source folder.
 sudo cp .vscode/20-ledger.ledgerblue.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules 
+sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
@@ -115,7 +113,7 @@ Run these commands on your host from the app's source folder once you have [buil
 
 ```shell
 # Install Python virtualenv
-python3 -m pip install virtualenv 
+python3 -m pip install virtualenv
 # Create the 'ledger' virtualenv
 python3 -m virtualenv ledger
 ```
@@ -127,7 +125,7 @@ Enter the Python virtual environment
 
 ```shell
 # Install Ledgerblue (tool to load the app)
-python3 -m pip install ledgerblue 
+python3 -m pip install ledgerblue
 # Load the app.
 python3 -m ledgerblue.runScript --scp --fileName bin/app.apdu --elfFile bin/app.elf
 ```
@@ -160,7 +158,7 @@ On Linux, you can use [Ledger's VS Code extension](#with-vscode) to run the test
 Install the tests requirements :
 
 ```shell
-pip install -r tests/requirements.txt 
+pip install -r tests/requirements.txt
 ```
 
 Then you can :

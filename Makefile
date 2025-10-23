@@ -30,7 +30,7 @@ APPNAME = "Concordium"
 # Application version
 APPVERSION_M = 5
 APPVERSION_N = 3
-APPVERSION_P = 1
+APPVERSION_P = 2
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += APPVERSION=\"$(APPVERSION)\"
@@ -49,6 +49,7 @@ ICON_NANOX = icons/app_concordium_14px.gif
 ICON_NANOSP = icons/app_concordium_14px.gif
 ICON_STAX = icons/app_concordium_32px.gif
 ICON_FLEX = icons/app_concordium_40px.gif
+ICON_APEX_P = icons/app_concordium_32px.png
 
 # Application allowed derivation curves.
 # Possibles curves are: secp256k1, secp256r1, ed25519 and bls12381g1

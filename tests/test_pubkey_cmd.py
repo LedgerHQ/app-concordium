@@ -25,7 +25,7 @@ nano_refuse_instructions = [
     NavInsID.BOTH_CLICK,
 ]
 
-flex_stax_accept_instructions = [
+wallet_accept_instructions = [
     NavInsID.SWIPE_CENTER_TO_LEFT,
     NavInsID.USE_CASE_CHOICE_CONFIRM,
     NavInsID.SWIPE_CENTER_TO_LEFT,
@@ -33,7 +33,7 @@ flex_stax_accept_instructions = [
     NavInsID.WAIT_FOR_HOME_SCREEN,
 ]
 
-flex_stax_refuse_instructions = [
+wallet_refuse_instructions = [
     NavInsID.SWIPE_CENTER_TO_LEFT,
     NavInsID.USE_CASE_CHOICE_REJECT,
     NavInsID.WAIT_FOR_HOME_SCREEN,
@@ -49,7 +49,7 @@ def test_get_legacy_public_key_confirm_accepted(
     if firmware.is_nano:
         instructions = nano_accept_instructions
     else:
-        instructions = flex_stax_accept_instructions
+        instructions = wallet_accept_instructions
 
     with client.get_public_key_with_confirmation(path=path):
         navigator.navigate_and_compare(
@@ -78,7 +78,7 @@ def test_get_signed_legacy_public_key_confirm_accepted(
     if firmware.is_nano:
         instructions = nano_accept_instructions
     else:
-        instructions = flex_stax_accept_instructions
+        instructions = wallet_accept_instructions
 
     with client.get_public_key_with_confirmation(path=path, signPublicKey=True):
         navigator.navigate_and_compare(
@@ -107,7 +107,7 @@ def test_get_signed_legacy_governance_public_key_confirm_accepted(
     if firmware.is_nano:
         instructions = nano_accept_instructions
     else:
-        instructions = flex_stax_accept_instructions
+        instructions = wallet_accept_instructions
 
     with client.get_public_key_with_confirmation(path=path, signPublicKey=True):
         navigator.navigate_and_compare(
@@ -136,7 +136,7 @@ def test_get_signed_new_public_key_confirm_accepted(
     if firmware.is_nano:
         instructions = nano_accept_instructions
     else:
-        instructions = flex_stax_accept_instructions
+        instructions = wallet_accept_instructions
 
     with client.get_public_key_with_confirmation(path=path, signPublicKey=True):
         navigator.navigate_and_compare(
@@ -162,7 +162,7 @@ def test_get_public_key_confirm_refused(backend, firmware, navigator, default_sc
     if firmware.is_nano:
             instructions = nano_refuse_instructions
     else:
-        instructions = flex_stax_refuse_instructions
+        instructions = wallet_refuse_instructions
 
     with pytest.raises(ExceptionRAPDU) as e:
         with client.get_public_key_with_confirmation(path=path):

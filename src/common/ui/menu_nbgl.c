@@ -19,6 +19,7 @@
 #ifdef HAVE_NBGL
 
 #include "globals.h"
+#include "display.h"
 
 static tx_state_t* tx_state = &global_tx_state;
 
@@ -48,7 +49,7 @@ void ui_menu_main(void) {
     tx_state->currentInstruction = -1;
 
     nbgl_useCaseHomeAndSettings(APPNAME,
-                                &C_app_concordium_64px,
+                                &ICON_APP_HOME,
                                 NULL,
                                 INIT_HOME_PAGE,
                                 NULL,

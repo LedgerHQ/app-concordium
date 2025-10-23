@@ -30,12 +30,12 @@ def instructions_builder(
     backend,
     confirm_instruction: NavInsID = NavInsID.USE_CASE_REVIEW_CONFIRM,
 ) -> list[NavInsID]:
-    if backend.firmware.device.startswith(("stax", "flex")):
-        go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
-        temp_confirm_instruction = confirm_instruction
-    else:
+    if backend.firmware.is_nano:
         go_right_instruction = NavInsID.RIGHT_CLICK
         temp_confirm_instruction = NavInsID.BOTH_CLICK
+    else:
+        go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
+        temp_confirm_instruction = confirm_instruction
 
     # Add the go right instruction for the number of screens needed
     instructions = [go_right_instruction] * number_of_screens_until_confirm
@@ -56,7 +56,7 @@ def navigate_until_text_and_compare(
 ):
     """Navigate through device screens until specified text is found and compare screenshots.
 
-    This function handles navigation through device screens differently based on the device type (Stax/Flex vs others).
+    This function handles navigation through device screens differently based on the device type (touch screen devices vs others).
     It will navigate through screens until the specified text is found, taking screenshots for comparison along the way.
 
     Args:
@@ -71,19 +71,19 @@ def navigate_until_text_and_compare(
         None
 
     Note:
-        For Stax/Flex devices:
+        For touch screen devices:
         - Uses swipe left gesture for navigation
         - Uses review confirm for confirmation
         For other devices:
         - Uses right click for navigation
         - Uses both click for confirmation
     """
-    if firmware.device.startswith(("stax", "flex")):
-        go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
-        confirm_instructions = [nav_ins_confirm_instruction]
-    else:
+    if firmware.is_nano:
         go_right_instruction = NavInsID.RIGHT_CLICK
         confirm_instructions = [NavInsID.BOTH_CLICK]
+    else:
+        go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
+        confirm_instructions = [nav_ins_confirm_instruction]
 
     navigator.navigate_until_text_and_compare(
         go_right_instruction,
