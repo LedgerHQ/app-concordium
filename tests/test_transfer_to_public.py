@@ -10,13 +10,12 @@ from application_client.boilerplate_response_unpacker import (
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID, NavIns
-from ragger.firmware import Firmware
 from utils import navigate_until_text_and_compare
 
 
 @pytest.mark.active_test_scope
 def test_transfer_to_public(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     header_and_type = bytes.fromhex(
@@ -36,7 +35,7 @@ def test_transfer_to_public(
         proof=proof,
     ):
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
     response = client.get_async_response()
     print("km------------response", response)

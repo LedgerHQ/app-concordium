@@ -21,7 +21,7 @@ aggregationVerifyKeyProof = "957aec4b2b7ed979ba2079d62246d135aefd61e7f46690c452f
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_capital_restake_open_status_and_keys(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -43,7 +43,7 @@ def test_sign_configure_baker_capital_restake_open_status_and_keys(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -58,7 +58,7 @@ def test_sign_configure_baker_capital_restake_open_status_and_keys(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_stop_baking(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -79,7 +79,7 @@ def test_sign_configure_baker_stop_baking(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -94,7 +94,7 @@ def test_sign_configure_baker_stop_baking(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_capital_restake_open_status_without_keys(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -115,7 +115,7 @@ def test_sign_configure_baker_capital_restake_open_status_without_keys(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -130,7 +130,7 @@ def test_sign_configure_baker_capital_restake_open_status_without_keys(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_only_keys(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -154,7 +154,7 @@ def test_sign_configure_baker_only_keys(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -169,7 +169,7 @@ def test_sign_configure_baker_only_keys(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_url_only(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -189,7 +189,7 @@ def test_sign_configure_baker_url_only(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -204,7 +204,7 @@ def test_sign_configure_baker_url_only(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_commission_rate_only(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -226,7 +226,7 @@ def test_sign_configure_baker_commission_rate_only(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -241,7 +241,7 @@ def test_sign_configure_baker_commission_rate_only(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_suspended_only(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -256,7 +256,7 @@ def test_sign_configure_baker_suspended_only(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -271,7 +271,7 @@ def test_sign_configure_baker_suspended_only(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_baker_all_parameters(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
 
     client = BoilerplateCommandSender(backend)
@@ -290,9 +290,9 @@ def test_sign_configure_baker_all_parameters(
         bitmap=bytes.fromhex(bitmap),
         aggregation_key=bytes.fromhex(aggregationVerifyKey + aggregationVerifyKeyProof),
     ):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -302,7 +302,7 @@ def test_sign_configure_baker_all_parameters(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -314,9 +314,9 @@ def test_sign_configure_baker_all_parameters(
     with client.sign_configure_baker_url(
         url=url_bytes, bitmap=bitmap, is_called_first=False
     ):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -326,7 +326,7 @@ def test_sign_configure_baker_all_parameters(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -343,7 +343,7 @@ def test_sign_configure_baker_all_parameters(
         is_called_first=False,
     ):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Continue",
             default_screenshot_path,
@@ -358,7 +358,7 @@ def test_sign_configure_baker_all_parameters(
         is_called_first=False,
     ):
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name + "_4"
+            backend, navigator, "Sign", default_screenshot_path, test_name + "_4"
         )
 
     response = client.get_async_response().data

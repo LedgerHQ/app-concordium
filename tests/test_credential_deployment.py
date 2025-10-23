@@ -10,13 +10,12 @@ from application_client.boilerplate_response_unpacker import (
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID, NavIns
-from ragger.firmware import Firmware
 from utils import navigate_until_text_and_compare, instructions_builder
 
 
 @pytest.mark.active_test_scope
 def test_credential_deployment_new(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
 
@@ -60,7 +59,7 @@ def test_credential_deployment_new(
             key=key,
         ):
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -83,9 +82,9 @@ def test_credential_deployment_new(
         proofs=proofs,
         transaction=new_transaction,
     ):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "details",
                 default_screenshot_path,
@@ -93,7 +92,7 @@ def test_credential_deployment_new(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Sign details",
                 default_screenshot_path,
@@ -113,7 +112,7 @@ def test_credential_deployment_new(
 
 @pytest.mark.active_test_scope
 def test_credential_deployment_existing(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
 
@@ -159,7 +158,7 @@ def test_credential_deployment_existing(
             key=key,
         ):
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -182,9 +181,9 @@ def test_credential_deployment_existing(
         proofs=proofs,
         transaction=existing_transaction,
     ):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "details",
                 default_screenshot_path,
@@ -192,7 +191,7 @@ def test_credential_deployment_existing(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Sign details",
                 default_screenshot_path,
@@ -212,7 +211,7 @@ def test_credential_deployment_existing(
 
 @pytest.mark.active_test_scope
 def test_credential_update(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
 
@@ -245,9 +244,9 @@ def test_credential_update(
             "08000004510000000000000000000000000000000000000002000000000000000020a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71401"
         ),
     ):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -257,7 +256,7 @@ def test_credential_update(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Approve",
                 default_screenshot_path,
@@ -274,7 +273,7 @@ def test_credential_update(
             key=key,
         ):
             # Only navigate if it's not the last key
-            if firmware.is_nano and i < len(keys) - 1:
+            if backend.device.is_nano and i < len(keys) - 1:
                 navigator.navigate_and_compare(
                     default_screenshot_path,
                     test_name + f"/2_key{i}",
@@ -284,9 +283,9 @@ def test_credential_update(
                     screen_change_before_first_instruction=False,
                     screen_change_after_last_instruction=False,
                 )
-            elif not firmware.is_nano and i < len(keys) - 1:
+            elif not backend.device.is_nano and i < len(keys) - 1:
                 navigate_until_text_and_compare(
-                    firmware,
+                    backend,
                     navigator,
                     "Approve",
                     default_screenshot_path,
@@ -297,8 +296,6 @@ def test_credential_update(
                 )
 
         number_of_screens_until_confirm = 1
-        if firmware.name == "nanos":
-            number_of_screens_until_confirm = 5
 
         with client.sign_update_credential_part_3(
             signature_threshold=signature_threshold,
@@ -310,7 +307,7 @@ def test_credential_update(
             proofs=proofs,
             credential_id_list=credential_id_list,
         ):
-            if firmware.is_nano:
+            if backend.device.is_nano:
                 navigator.navigate_and_compare(
                     default_screenshot_path,
                     test_name + "/3_rem_credential",
@@ -323,7 +320,7 @@ def test_credential_update(
                 )
             else:
                 navigate_until_text_and_compare(
-                    firmware,
+                    backend,
                     navigator,
                     "Approve",
                     default_screenshot_path,
@@ -336,7 +333,7 @@ def test_credential_update(
         with client.sign_update_credential_part_4(
             threshold=bytes.fromhex(f"{len(credential_id_list):02x}"),
         ):
-            if firmware.is_nano:
+            if backend.device.is_nano:
                 navigator.navigate_and_compare(
                     default_screenshot_path,
                     test_name + "/4_threshold_and_sign",
@@ -348,7 +345,7 @@ def test_credential_update(
                 )
             else:
                 navigate_until_text_and_compare(
-                    firmware,
+                    backend,
                     navigator,
                     "Sign transaction",
                     default_screenshot_path,

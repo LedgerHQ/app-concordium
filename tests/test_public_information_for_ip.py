@@ -19,7 +19,7 @@ def create_right_clicks_and_confirm(n: int) -> list:
 
 @pytest.mark.active_test_scope
 def test_sign_public_information_for_ip(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -44,9 +44,9 @@ def test_sign_public_information_for_ip(
     # As it requires on-screen validation, the function is asynchronous.
     # It will yield the result when the navigation is done
     with client.sign_public_information_for_ip_part_1(chunks=[data_1, data_2]):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -56,7 +56,7 @@ def test_sign_public_information_for_ip(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -66,9 +66,9 @@ def test_sign_public_information_for_ip(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
     with client.sign_public_information_for_ip_part_2(chunks=[data_3]):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -78,7 +78,7 @@ def test_sign_public_information_for_ip(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -90,7 +90,7 @@ def test_sign_public_information_for_ip(
 
     with client.sign_public_information_for_ip_part_3(chunks=[data_4, data_5]):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Sign identity",
             default_screenshot_path,

@@ -30,7 +30,7 @@ def instructions_builder(
     backend,
     confirm_instruction: NavInsID = NavInsID.USE_CASE_REVIEW_CONFIRM,
 ) -> list[NavInsID]:
-    if backend.firmware.is_nano:
+    if backend.device.is_nano:
         go_right_instruction = NavInsID.RIGHT_CLICK
         temp_confirm_instruction = NavInsID.BOTH_CLICK
     else:
@@ -45,7 +45,7 @@ def instructions_builder(
 
 
 def navigate_until_text_and_compare(
-    firmware,
+    backend,
     navigator,
     text: str,
     screenshot_path: str,
@@ -60,7 +60,7 @@ def navigate_until_text_and_compare(
     It will navigate through screens until the specified text is found, taking screenshots for comparison along the way.
 
     Args:
-        firmware: The firmware object containing device information
+        backend: The backend object containing device information
         navigator: The navigator object used to control device navigation
         text: The text string to search for on device screens
         screenshot_path: Path where screenshot comparison files will be saved
@@ -78,7 +78,7 @@ def navigate_until_text_and_compare(
         - Uses right click for navigation
         - Uses both click for confirmation
     """
-    if firmware.is_nano:
+    if backend.device.is_nano:
         go_right_instruction = NavInsID.RIGHT_CLICK
         confirm_instructions = [NavInsID.BOTH_CLICK]
     else:

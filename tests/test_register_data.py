@@ -10,13 +10,12 @@ from application_client.boilerplate_response_unpacker import (
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID, NavIns
-from ragger.firmware import Firmware
 from utils import navigate_until_text_and_compare, instructions_builder
 
 
 @pytest.mark.active_test_scope
 def test_register_data(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     path = "m/1105/0/0/0/0/2/0/0"
@@ -32,7 +31,7 @@ def test_register_data(
         data_length=len(data),
     ):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Continue",
             default_screenshot_path,
@@ -48,7 +47,7 @@ def test_register_data(
 
     # Send the second part of the data
     with client.register_data_part_2(data):
-        if firmware.is_nano:
+        if backend.device.is_nano:
             navigator.navigate_and_compare(
                 default_screenshot_path,
                 test_name + "_2",
@@ -59,7 +58,7 @@ def test_register_data(
             )
         else:
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Sign transaction",
                 default_screenshot_path,

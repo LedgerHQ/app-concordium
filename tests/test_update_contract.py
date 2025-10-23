@@ -10,13 +10,12 @@ from application_client.boilerplate_response_unpacker import (
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID, NavIns
-from ragger.firmware import Firmware
 from utils import navigate_until_text_and_compare, instructions_builder
 
 
 @pytest.mark.active_test_scope
 def test_update_contract(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     path = "m/1105/0/0/0/0/2/0/0"
@@ -39,7 +38,7 @@ def test_update_contract(
         params=params,
     ):
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
     response = client.get_async_response()
     print(response.data.hex())
@@ -51,7 +50,7 @@ def test_update_contract(
 
 @pytest.mark.active_test_scope
 def test_update_contract(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     path = "m/1105/0/0/0/0/2/0/0"
@@ -79,7 +78,7 @@ def test_update_contract(
         params=params,
     ):
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
     response = client.get_async_response()
     print(response.data.hex())

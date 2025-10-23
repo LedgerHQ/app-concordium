@@ -1,13 +1,12 @@
 import pytest
-from ragger.firmware import Firmware
 from ragger.navigator import NavInsID, NavIns
 
 
 # In this test we check the behavior of the device main menu
 @pytest.mark.active_test_scope
-def test_app_mainmenu(firmware, navigator, test_name, default_screenshot_path):
+def test_app_mainmenu(backend, navigator, test_name, default_screenshot_path):
     # Navigate in the main menu
-    if firmware.is_nano:
+    if backend.device.is_nano:
         instructions = [
             NavInsID.RIGHT_CLICK,
             NavInsID.RIGHT_CLICK,

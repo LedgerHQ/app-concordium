@@ -10,18 +10,17 @@ from application_client.boilerplate_response_unpacker import (
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID, NavIns
-from ragger.firmware import Firmware
 from utils import navigate_until_text_and_compare
 
 
 @pytest.mark.active_test_scope
 def test_export_standard_private_key_legacy_path(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     with client.export_private_key(export_type="standard", identity_index=0):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Accept",
             default_screenshot_path,
@@ -38,12 +37,12 @@ def test_export_standard_private_key_legacy_path(
 
 @pytest.mark.active_test_scope
 def test_export_recovery_private_key_legacy_path(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     with client.export_private_key(export_type="recovery", identity_index=0):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Accept",
             default_screenshot_path,
@@ -60,14 +59,14 @@ def test_export_recovery_private_key_legacy_path(
 
 @pytest.mark.active_test_scope
 def test_export_prfkey_and_idcredsed_private_key_legacy_path(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     with client.export_private_key(
         export_type="prfkey_and_idcredsec", identity_index=0
     ):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Accept",
             default_screenshot_path,
@@ -84,14 +83,14 @@ def test_export_prfkey_and_idcredsed_private_key_legacy_path(
 
 @pytest.mark.active_test_scope
 def test_export_standard_private_key_new_path(
-    backend, firmware, navigator, test_name, default_screenshot_path
+    backend, navigator, test_name, default_screenshot_path
 ):
     client = BoilerplateCommandSender(backend)
     with client.export_private_key(
         export_type="standard", identity_index=0, idp_index=0
     ):
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Accept",
             default_screenshot_path,

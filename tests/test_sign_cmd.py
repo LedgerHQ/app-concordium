@@ -10,6 +10,7 @@ from application_client.boilerplate_response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
+from ledgered.devices import DeviceType
 from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID
 from utils import navigate_until_text_and_compare, instructions_builder, split_message
@@ -23,7 +24,7 @@ MAX_APDU_LEN: int = 255
 # We will ensure that the displayed information is correct by using screenshots comparison
 @pytest.mark.active_test_scope
 def test_sign_tx_simple_transfer_legacy_path(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -40,7 +41,7 @@ def test_sign_tx_simple_transfer_legacy_path(
     with client.sign_simple_transfer(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -59,7 +60,7 @@ def test_sign_tx_simple_transfer_legacy_path(
 # We will ensure that the displayed information is correct by using screenshots comparison
 @pytest.mark.active_test_scope
 def test_sign_tx_simple_transfer_new_path(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -76,7 +77,7 @@ def test_sign_tx_simple_transfer_new_path(
     with client.sign_simple_transfer(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -94,7 +95,7 @@ def test_sign_tx_simple_transfer_new_path(
 # We will ensure that the displayed information is correct by using screenshots comparison
 @pytest.mark.active_test_scope
 def test_sign_tx_simple_transfer_with_memo_legacy_path(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -120,7 +121,7 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     ):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -137,7 +138,7 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
 
 @pytest.mark.active_test_scope
 def test_sign_tx_transfer_with_schedule_legacy_path(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
     client = BoilerplateCommandSender(backend)
@@ -174,7 +175,7 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
     ):
         # Navigate and compare screenshots for validation
         navigate_until_text_and_compare(
-            firmware,
+            backend,
             navigator,
             "Continue",
             default_screenshot_path,
@@ -186,10 +187,10 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
 
     # Process each chunk of pairs
     screenshots_so_far = 3
-    if firmware.name == "nanos":
-        screenshots_so_far = 10
-    elif firmware.is_nano:
+    if backend.device.is_nano:
         screenshots_so_far = 6
+#    elif backend.device.type == DeviceType.APEX_P:
+#        screenshots_so_far = 4
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -230,7 +231,7 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
 
 @pytest.mark.active_test_scope
 def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
     client = BoilerplateCommandSender(backend)
@@ -277,7 +278,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     for chunk in memo_chunks:
         with client.sign_tx_with_schedule_and_memo_part_2(memo_chunk=chunk):
             navigate_until_text_and_compare(
-                firmware,
+                backend,
                 navigator,
                 "Continue",
                 default_screenshot_path,
@@ -289,11 +290,9 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
 
     # Process each chunk of pairs
     screenshots_so_far = 3
-    if firmware.name == "nanos":
-        screenshots_so_far = 11
-    elif firmware.is_nano:
+    if backend.device.is_nano:
         screenshots_so_far = 7
-    elif firmware.name == "apex_p":
+    elif backend.device.type == DeviceType.APEX_P:
         screenshots_so_far = 4
 
     for chunk in pairs_chunk:

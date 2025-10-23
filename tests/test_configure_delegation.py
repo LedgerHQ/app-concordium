@@ -10,7 +10,7 @@ from utils import navigate_until_text_and_compare
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_capital(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -26,7 +26,7 @@ def test_sign_configure_delegation_capital(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -40,7 +40,7 @@ def test_sign_configure_delegation_capital(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_stop_delegation(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -56,7 +56,7 @@ def test_sign_configure_delegation_stop_delegation(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -70,7 +70,7 @@ def test_sign_configure_delegation_stop_delegation(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_restake(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -86,7 +86,7 @@ def test_sign_configure_delegation_restake(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -100,7 +100,7 @@ def test_sign_configure_delegation_restake(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_target(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -116,7 +116,7 @@ def test_sign_configure_delegation_target(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -130,7 +130,7 @@ def test_sign_configure_delegation_target(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_capital_target(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -146,7 +146,7 @@ def test_sign_configure_delegation_capital_target(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -160,7 +160,7 @@ def test_sign_configure_delegation_capital_target(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_capital_restake_target(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -176,7 +176,7 @@ def test_sign_configure_delegation_capital_restake_target(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
@@ -190,7 +190,7 @@ def test_sign_configure_delegation_capital_restake_target(
 
 @pytest.mark.active_test_scope
 def test_sign_configure_delegation_passive_delegation(
-    backend, firmware, navigator, default_screenshot_path, test_name
+    backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
     client = BoilerplateCommandSender(backend)
@@ -206,7 +206,7 @@ def test_sign_configure_delegation_passive_delegation(
     with client.sign_configure_delegation(path=path, transaction=transaction):
         # Validate the on-screen request by performing the navigation appropriate for this device
         navigate_until_text_and_compare(
-            firmware, navigator, "Sign", default_screenshot_path, test_name
+            backend, navigator, "Sign", default_screenshot_path, test_name
         )
 
     # The device as yielded the result, parse it and ensure that the signature is correct
