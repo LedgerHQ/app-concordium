@@ -28,12 +28,12 @@ void handleDeployModule(uint8_t *cdata, uint8_t p1, uint8_t lc) {
         if (remainingDataLength < 8) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         ctx_deploy_module->version = U4BE(cdata, 0);
         ctx_deploy_module->sourceLength = U4BE(cdata, 4);
         ctx_deploy_module->remainingSourceLength = ctx_deploy_module->sourceLength;
 
-        numberToText((uint8_t *)ctx_deploy_module->versionDisplay,
+        numberToText((uint8_t *) ctx_deploy_module->versionDisplay,
                      sizeof(ctx_deploy_module->versionDisplay),
                      ctx_deploy_module->version);
         sendSuccessNoIdle();
@@ -43,7 +43,7 @@ void handleDeployModule(uint8_t *cdata, uint8_t p1, uint8_t lc) {
         if (ctx_deploy_module->remainingSourceLength < lc) {
             THROW(ERROR_INVALID_SOURCE_LENGTH);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, lc);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, lc);
         ctx_deploy_module->remainingSourceLength -= lc;
         if (ctx_deploy_module->remainingSourceLength > 0) {
             sendSuccessNoIdle();

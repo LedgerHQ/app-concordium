@@ -61,7 +61,7 @@ size_t decimalDigitsDisplay(uint8_t *dst,
     size_t length = lengthOfNumber(decimalPart);
     int zeroFillLength = decimalDigitsLength - length;
 
-    if (zeroFillLength < 0 || dstLength < (size_t)zeroFillLength) {
+    if (zeroFillLength < 0 || dstLength < (size_t) zeroFillLength) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 

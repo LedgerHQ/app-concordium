@@ -1,7 +1,6 @@
 ---
 BasedOnStyle: Google
 IndentWidth: 4
----
 Language: Cpp
 ColumnLimit: 100
 PointerAlignment: Right
@@ -9,8 +8,7 @@ AlignAfterOpenBracket: Align
 AlignConsecutiveMacros: true
 AllowAllParametersOfDeclarationOnNextLine: false
 SortIncludes: false
-SpaceAfterCStyleCast: false
-SpacesInCStyleCastParentheses: false
+SpaceAfterCStyleCast: true
 AllowShortCaseLabelsOnASingleLine: false
 AllowAllArgumentsOnNextLine: false
 AllowShortBlocksOnASingleLine: Never

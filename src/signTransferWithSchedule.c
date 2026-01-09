@@ -18,7 +18,7 @@ void processNextScheduledAmount(uint8_t *buffer) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint64_t timestamp = U8BE(ctx->buffer, ctx->pos) / 1000;
-        updateHash((cx_hash_t *)&tx_state->hash, buffer + ctx->pos, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, buffer + ctx->pos, 8);
         ctx->pos += 8;
         int valid = secondsToTm(timestamp, &ctx->time);
         if (valid != 0) {
@@ -35,7 +35,7 @@ void processNextScheduledAmount(uint8_t *buffer) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint64_t amount = U8BE(ctx->buffer, ctx->pos);
-        updateHash((cx_hash_t *)&tx_state->hash, buffer + ctx->pos, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, buffer + ctx->pos, 8);
         ctx->pos += 8;
         amountToGtuDisplay(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
 
@@ -88,7 +88,7 @@ void handleTransferPairs(uint8_t *cdata, uint8_t dataLength, volatile unsigned i
 #define P1_MEMO                     0x03
 
 void finishMemoScheduled(volatile unsigned int *flags) {
-    updateHash((cx_hash_t *)&tx_state->hash, &ctx->remainingNumberOfScheduledAmounts, 1);
+    updateHash((cx_hash_t *) &tx_state->hash, &ctx->remainingNumberOfScheduledAmounts, 1);
     ctx->state = TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS;
     startInitialScheduledTransferDisplay(true);
     *flags |= IO_ASYNCH_REPLY;
@@ -126,13 +126,13 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
             THROW(ERROR_INVALID_PARAM);
         }
 
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 2);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 2);
 
         // Update the state to expect the next message to contain the first bytes of the memo.
         ctx->state = TX_TRANSFER_WITH_SCHEDULE_MEMO_START;
         sendSuccessNoIdle();
     } else if (p1 == P1_MEMO && ctx->state == TX_TRANSFER_WITH_SCHEDULE_MEMO_START) {
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, dataLength);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
         // Read initial part of memo and then display it:
         readCborInitial(cdata, dataLength);
@@ -144,7 +144,7 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
             sendSuccessNoIdle();
         }
     } else if (p1 == P1_MEMO && ctx->state == TX_TRANSFER_WITH_SCHEDULE_MEMO) {
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, dataLength);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
         // Read current part of memo and then display it:
         readCborContent(cdata, dataLength);
@@ -186,7 +186,7 @@ void handleSignTransferWithSchedule(uint8_t *cdata,
         }
         ctx->remainingNumberOfScheduledAmounts = cdata[0];
         // Hash schedule length
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
 
         // Update the state to expect the next message to contain transfer pairs.
         ctx->state = TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS;
