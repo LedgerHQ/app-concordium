@@ -108,7 +108,9 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
                                           dataLength,
                                           TRANSFER_WITH_SCHEDULE_WITH_MEMO,
                                           ctx->displayStr,
-                                          sizeof(ctx->displayStr));
+                                          sizeof(ctx->displayStr),
+                                          ctx->energy_amount_str,
+                                          sizeof(ctx->energy_amount_str));
 
         // Store the number of scheduled amounts we are going to receive next.
         if (dataLength < 1) {
@@ -178,7 +180,9 @@ void handleSignTransferWithSchedule(uint8_t *cdata,
                                           lc,
                                           TRANSFER_WITH_SCHEDULE,
                                           ctx->displayStr,
-                                          sizeof(ctx->displayStr));
+                                          sizeof(ctx->displayStr),
+                                          ctx->energy_amount_str,
+                                          sizeof(ctx->energy_amount_str));
 
         // Store the number of scheduled amounts we are going to receive next.
         if (lc < 1) {

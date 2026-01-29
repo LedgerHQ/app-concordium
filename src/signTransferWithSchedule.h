@@ -35,6 +35,7 @@ typedef struct {
     uint8_t scheduledAmountsInCurrentPacket;
 
     uint8_t displayAmount[30];
+    uint8_t energy_amount_str[30];
     uint8_t displayTimestamp[25];
 
     tm time;

@@ -93,7 +93,9 @@ int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,
                              uint8_t kind,
                              uint8_t *recipientDst,
-                             size_t recipientSize) {
+                             size_t recipientSize,
+                             uint8_t *feesDst,
+                             size_t feesSize) {
     // Parse the key derivation path, which should always be the first thing received
     // in a command to the Ledger application.
     int keyPathLength = parseKeyDerivationPath(cdata, dataLength);
@@ -106,6 +108,12 @@ int handleHeaderAndToAddress(uint8_t *cdata,
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     int headerLength = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, kind);
+
+    // extract energy amount from header
+    uint64_t energy_amount_u64 = U8BE(cdata, 40);
+
+    amountToGtuDisplay((uint8_t *) feesDst, feesSize, energy_amount_u64);
+
     cdata += headerLength;
     remainingDataLength -= headerLength;
 
