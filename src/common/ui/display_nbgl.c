@@ -947,16 +947,16 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
-    pairs[index].item = "Sender";
+    pairs[index].item = "From";
     pairs[index].value = (char *) global_account_sender.sender;
-    index++;
-    pairs[index].item = "Recipient";
-    pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayStr;
     index++;
     pairs[index].item = "Amount";
     pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayAmount;
     index++;
-    pairs[index].item = "Fees";
+    pairs[index].item = "To";
+    pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayStr;
+    index++;
+    pairs[index].item = "Max fees";
     pairs[index].value = (char *) global.withDataBlob.signTransferContext.energy_amount_str;
     index++;
     if (displayMemo) {

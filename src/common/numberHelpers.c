@@ -114,37 +114,22 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 
     size_t offset = 0;
 
-    // If we reach this case, then the number is greater than the resolution and we will
-    // need to consider thousand separators for the whole number part.
     size_t wholeNumberLength = length - decimalDigitsLength;
-    int current = 0;
-    size_t separatorCount = wholeNumberLength / 3;
-    if (wholeNumberLength % 3 == 0) {
-        separatorCount -= 1;
-    }
     uint64_t wholePart = amount / resolution;
 
     // We check that the entire number and termination fits,
     // under the assumption that there is no decimalPart
-    if (dstLength < wholeNumberLength + separatorCount + 1) {
+    if (dstLength < wholeNumberLength + 1) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
-    // Write the whole number part of the amount to the output destination. This
-    // part has to have thousand separators added.
-    for (int i = wholeNumberLength - 1 + separatorCount; i >= 0; i--) {
+    // Write the whole number part of the amount to the output destination.
+    for (int i = wholeNumberLength - 1; i >= 0; i--) {
         dst[i] = (wholePart % 10) + '0';
         wholePart /= 10;
-
-        current += 1;
-        if (current == 3 && i != 0) {
-            dst[i - 1] = ',';
-            i--;
-            current = 0;
-        }
     }
 
-    offset = wholeNumberLength + separatorCount;
+    offset = wholeNumberLength;
 
     // The first 6 digits should be without thousand separators,
     // as they are part of the decimal part of the number. Write those
@@ -188,10 +173,10 @@ size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t numb
  */
 size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount) {
     if (dstLength < 5) return 0;  // Prevent overflow
-    memmove(dst, "CCD ", 4);
-    size_t offset = decimalNumberToDisplay(dst + 4, dstLength, microGtuAmount, 1000000, 6) + 4;
-    dst[offset] = '\0';
-    return offset + 1;
+    size_t offset = decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, 6);
+    memmove(dst + offset, " CCD\0", 5);
+    offset += 4;
+    return offset;
 }
 
 void toPaginatedHex(uint8_t *byteArray, const uint64_t len, char *asHex, const size_t asHexSize) {

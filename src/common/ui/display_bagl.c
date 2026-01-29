@@ -20,7 +20,7 @@ UX_STEP_NOCB(ux_sign_flow_account_sender_view,
 
 UX_STEP_NOCB(ux_sign_flow_fees_view,
              bnnn_paging,
-             {.title = "Fees",
+             {.title = "Max fees",
               .text = (char *) global.withDataBlob.signTransferContext.energy_amount_str});
 
 // UI definitions for comparison of public-key on the device
