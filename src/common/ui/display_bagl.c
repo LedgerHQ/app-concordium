@@ -18,6 +18,11 @@ UX_STEP_NOCB(ux_sign_flow_account_sender_view,
              bnnn_paging,
              {.title = "Sender", .text = (char *) global_account_sender.sender});
 
+UX_STEP_NOCB(ux_sign_flow_fees_view,
+             bnnn_paging,
+             {.title = "Fees",
+              .text = (char *) global.withDataBlob.signTransferContext.energy_amount_str});
+
 // UI definitions for comparison of public-key on the device
 // with the public-key that the caller received.
 UX_STEP_NOCB(ux_sign_compare_public_key_0_step,
@@ -738,6 +743,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_review;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_1_step;
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_2_step;
 
     if (displayMemo) {
