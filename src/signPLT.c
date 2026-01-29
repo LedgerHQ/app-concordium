@@ -29,7 +29,7 @@ bool cbor_read_string_or_byte_string(CborValue* it,
     }
 
     const char* string_ptr;
-    CborError err = _cbor_value_get_string_chunk(it, (const void**)&string_ptr, output_size, NULL);
+    CborError err = _cbor_value_get_string_chunk(it, (const void**) &string_ptr, output_size, NULL);
     if (err) {
         return true;
     }
@@ -61,7 +61,7 @@ void add_char_array_to_buffer(buffer_t* dst, char* src, size_t src_size) {
         PRINTF("The destination buffer is too small\n");
         THROW(ERROR_PLT_BUFFER_ERROR);
     }
-    memcpy((void*)(dst->ptr + dst->offset), src, src_size);
+    memcpy((void*) (dst->ptr + dst->offset), src, src_size);
     dst->offset += src_size;
 }
 
@@ -95,7 +95,7 @@ CborError decode_cbor_recursive(CborValue* it,
                     temp = "{";
                 }
                 PRINTF("%s", temp);
-                add_char_array_to_buffer(out_buf, (char*)temp, strlen(temp));
+                add_char_array_to_buffer(out_buf, (char*) temp, strlen(temp));
 
                 err = cbor_value_enter_container(it, &recursed);
                 if (err) return err;  // parse error
@@ -110,7 +110,7 @@ CborError decode_cbor_recursive(CborValue* it,
                     temp = "},";
                 }
                 PRINTF("%s", temp);
-                add_char_array_to_buffer(out_buf, (char*)temp, strlen(temp));
+                add_char_array_to_buffer(out_buf, (char*) temp, strlen(temp));
                 continue;
             }
             case CborIntegerType: {
@@ -127,7 +127,7 @@ CborError decode_cbor_recursive(CborValue* it,
 
                 if (cbor_value_is_negative_integer(it)) {
                     // Handle negative integers
-                    int64_t signed_val = -(int64_t)(raw_val + 1);
+                    int64_t signed_val = -(int64_t) (raw_val + 1);
                     format_i64(integer_value, sizeof(integer_value), signed_val);
                 } else {
                     // Handle positive integers
@@ -143,7 +143,7 @@ CborError decode_cbor_recursive(CborValue* it,
                 uint8_t byte_string_data[CBOR_STRING_BUFFER_SIZE];
                 size_t byte_string_length;
                 err = cbor_read_string_or_byte_string(it,
-                                                      (char*)byte_string_data,
+                                                      (char*) byte_string_data,
                                                       &byte_string_length,
                                                       sizeof(byte_string_data),
                                                       false);
@@ -156,9 +156,9 @@ CborError decode_cbor_recursive(CborValue* it,
                     PRINTF("format_hex error\n");
                     THROW(ERROR_PLT_CBOR_ERROR);
                 }
-                add_char_array_to_buffer(out_buf, (char*)"0x", 2);
+                add_char_array_to_buffer(out_buf, (char*) "0x", 2);
                 add_char_array_to_buffer(out_buf, string_value, strlen(string_value));
-                add_char_array_to_buffer(out_buf, (char*)",", 1);
+                add_char_array_to_buffer(out_buf, (char*) ",", 1);
                 PRINTF("ByteString(%d): 0x%s\n", byte_string_length, string_value);
                 break;
             }
@@ -167,7 +167,7 @@ CborError decode_cbor_recursive(CborValue* it,
                 uint8_t text_string_data[CBOR_STRING_BUFFER_SIZE];
                 size_t text_string_length;
                 err = cbor_read_string_or_byte_string(it,
-                                                      (char*)text_string_data,
+                                                      (char*) text_string_data,
                                                       &text_string_length,
                                                       sizeof(text_string_data),
                                                       true);
@@ -186,7 +186,7 @@ CborError decode_cbor_recursive(CborValue* it,
                     snprintf(text_display,
                              sizeof(text_display),
                              "\"%.*s\",",
-                             (int)text_string_length,
+                             (int) text_string_length,
                              text_string_data);
                 }
 
@@ -218,13 +218,13 @@ CborError decode_cbor_recursive(CborValue* it,
             case CborNullType:
                 temp = "null,";
                 PRINTF("null");
-                add_char_array_to_buffer(out_buf, (char*)temp, strlen(temp));
+                add_char_array_to_buffer(out_buf, (char*) temp, strlen(temp));
                 break;
 
             case CborUndefinedType:
                 temp = "undefined,";
                 PRINTF("undefined");
-                add_char_array_to_buffer(out_buf, (char*)temp, strlen(temp));
+                add_char_array_to_buffer(out_buf, (char*) temp, strlen(temp));
                 break;
 
             case CborBooleanType: {
@@ -232,7 +232,7 @@ CborError decode_cbor_recursive(CborValue* it,
                 cbor_value_get_boolean(it, &val);  // can't fail
                 temp = val ? "true," : "false,";
                 PRINTF(temp);
-                add_char_array_to_buffer(out_buf, (char*)temp, strlen(temp));
+                add_char_array_to_buffer(out_buf, (char*) temp, strlen(temp));
                 break;
             }
 
@@ -243,8 +243,8 @@ CborError decode_cbor_recursive(CborValue* it,
                 snprintf(float_display,
                          sizeof(float_display),
                          "Float:0x%08x,",
-                         (uint32_t)float_value);
-                PRINTF("Float: 0x%08x\n", (uint32_t)float_value);
+                         (uint32_t) float_value);
+                PRINTF("Float: 0x%08x\n", (uint32_t) float_value);
                 add_char_array_to_buffer(out_buf, float_display, strlen(float_display));
                 break;
             }
@@ -253,8 +253,8 @@ CborError decode_cbor_recursive(CborValue* it,
                 double val;
                 char double_display[CBOR_FLOAT_DISPLAY_SIZE];
                 cbor_value_get_double(it, &val);
-                snprintf(double_display, sizeof(double_display), "Double:0x%08x,", (uint32_t)val);
-                PRINTF("Double: 0x%08x\n", (uint32_t)val);
+                snprintf(double_display, sizeof(double_display), "Double:0x%08x,", (uint32_t) val);
+                PRINTF("Double: 0x%08x\n", (uint32_t) val);
                 add_char_array_to_buffer(out_buf, double_display, strlen(double_display));
                 break;
             }
@@ -292,7 +292,7 @@ bool parse_plt_cbor(uint8_t* cbor, size_t cbor_length) {
     }
 
     char temp[MAX_PLT_DIPLAY_STR] = {0};
-    buffer_t out_buf = {.ptr = (const uint8_t*)temp, .size = MAX_PLT_DIPLAY_STR, .offset = 0};
+    buffer_t out_buf = {.ptr = (const uint8_t*) temp, .size = MAX_PLT_DIPLAY_STR, .offset = 0};
     tag_list_t tag_list;  // initiate an empty tag_list_t
     err = decode_cbor_recursive(&it, 0, &out_buf, MAX_PLT_DIPLAY_STR);
     if (err) {
@@ -665,7 +665,7 @@ void handle_sign_plt_transaction(uint8_t* cdata, uint8_t lc, uint8_t chunk, bool
         remaining_data_length -= offset;
 
         // Hash the rest of the chunk
-        updateHash((cx_hash_t*)&tx_state->hash, cdata, remaining_data_length);
+        updateHash((cx_hash_t*) &tx_state->hash, cdata, remaining_data_length);
 
         // Parse token Id info
         ctx->tokenIdLength = cdata[0];

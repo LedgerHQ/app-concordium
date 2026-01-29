@@ -17,12 +17,12 @@ void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
     if (dataLength < 1) {
         THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
     }
-    updateHash((cx_hash_t *)&tx_state->hash, buffer, 1);
+    updateHash((cx_hash_t *) &tx_state->hash, buffer, 1);
     dataLength -= 1;
     buffer += 1;
 
     // Hash schemeId
-    updateHash((cx_hash_t *)&tx_state->hash, buffer, 1);
+    updateHash((cx_hash_t *) &tx_state->hash, buffer, 1);
     if (dataLength < 1) {
         THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
     }
@@ -34,7 +34,7 @@ void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
         THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
     }
     memmove(verificationKey, buffer, KEY_LENGTH);
-    updateHash((cx_hash_t *)&tx_state->hash, verificationKey, KEY_LENGTH);
+    updateHash((cx_hash_t *) &tx_state->hash, verificationKey, KEY_LENGTH);
 
     // Convert to a human-readable format.
     toPaginatedHex(verificationKey,
@@ -100,7 +100,7 @@ void handleSignUpdateCredential(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->credentialDeploymentCount = dataBuffer[0];
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         if (ctx->credentialDeploymentCount == 0) {
             ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_ID_COUNT;
         } else {
@@ -116,7 +116,7 @@ void handleSignUpdateCredential(uint8_t *dataBuffer,
         if (remainingDataLength < 1) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL;
         sendSuccessNoIdle();
     } else if (p2 == P2_CREDENTIAL_CREDENTIAL &&
@@ -129,7 +129,7 @@ void handleSignUpdateCredential(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->credentialIdCount = dataBuffer[0];
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
 
         if (ctx->credentialIdCount == 0) {
             ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_THRESHOLD;
@@ -141,7 +141,7 @@ void handleSignUpdateCredential(uint8_t *dataBuffer,
         if (remainingDataLength < 48) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 48);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 48);
         toPaginatedHex(dataBuffer, 48, ctx->credentialId, sizeof(ctx->credentialId));
 
         ctx->credentialIdCount -= 1;
@@ -157,7 +157,7 @@ void handleSignUpdateCredential(uint8_t *dataBuffer,
         }
         uint8_t threshold = dataBuffer[0];
         bin2dec(ctx->threshold, sizeof(ctx->threshold), threshold);
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
 
         uiSignUpdateCredentialThresholdDisplay(flags);
 
@@ -194,7 +194,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->numberOfVerificationKeys = dataBuffer[0];
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEY;
         sendSuccessNoIdle();
     } else if (p1 == P1_VERIFICATION_KEY) {
@@ -233,7 +233,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         bin2dec(ctx->signatureThreshold, sizeof(ctx->signatureThreshold), dataBuffer[0]);
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         dataBuffer += 1;
         remainingDataLength -= 1;
         // Parse the RegIdCred, but do not display it, as the user cannot feasibly verify it.
@@ -244,7 +244,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->regIdCred[48 * 2] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 48);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 48);
         dataBuffer += 48;
         remainingDataLength -= 48;
 
@@ -253,10 +253,10 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint64_t identityProviderIndex = U4BE(dataBuffer, 0);
-        numberToText((uint8_t *)ctx->identityProviderIndex,
+        numberToText((uint8_t *) ctx->identityProviderIndex,
                      sizeof(ctx->identityProviderIndex),
                      identityProviderIndex);
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 4);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 4);
         dataBuffer += 4;
         remainingDataLength -= 4;
 
@@ -267,12 +267,12 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         int offset = numberToText(ctx->anonymityRevocationThreshold,
                                   sizeof(ctx->anonymityRevocationThreshold),
                                   dataBuffer[0]);
-        if ((size_t)(offset + 8) > sizeof(ctx->anonymityRevocationThreshold)) {
+        if ((size_t) (offset + 8) > sizeof(ctx->anonymityRevocationThreshold)) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         memmove(ctx->anonymityRevocationThreshold + offset, " out of ", 8);
         offset += 8;
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         dataBuffer += 1;
         remainingDataLength -= 1;
         // Parse the length of the following list of anonymity revokers.
@@ -280,7 +280,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->anonymityRevocationListLength = U2BE(dataBuffer, 0);
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 2);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 2);
         // Add the total amount of revokers to the display of threshold to get "x out of y"
         bin2dec(ctx->anonymityRevocationThreshold + offset,
                 sizeof(ctx->anonymityRevocationThreshold) - offset,
@@ -303,7 +303,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->arIdentity[8] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 4);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 4);
         dataBuffer += 4;
         remainingDataLength -= 4;
 
@@ -320,7 +320,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->encIdCredPubShare[96 * 2] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, encIdCredPubShare, 96);
+        updateHash((cx_hash_t *) &tx_state->hash, encIdCredPubShare, 96);
 
         if (ctx->anonymityRevocationListLength == 1) {
             ctx->state = TX_CREDENTIAL_DEPLOYMENT_CREDENTIAL_DATES;
@@ -335,7 +335,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         if (remainingDataLength < 6) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 6);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 6);
         dataBuffer += 6;
         remainingDataLength -= 6;
 
@@ -344,7 +344,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->attributeListLength = U2BE(dataBuffer, 0);
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 2);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 2);
 
         if (ctx->attributeListLength == 0) {
             ctx->state = TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS;
@@ -366,7 +366,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         memmove(attributeTag, dataBuffer, 1);
         dataBuffer += 1;
         remainingDataLength -= 1;
-        updateHash((cx_hash_t *)&tx_state->hash, attributeTag, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, attributeTag, 1);
 
         // Parse attribute length, so we know how much to parse in next packet.
         uint8_t attributeValueLength[1];
@@ -375,7 +375,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         }
         memmove(attributeValueLength, dataBuffer, 1);
         ctx->attributeValueLength = attributeValueLength[0];
-        updateHash((cx_hash_t *)&tx_state->hash, attributeValueLength, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, attributeValueLength, 1);
 
         ctx->state = TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_VALUE;
         // Ask computer for the attribute value.
@@ -385,7 +385,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         if (remainingDataLength < ctx->attributeValueLength) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, ctx->attributeValueLength);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->attributeValueLength);
         ctx->attributeListLength -= 1;
 
         // We have processed all attributes
@@ -404,7 +404,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
         }
         ctx->proofLength = U4BE(dataBuffer, 0);
         if (p2 == P2_CREDENTIAL_CREDENTIAL) {
-            updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 4);
+            updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 4);
         }
         ctx->state = TX_CREDENTIAL_DEPLOYMENT_PROOFS;
         sendSuccessNoIdle();
@@ -413,14 +413,14 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             if (remainingDataLength < MAX_CDATA_LENGTH) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }
-            updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, MAX_CDATA_LENGTH);
+            updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, MAX_CDATA_LENGTH);
             ctx->proofLength -= MAX_CDATA_LENGTH;
             sendSuccessNoIdle();
         } else {
             if (remainingDataLength < ctx->proofLength) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }
-            updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, ctx->proofLength);
+            updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->proofLength);
 
             // If an update credential transaction, then update state to next step.
             if (p2 == P2_CREDENTIAL_CREDENTIAL &&
@@ -445,14 +445,14 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint8_t newOrExisting = dataBuffer[0];
-        updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         dataBuffer += 1;
         remainingDataLength -= 1;
         if (newOrExisting == 0) {
             if (remainingDataLength < 8) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }
-            updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 8);
+            updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 8);
             if (ctx->showIntro) {
                 uiSignCredentialDeploymentNewIntroDisplay();
             } else {
@@ -475,7 +475,7 @@ void handleSignCredentialDeployment(uint8_t *dataBuffer,
                 THROW(ERROR_INVALID_TRANSACTION);
             }
             ctx->accountAddress[55] = '\0';
-            updateHash((cx_hash_t *)&tx_state->hash, dataBuffer, 32);
+            updateHash((cx_hash_t *) &tx_state->hash, dataBuffer, 32);
 
             if (ctx->showIntro) {
                 uiSignCredentialDeploymentExistingIntroDisplay();

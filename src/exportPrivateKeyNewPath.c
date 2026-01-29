@@ -170,50 +170,71 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     ////// Set up the display //////
     offset = 0;
     /// Add the identity provider to the display
-    memmove(ctx->display, "IDP#", 4);
+    memmove(ctx->display_credid, "IDP#", 4);
     offset += 4;
-    offset += bin2dec(ctx->display + offset, sizeof(ctx->display) - offset, identityProvider);
+    offset += bin2dec(ctx->display_credid + offset,
+                      sizeof(ctx->display_credid) - offset,
+                      identityProvider);
     /// Add the identity to the display
     // Remove the null terminator from the display to add the identity
     offset -= 1;
-    memmove(ctx->display + offset, " ID#", 4);
+    memmove(ctx->display_credid + offset, " ID#", 4);
     offset += 4;
-    offset += bin2dec(ctx->display + offset, sizeof(ctx->display) - offset, identity);
+    offset += bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, identity);
+
+    memmove(ctx->display_review_operation,
+            "Review operation",
+            EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN);
+
+    memmove(ctx->display_credid_title, "Credentials ID", EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN);
+
+    memmove(ctx->display_sign, "Sign operation", EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN);
 
     if (p1 == P1_IDENTITY_CREDENTIAL_CREATION) {
-        /// Set the display header
-        memmove(ctx->displayHeader, "ID Credential Creation", 23);
+        memmove(ctx->display_review_verb,
+                "to create credentials",
+                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+        memmove(ctx->display_sign_verb, "to create credentials?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_ACCOUNT_CREATION) {
         /// Set the display header
-        memmove(ctx->displayHeader, "Account Creation", 17);
+        memmove(ctx->display_review_verb, "to create account", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+        memmove(ctx->display_sign_verb, "to create account?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
         /// Add the account to the display
-        // Remove the null terminator from the display to add the account
         offset -= 1;
-        memmove(ctx->display + offset, " ACCOUNT#", 9);
+        memmove(ctx->display_credid + offset, " ACCOUNT#", 9);
         offset += 9;
-        bin2dec(ctx->display + offset, sizeof(ctx->display) - offset, account);
+        bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, account);
     } else if (p1 == P1_ID_RECOVERY) {
-        /// Set the display header
-        memmove(ctx->displayHeader, "ID Recovery", 12);
+        memmove(ctx->display_review_verb,
+                "to recover credentials",
+                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+        memmove(ctx->display_sign_verb,
+                "to recover credentials?",
+                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_ACCOUNT_CREDENTIAL_DISCOVERY) {
         /// Set the display header
-        memmove(ctx->displayHeader, "Account Cred Discovery", 23);
+        memmove(ctx->display_review_verb,
+                "to discover credentials",
+                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+        memmove(ctx->display_sign_verb,
+                "to discover credentials?",
+                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_CREATION_OF_ZK_PROOF) {
         /// Set the display header
-        memmove(ctx->displayHeader, "ZK Proof Creation", 18);
+        memmove(ctx->display_review_verb, "to create ZK proof", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+        memmove(ctx->display_sign_verb, "to create ZK proof?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
         /// Add the account to the display
-        // Remove the null terminator from the display to add the account
         offset -= 1;
-        memmove(ctx->display + offset, " ACCOUNT#", 9);
+        memmove(ctx->display_credid + offset, " ACCOUNT#", 9);
         offset += 9;
-        bin2dec(ctx->display + offset, sizeof(ctx->display) - offset, account);
+        bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, account);
     }
 
     uiExportPrivateKeysNewPath(flags);
 }
 
 void sendPrivateKeysNewPath(void) {
-    if ((size_t)ctx->privateKeysLength > sizeof(G_io_apdu_buffer)) {
+    if ((size_t) ctx->privateKeysLength > sizeof(G_io_apdu_buffer)) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     memmove(G_io_apdu_buffer, ctx->outputPrivateKeys, ctx->privateKeysLength);

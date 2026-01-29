@@ -39,7 +39,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
         if (remainingDataLength < 192) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 192);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 192);
         cdata += 192;
         remainingDataLength -= 192;
 
@@ -49,7 +49,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
         }
         uint64_t amountToPublic = U8BE(cdata, 0);
         amountToGtuDisplay(ctx->amount, sizeof(ctx->amount), amountToPublic);
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         cdata += 8;
         remainingDataLength -= 8;
 
@@ -62,7 +62,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->recipientAddress[55] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 32);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 32);
         cdata += 32;
         remainingDataLength -= 32;
 
@@ -70,7 +70,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
         if (remainingDataLength < 8) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         cdata += 8;
         remainingDataLength -= 8;
 
@@ -83,7 +83,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
         ctx->state = TX_TRANSFER_TO_PUBLIC_PROOF;
         sendSuccessNoIdle();
     } else if (p1 == P1_PROOF && ctx->state == TX_TRANSFER_TO_PUBLIC_PROOF) {
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, dataLength);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
         if (ctx->proofSize == dataLength) {
             // We have received all proof bytes, continue to signing flow.

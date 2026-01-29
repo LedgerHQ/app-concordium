@@ -113,6 +113,7 @@ class InsType(IntEnum):
     REGISTER_DATA = 0x35
     EXPORT_PRIVATE_KEY_NEW = 0x37
     SIGN_PLT_TRANSACTION = 0x38
+    GET_APP_VERSION = 0x40
 
 
 class Errors(IntEnum):
@@ -169,6 +170,11 @@ class BoilerplateCommandSender:
     def get_app_name(self) -> RAPDU:
         return self.backend.exchange(
             cla=CLA, ins=InsType.GET_APP_NAME, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
+        )
+
+    def get_app_version(self) -> RAPDU:
+        return self.backend.exchange(
+            cla=CLA, ins=InsType.GET_APP_VERSION, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
         )
 
     def get_public_key(self, path: str, signPublicKey: bool = False) -> RAPDU:

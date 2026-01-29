@@ -50,7 +50,7 @@ void handleSignRegisterData(uint8_t *cdata,
             THROW(ERROR_INVALID_PARAM);
         }
         data_ctx->cborLength = ctx->dataLength;
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 2);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 2);
 
         ctx->state = TX_REGISTER_DATA_PAYLOAD_START;
 
@@ -61,7 +61,7 @@ void handleSignRegisterData(uint8_t *cdata,
             THROW(ERROR_INVALID_TRANSACTION);
         }
         ctx->dataLength -= dataLength;
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, dataLength);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
         switch (ctx->state) {
             case TX_REGISTER_DATA_PAYLOAD_START:

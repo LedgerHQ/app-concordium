@@ -73,11 +73,11 @@ static parsed_number_t parse_number(const char* str, const char* end) {
     // Store the result based on sign with proper bounds checking
     if (is_negative) {
         // Check if magnitude fits in int64_t range
-        if (magnitude > (uint64_t)INT64_MAX) {
+        if (magnitude > (uint64_t) INT64_MAX) {
             return result;  // Magnitude too large for int64_t
         }
         result.is_signed = true;
-        result.value.signed_val = -(int64_t)magnitude;
+        result.value.signed_val = -(int64_t) magnitude;
     } else {
         result.is_signed = false;
         result.value.unsigned_val = magnitude;
@@ -146,9 +146,9 @@ bool extract_tags_ledger(const char* input, tag_list_t* tag_list) {
         // Determine content type and find matching delimiter
         const char* content_end = NULL;
         if (*content_start == '[') {
-            content_end = find_matching_delimiter((char*)content_start, '[', ']');
+            content_end = find_matching_delimiter((char*) content_start, '[', ']');
         } else if (*content_start == '{') {
-            content_end = find_matching_delimiter((char*)content_start, '{', '}');
+            content_end = find_matching_delimiter((char*) content_start, '{', '}');
         } else {
             content_end = find_char(content_start, ',');
         }
@@ -163,13 +163,13 @@ bool extract_tags_ledger(const char* input, tag_list_t* tag_list) {
 
         // Check if content fits in our buffer
         if (content_length >= MAX_TAG_CONTENT_SIZE) {
-            PRINTF("Tag content too large: %d bytes\n", (uint32_t)content_length);
+            PRINTF("Tag content too large: %d bytes\n", (uint32_t) content_length);
             return false;
         }
 
         // Store tag information
         tag_list->tags[tag_list->count].tag_number =
-            (uint64_t)tag_number;  // Cast to uint64_t since tags are positive
+            (uint64_t) tag_number;  // Cast to uint64_t since tags are positive
         tag_list->tags[tag_list->count].content_length = content_length;
         tag_list->tags[tag_list->count].is_valid = true;
 
@@ -203,14 +203,14 @@ tag_info_t* find_tag_by_number(tag_list_t* tag_list, uint64_t tag_number) {
 void print_tags_ledger(const tag_list_t* tag_list) {
     if (!tag_list) return;
     char tag_number_str[CBOR_TAG_NUMBER_SIZE];
-    PRINTF("Extracted %d tags:\n", (int)tag_list->count);
+    PRINTF("Extracted %d tags:\n", (int) tag_list->count);
     for (size_t i = 0; i < tag_list->count; i++) {
         format_i64(tag_number_str, sizeof(tag_number_str), tag_list->tags[i].tag_number);
         if (tag_list->tags[i].is_valid) {
-            PRINTF("Tag %d:\n", (int)(i + 1));
+            PRINTF("Tag %d:\n", (int) (i + 1));
             PRINTF("  Number: %s\n", tag_number_str);
             PRINTF("  Content: %s\n", tag_list->tags[i].content);
-            PRINTF("  Length: %d\n", (int)tag_list->tags[i].content_length);
+            PRINTF("  Length: %d\n", (int) tag_list->tags[i].content_length);
         }
     }
 }
@@ -286,7 +286,7 @@ bool parse_tag_40307(tag_info_t* tag) {
     size_t hex_length = hex_end - hex_start;
 
     if (hex_length != 64) {  // 32 bytes = 64 hex characters
-        PRINTF("Invalid address length: expected 64 hex chars, got %d\n", (int)hex_length);
+        PRINTF("Invalid address length: expected 64 hex chars, got %d\n", (int) hex_length);
         return false;
     }
 
@@ -294,7 +294,7 @@ bool parse_tag_40307(tag_info_t* tag) {
     for (size_t i = 0; i < hex_length; i++) {
         char c = hex_start[i];
         if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
-            PRINTF("Invalid hex character at position %d: %c\n", (int)i, c);
+            PRINTF("Invalid hex character at position %d: %c\n", (int) i, c);
             return false;
         }
     }
@@ -312,7 +312,7 @@ bool parse_tag_40307(tag_info_t* tag) {
 
     if (base58check_encode(address_bytes,
                            sizeof(address_bytes),
-                           (unsigned char*)base58_address,
+                           (unsigned char*) base58_address,
                            &base58_length) == -1) {
         PRINTF("Failed to encode address as base58\n");
         return false;
@@ -369,7 +369,7 @@ bool parse_tag_4(tag_info_t* tag) {
     }
     if (!num.is_signed && num.value.unsigned_val != 0) {
         PRINTF("Warning: positive exponent %llu found\n",
-               (unsigned long long)num.value.unsigned_val);
+               (unsigned long long) num.value.unsigned_val);
         return false;
     }
     int64_t exponent = num.value.signed_val;
@@ -397,14 +397,14 @@ bool parse_tag_4(tag_info_t* tag) {
         return false;
     }
     if (num.is_signed) {
-        PRINTF("Warning: negative mantissa %lld found\n", (long long)num.value.signed_val);
+        PRINTF("Warning: negative mantissa %lld found\n", (long long) num.value.signed_val);
         return false;
     }
     uint64_t mantissa = num.value.unsigned_val;
 
     PRINTF("Parsed exponent: %lld, mantissa: %llu\n",
-           (long long)exponent,
-           (unsigned long long)mantissa);
+           (long long) exponent,
+           (unsigned long long) mantissa);
 
     // Check for extreme values that would create unreadable output
     int64_t abs_exponent = -exponent;
@@ -431,7 +431,7 @@ bool parse_tag_4(tag_info_t* tag) {
     } else if (abs_exponent == 0) {
         // No decimal places needed
         snprintf(tag->parsedContent, MAX_TAG_PARSED_CONTENT_SIZE, "%s", mantissa_str);
-    } else if (mantissa_len > (size_t)abs_exponent) {
+    } else if (mantissa_len > (size_t) abs_exponent) {
         // Place decimal point within the string
         size_t int_len = mantissa_len - abs_exponent;
         if (int_len + 1 + abs_exponent + 1 > MAX_TAG_PARSED_CONTENT_SIZE) {
@@ -578,26 +578,26 @@ bool replace_tag_with_parsed_content(buffer_t* buffer, const tag_info_t* tag) {
     snprintf(tag_pattern, sizeof(tag_pattern), ",Tag(%s):", tag_number_str);
 
     PRINTF("Looking for pattern: '%s'\n", tag_pattern);
-    PRINTF("Buffer content: %s\n", (char*)buffer->ptr);
+    PRINTF("Buffer content: %s\n", (char*) buffer->ptr);
 
     // Find the tag pattern in the buffer
-    const char* tag_start = find_substring((const char*)buffer->ptr, tag_pattern);
+    const char* tag_start = find_substring((const char*) buffer->ptr, tag_pattern);
     if (!tag_start) {
         PRINTF("Could not find tag pattern in buffer\n");
         return false;
     }
 
-    PRINTF("Found tag at position: %d\n", (int)(tag_start - (const char*)buffer->ptr));
+    PRINTF("Found tag at position: %d\n", (int) (tag_start - (const char*) buffer->ptr));
 
     // Calculate the total length to replace: ",Tag(N):" + content_length
     size_t pattern_length = strlen(tag_pattern);
     size_t total_replace_length = pattern_length + tag->content_length;
 
     // Get the position in the buffer where replacement starts
-    size_t replace_start_pos = tag_start - (const char*)buffer->ptr;
+    size_t replace_start_pos = tag_start - (const char*) buffer->ptr;
 
     // Get lengths
-    size_t buffer_length = strlen((const char*)buffer->ptr);
+    size_t buffer_length = strlen((const char*) buffer->ptr);
     size_t parsed_content_length = strlen(tag->parsedContent);
 
     // Add 1 for the colon prefix
@@ -609,18 +609,18 @@ bool replace_tag_with_parsed_content(buffer_t* buffer, const tag_info_t* tag) {
     // CHECK FOR BUFFER OVERFLOW
     if (new_buffer_length >= buffer->size) {
         PRINTF("Buffer overflow: new length %d >= buffer capacity %d\n",
-               (int)new_buffer_length,
-               (int)buffer->size);
+               (int) new_buffer_length,
+               (int) buffer->size);
         return false;
     }
 
     PRINTF("Replace start pos: %d, total replace length: %d, replacement content length: %d\n",
-           (int)replace_start_pos,
-           (int)total_replace_length,
-           (int)replacement_content_length);
+           (int) replace_start_pos,
+           (int) total_replace_length,
+           (int) replacement_content_length);
 
     // Cast to char* for modification
-    char* mutable_buffer = (char*)buffer->ptr;
+    char* mutable_buffer = (char*) buffer->ptr;
 
     // If the new content is longer than what we're replacing, we need to move content
     if (replacement_content_length > total_replace_length) {
@@ -667,7 +667,7 @@ bool replace_tag_with_parsed_content(buffer_t* buffer, const tag_info_t* tag) {
     }
 
     PRINTF("Successfully replaced tag content. New buffer length: %d\n",
-           (int)strlen((const char*)buffer->ptr));
+           (int) strlen((const char*) buffer->ptr));
 
     // Update buffer size to reflect new content length
     buffer->size = new_buffer_length;
@@ -682,7 +682,7 @@ bool remove_useless_commas(buffer_t* buffer) {
         return false;
     }
 
-    char* mutable_buffer = (char*)buffer->ptr;
+    char* mutable_buffer = (char*) buffer->ptr;
     size_t buffer_length = strlen(mutable_buffer);
     size_t write_pos = 0;
 
@@ -705,12 +705,12 @@ bool remove_useless_commas(buffer_t* buffer) {
             // Check if next character is a closing delimiter OR if we've reached the end
             if (next_pos >= buffer_length) {
                 // Trailing comma at the end of buffer
-                PRINTF("Removing trailing comma at position %d (end of buffer)\n", (int)read_pos);
+                PRINTF("Removing trailing comma at position %d (end of buffer)\n", (int) read_pos);
                 continue;
             } else if (mutable_buffer[next_pos] == '}' || mutable_buffer[next_pos] == ']') {
                 // Comma before closing delimiter
                 PRINTF("Removing comma at position %d before '%c'\n",
-                       (int)read_pos,
+                       (int) read_pos,
                        mutable_buffer[next_pos]);
                 continue;
             } else if (mutable_buffer[next_pos] == '{') {
@@ -728,7 +728,7 @@ bool remove_useless_commas(buffer_t* buffer) {
                     if (quote_start > 0 && mutable_buffer[quote_start] == '"') {
                         is_map_key = true;
                         PRINTF("Converting comma to colon at position %d (JSON map key)\n",
-                               (int)read_pos);
+                               (int) read_pos);
                     }
                 }
 
@@ -755,7 +755,7 @@ bool remove_useless_commas(buffer_t* buffer) {
     buffer->size = write_pos;
 
     PRINTF("After cleanup: %s\n", mutable_buffer);
-    PRINTF("New buffer length: %d\n", (int)write_pos);
+    PRINTF("New buffer length: %d\n", (int) write_pos);
 
     return true;
 }
@@ -765,7 +765,7 @@ bool parse_tags_in_buffer(buffer_t* buffer, tag_list_t* tag_list) {
         return false;
     }
 
-    if (!extract_tags_ledger((const char*)buffer->ptr, tag_list)) {
+    if (!extract_tags_ledger((const char*) buffer->ptr, tag_list)) {
         PRINTF("error while extracting tags\n");
         return false;
     };

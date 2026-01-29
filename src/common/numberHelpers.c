@@ -61,7 +61,7 @@ size_t decimalDigitsDisplay(uint8_t *dst,
     size_t length = lengthOfNumber(decimalPart);
     int zeroFillLength = decimalDigitsLength - length;
 
-    if (zeroFillLength < 0 || dstLength < (size_t)zeroFillLength) {
+    if (zeroFillLength < 0 || dstLength < (size_t) zeroFillLength) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
@@ -211,7 +211,7 @@ void toPaginatedHex(uint8_t *byteArray, const uint64_t len, char *asHex, const s
         // Insert a space to force the Ledger to paginate the string every
         // 16 characters.
         if ((2 * (i + 1)) % 16 == 0 && i != len - 1) {
-            asHex[2 * i + (offset + 2)] = ' ';
+            asHex[2 * i + (offset + 2)] = '\n';
             offset += 1;
         }
     }

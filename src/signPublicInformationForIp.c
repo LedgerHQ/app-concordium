@@ -33,7 +33,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->idCredPub[48 * 2] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 48);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 48);
         cdata += 48;
         remainingDataLength -= 48;
 
@@ -45,7 +45,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->credId[48 * 2] = '\0';
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 48);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 48);
         cdata += 48;
         remainingDataLength -= 48;
 
@@ -54,7 +54,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         ctx->publicKeysLength = cdata[0];
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
 
         ctx->showIntro = true;
         ctx->state = TX_PUBLIC_INFO_FOR_IP_VERIFICATION_KEY;
@@ -72,7 +72,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         }
         ctx->keyType[2] = '\0';
         // Hash key type
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         cdata += 1;
         remainingDataLength -= 1;
         // Hash key index
@@ -80,7 +80,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
 
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         cdata += 1;
         remainingDataLength -= 1;
         uint8_t publicKey[32];
@@ -88,7 +88,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         memmove(publicKey, cdata, 32);
-        updateHash((cx_hash_t *)&tx_state->hash, publicKey, 32);
+        updateHash((cx_hash_t *) &tx_state->hash, publicKey, 32);
         toPaginatedHex(publicKey, 32, ctx->publicKey, sizeof(ctx->publicKey));
 
         ctx->publicKeysLength -= 1;
@@ -111,7 +111,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         if (remainingDataLength < 1) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         bin2dec(ctx->threshold, sizeof(ctx->threshold), cdata[0]);
 
         if (ctx->showIntro) {

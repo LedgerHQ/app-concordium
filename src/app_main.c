@@ -56,7 +56,7 @@ void app_main() {
         storage.dummy1_allowed = 0x00;
         storage.dummy2_allowed = 0x00;
         storage.initialized = 0x01;
-        nvm_write((void *)&N_storage, &storage, sizeof(internal_storage_t));
+        nvm_write((void *) &N_storage, &storage, sizeof(internal_storage_t));
     }
 
     for (;;) {
@@ -87,6 +87,10 @@ void app_main() {
             explicit_bzero(&global, sizeof(global));
             global_tx_state.currentInstruction = cmd.ins;
             isInitialCall = true;
+        }
+
+        if (cmd.cla != CLA) {
+            io_send_sw(ERROR_INVALID_CLA);
         }
 
         // Dispatch structured APDU command to handler

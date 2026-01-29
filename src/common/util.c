@@ -48,7 +48,7 @@ int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, 
         PRINTF("Issue with length\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
-    updateHash((cx_hash_t *)&tx_state->hash, cdata, headerLength);
+    updateHash((cx_hash_t *) &tx_state->hash, cdata, headerLength);
     cdata += headerLength;
 
     uint8_t type = cdata[0];
@@ -56,7 +56,7 @@ int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, 
         PRINTF("Received kind is different than the expected one\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
-    updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+    updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
 
     return headerLength + 1;
 }
@@ -138,7 +138,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
         THROW(ERROR_INVALID_TRANSACTION);
     }
     memmove(toAddress, cdata, 32);
-    updateHash((cx_hash_t *)&tx_state->hash, toAddress, 32);
+    updateHash((cx_hash_t *) &tx_state->hash, toAddress, 32);
 
     // The recipient address is in a base58 format, so we need to encode it to be
     // able to display in a human-readable way.
@@ -234,7 +234,7 @@ void getPrivateKey(uint32_t *keyPathInput,
                                                              keyPathLength,
                                                              privateKeyData,
                                                              NULL,
-                                                             (unsigned char *)"ed25519 seed",
+                                                             (unsigned char *) "ed25519 seed",
                                                              12));
             ensureNoError(cx_ecfp_init_private_key_no_throw(CX_CURVE_Ed25519,
                                                             privateKeyData,
@@ -367,7 +367,7 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
         cx_hkdf_expand(CX_SHA256,
                        prk,
                        sizeof(prk),
-                       (unsigned char *)l_bytes,
+                       (unsigned char *) l_bytes,
                        sizeof(l_bytes),
                        sk,
                        sizeof(sk));
@@ -400,7 +400,7 @@ void getBlsPrivateKey(uint32_t *keyPathInput,
 size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst) {
     uint64_t numerator = U8BE(cdata, 0);
     uint64_t denominator = U8BE(cdata, 8);
-    updateHash((cx_hash_t *)&tx_state->hash, cdata, 16);
+    updateHash((cx_hash_t *) &tx_state->hash, cdata, 16);
     int numLength = numberToText(dst, sizeOfDst, numerator);
     memmove(dst + numLength, " / ", 3);
     numberToText(dst + numLength + 3, sizeOfDst - (numLength + 3), denominator);
@@ -410,7 +410,7 @@ size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst) {
 bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, size_t output_size) {
     // Hex string must have even length (each byte = 2 hex chars)
     if (hex_len % 2 != 0) {
-        PRINTF("Invalid hex string length: %d (must be even)\n", (int)hex_len);
+        PRINTF("Invalid hex string length: %d (must be even)\n", (int) hex_len);
         return false;
     }
 
@@ -420,8 +420,8 @@ bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, s
     // Check if we have enough space in output buffer
     if (byte_count > output_size) {
         PRINTF("Output buffer too small: need %d bytes, have %d\n",
-               (int)byte_count,
-               (int)output_size);
+               (int) byte_count,
+               (int) output_size);
         return false;
     }
 
@@ -433,7 +433,7 @@ bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, s
 
         // Validate hex characters
         if (!is_hex_digit(high) || !is_hex_digit(low)) {
-            PRINTF("Invalid hex character at position %d: '%c%c'\n", (int)i, high, low);
+            PRINTF("Invalid hex character at position %d: '%c%c'\n", (int) i, high, low);
             return false;
         }
 
@@ -464,7 +464,7 @@ bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, s
 bool hex_string_to_ascii(const char *hex_str, size_t hex_len, char *output, size_t output_size) {
     // Hex string must have even length (each byte = 2 hex chars)
     if (hex_len % 2 != 0) {
-        PRINTF("Invalid hex string length: %d (must be even)\n", (int)hex_len);
+        PRINTF("Invalid hex string length: %d (must be even)\n", (int) hex_len);
         return false;
     }
 
@@ -474,8 +474,8 @@ bool hex_string_to_ascii(const char *hex_str, size_t hex_len, char *output, size
     // Check if we have enough space in output buffer
     if (byte_count > output_size) {
         PRINTF("Output buffer too small: need %d bytes, have %d\n",
-               (int)byte_count,
-               (int)output_size);
+               (int) byte_count,
+               (int) output_size);
         return false;
     }
     uint8_t bytes[100];
@@ -486,7 +486,7 @@ bool hex_string_to_ascii(const char *hex_str, size_t hex_len, char *output, size
 
     // Actually convert to text (not nibbles!)
     for (size_t i = 0; i < byte_count; i++) {
-        output[i] = (char)bytes[i];
+        output[i] = (char) bytes[i];
     }
     output[byte_count] = '\0';  // Null terminate
 

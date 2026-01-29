@@ -1,7 +1,8 @@
 from hashlib import sha256
-
-# from sha3 import keccak_256  # type: ignore
+from pathlib import Path
+from Crypto.Hash import keccak  # type: ignore
 from typing import List
+import re
 
 from ecdsa.curves import SECP256k1  # type: ignore
 from ecdsa.keys import VerifyingKey  # type: ignore
@@ -129,6 +130,39 @@ def navigate_until_text_and_compare(
         screen_change_before_first_instruction,
         screen_change_after_last_instruction,
     )
+
+
+def _read_makefile() -> List[str]:
+    """Read lines from the parent Makefile """
+
+    makefile = Path(__file__).resolve().parents[1] / "Makefile"
+    with open(makefile, "r", encoding="utf-8") as f_p:
+        lines = f_p.readlines()
+    return lines
+
+
+def verify_version(version: str) -> None:
+    """Verify the app version, based on defines in Makefile
+
+    Args:
+        Version (str): Version to be checked
+    """
+
+    vers_dict = {}
+    vers_str = ""
+    lines = _read_makefile()
+    version_re = re.compile(r"^APPVERSION_(?P<part>\w)\s?=\s?(?P<val>\d*)", re.I)
+    for line in lines:
+        info = version_re.match(line)
+        if info:
+            dinfo = info.groupdict()
+            vers_dict[dinfo["part"]] = int(dinfo["val"])
+    try:
+        expected_hex = f"[0x9000] {vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
+    except KeyError:
+        pass
+
+    assert str(version).strip() == expected_hex.strip()
 
 
 # The following functions might be useful someday, they are not tested, so some of them might not behave as expected

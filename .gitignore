@@ -25,6 +25,7 @@ __pycache__/
 *.egg-info/
 .eggs/
 .python-version
+.venv/
 
 # Doxygen
 doc/html
@@ -38,3 +39,6 @@ ledger/
 
 # Helpers
 diff
+
+# Vscode
+.vscode/

@@ -16,7 +16,7 @@ static const uint8_t bls12_381_r[32] = {
  * Converts bytes into uint64_t (big endian).
  */
 #define U8BE(buf, off) \
-    (((uint64_t)(U4BE(buf, off)) << 32) | ((uint64_t)(U4BE(buf, off + 4)) & 0xFFFFFFFF))
+    (((uint64_t) (U4BE(buf, off)) << 32) | ((uint64_t) (U4BE(buf, off + 4)) & 0xFFFFFFFF))
 
 /**
  * Send a user rejection back to the caller, which will indicate to

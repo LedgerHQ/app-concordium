@@ -85,11 +85,6 @@
 #define APPNAME_LEN (sizeof(APPNAME) - 1)
 
 /**
- * Maximum length of MAJOR_VERSION || MINOR_VERSION || PATCH_VERSION.
- */
-#define APPVERSION_LEN 3
-
-/**
  * Maximum length of application name.
  */
 #define MAX_APPNAME_LEN 64
@@ -209,7 +204,7 @@ typedef struct internal_storage_t {
 
 extern const internal_storage_t N_storage_real;
 
-#define N_storage (*(volatile internal_storage_t *)PIC(&N_storage_real))
+#define N_storage (*(volatile internal_storage_t *) PIC(&N_storage_real))
 
 enum {
     // Successful codes

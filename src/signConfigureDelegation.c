@@ -27,7 +27,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
     if (remainingDataLength < 2) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
-    updateHash((cx_hash_t *)&tx_state->hash, cdata, 2);
+    updateHash((cx_hash_t *) &tx_state->hash, cdata, 2);
     uint16_t bitmap = U2BE(cdata, 0);
     cdata += 2;
     remainingDataLength -= 2;
@@ -54,7 +54,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
             ctx->stopDelegation = false;
             amountToGtuDisplay(ctx->displayCapital, sizeof(ctx->displayCapital), capitalAmount);
         }
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 8);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         expectedDataLength += 8;
         cdata += 8;
         remainingDataLength -= 8;
@@ -65,7 +65,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint8_t restake = cdata[0];
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         expectedDataLength += 1;
         cdata += 1;
         remainingDataLength -= 1;
@@ -83,7 +83,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         uint8_t delegationType = cdata[0];
-        updateHash((cx_hash_t *)&tx_state->hash, cdata, 1);
+        updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         expectedDataLength += 1;
         cdata += 1;
         remainingDataLength -= 1;
@@ -97,7 +97,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
             expectedDataLength += 8;
             memmove(ctx->displayDelegationTarget, "Baker ID ", 9);
             bin2dec(ctx->displayDelegationTarget + 9, 21, bakerId);
-            updateHash((cx_hash_t *)&tx_state->hash, cdata, 8);
+            updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         } else {
             THROW(ERROR_INVALID_TRANSACTION);
         }

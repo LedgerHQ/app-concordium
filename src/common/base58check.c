@@ -54,5 +54,5 @@ int base58check_encode(const unsigned char *in, size_t length, unsigned char *ou
     }
     memmove(&buffer[1 + ADDRESS_LENGTH], hash, 4);
 
-    return base58_encode(buffer, 1 + ADDRESS_LENGTH + 4, (char *)out, *outlen);
+    return base58_encode(buffer, 1 + ADDRESS_LENGTH + 4, (char *) out, *outlen);
 }
