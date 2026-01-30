@@ -16,7 +16,7 @@ UX_FLOW(ux_display_memo, &ux_display_memo_step);
 
 UX_STEP_NOCB(ux_sign_flow_account_sender_view,
              bnnn_paging,
-             {.title = "Sender", .text = (char *) global_account_sender.sender});
+             {.title = "From", .text = (char *) global_account_sender.sender});
 
 UX_STEP_NOCB(ux_sign_flow_fees_view,
              bnnn_paging,
@@ -734,7 +734,7 @@ UX_STEP_NOCB(ux_sign_flow_1_step,
 
 UX_STEP_NOCB(ux_sign_flow_2_step,
              bnnn_paging,
-             {.title = "Recipient",
+             {.title = "To",
               .text = (char *) global.withDataBlob.signTransferContext.displayStr});
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
@@ -743,13 +743,12 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_review;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_1_step;
-    ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_2_step;
 
     if (displayMemo) {
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
-
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_sign;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_decline;
 

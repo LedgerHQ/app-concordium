@@ -956,14 +956,14 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     pairs[index].item = "To";
     pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayStr;
     index++;
-    pairs[index].item = "Max fees";
-    pairs[index].value = (char *) global.withDataBlob.signTransferContext.energy_amount_str;
-    index++;
     if (displayMemo) {
         pairs[index].item = "Memo";
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
     }
+    pairs[index].item = "Max fees";
+    pairs[index].value = (char *) global.withDataBlob.signTransferContext.energy_amount_str;
+    index++;
 
     // Create the page content
     nbgl_contentTagValueList_t content;
