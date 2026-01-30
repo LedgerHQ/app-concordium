@@ -62,7 +62,6 @@
 #include "deployModule.h"
 #include "initContract.h"
 #include "updateContract.h"
-#include "signPLT.h"
 
 #define LEGACY_PURPOSE   1105
 #define LEGACY_COIN_TYPE 0
@@ -123,7 +122,6 @@ typedef enum {
     TRANSFER_WITH_SCHEDULE_WITH_MEMO = 24,
     CONFIGURE_BAKER = 25,
     CONFIGURE_DELEGATION = 26,
-    PLT_TRANSACTION = 27,
 } transactionKind_e;
 
 typedef struct {
@@ -167,7 +165,6 @@ typedef struct {
         signTransferContext_t signTransferContext;
         signTransferWithScheduleContext_t signTransferWithScheduleContext;
         signRegisterData_t signRegisterData;
-        signPLTContext_t signPLTContext;
     };
     cborContext_t cborContext;
 
@@ -228,11 +225,6 @@ enum {
     ERROR_INVALID_PARAMS_LENGTH = 0x6B0B,
     ERROR_INVALID_MODULE_REF = 0x6B09,
     ERROR_INVALID_COININFO = 0x6B0C,
-
-    // PLT-specific error codes
-    ERROR_PLT_CBOR_ERROR = 0x6B0D,    // PLT CBOR parsing or processing error
-    ERROR_PLT_BUFFER_ERROR = 0x6B0E,  // PLT buffer overflow or size error
-    ERROR_PLT_DATA_ERROR = 0x6B0F,    // PLT data validation or integrity error
 
     // Error codes from the Ledger firmware
     ERROR_DEVICE_LOCKED = 0x530C,

@@ -1,10 +1,10 @@
 import pytest
 
-from application_client.boilerplate_command_sender import (
-    BoilerplateCommandSender,
+from application_client.command_sender import (
+    CommandSender,
     Errors,
 )
-from application_client.boilerplate_response_unpacker import (
+from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
@@ -43,7 +43,7 @@ wallet_refuse_instructions = [
 def test_get_legacy_public_key_confirm_accepted(
     backend, navigator, default_screenshot_path, test_name, scenario_navigator
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path = "m/1105/0/0/0/0/2/0/0"
     if backend.device.is_nano:
         instructions = nano_accept_instructions
@@ -71,7 +71,7 @@ def test_get_legacy_public_key_confirm_accepted(
 def test_get_signed_legacy_public_key_confirm_accepted(
     backend, navigator, default_screenshot_path, test_name
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path = "m/1105/0/0/0/0/2/0/0"
     if backend.device.is_nano:
         instructions = nano_accept_instructions
@@ -99,7 +99,7 @@ def test_get_signed_legacy_public_key_confirm_accepted(
 def test_get_signed_legacy_governance_public_key_confirm_accepted(
     backend, navigator, default_screenshot_path, test_name
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path = "m/1105/0/1/0/0"
     if backend.device.is_nano:
         instructions = nano_accept_instructions
@@ -127,7 +127,7 @@ def test_get_signed_legacy_governance_public_key_confirm_accepted(
 def test_get_signed_new_public_key_confirm_accepted(
     backend, navigator, default_screenshot_path, test_name
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path = "m/44/919/0/0/0"
     if backend.device.is_nano:
         instructions = nano_accept_instructions
@@ -155,7 +155,7 @@ def test_get_signed_new_public_key_confirm_accepted(
 def test_get_public_key_confirm_refused(
     backend, navigator, default_screenshot_path, test_name
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path = "m/44'/919'/0'/0/0"
     if backend.device.is_nano:
         instructions = nano_refuse_instructions

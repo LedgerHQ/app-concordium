@@ -32,7 +32,3 @@ string(REPLACE " " ";" COMPILATION_FLAGS ${COMPILATION_FLAGS_})
 add_executable(standalone_export_pk_new_path_fuzzer src/standalone_export_pk_new_path_fuzzer.c)
 target_compile_options(standalone_export_pk_new_path_fuzzer PUBLIC ${COMPILATION_FLAGS})
 target_link_options(standalone_export_pk_new_path_fuzzer PUBLIC ${COMPILATION_FLAGS})
-
-add_executable(standalone_plt_fuzzer src/standalone_plt_fuzzer.c)
-target_compile_options(standalone_plt_fuzzer PUBLIC ${COMPILATION_FLAGS})
-target_link_options(standalone_plt_fuzzer PUBLIC ${COMPILATION_FLAGS})

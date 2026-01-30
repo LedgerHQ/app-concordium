@@ -56,13 +56,6 @@ This document lists all error codes that can be returned by the Concordium Ledge
 | `0xB007` | `SW_BAD_STATE`               | Security issue with bad state |
 | `0xB008` | `SW_SIGNATURE_FAIL`          | Failed to sign raw transaction |
 
-### PLT Transaction Specific Errors
-
-| Code   | Name                              | Description |
-|--------|-----------------------------------|-------------|
-| `0x6B0D` | `ERROR_PLT_CBOR_ERROR` | PLT CBOR parsing or processing error |
-| `0x6B0E` | `ERROR_PLT_BUFFER_ERROR` | PLT buffer overflow or size error |
-| `0x6B0F` | `ERROR_PLT_DATA_ERROR` | PLT data validation or integrity error |
 
 ## Error Handling Guidelines
 

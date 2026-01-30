@@ -1,10 +1,10 @@
 import pytest
 
-from application_client.boilerplate_command_sender import (
-    BoilerplateCommandSender,
+from application_client.command_sender import (
+    CommandSender,
     Errors,
 )
-from application_client.boilerplate_response_unpacker import (
+from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
@@ -17,7 +17,7 @@ from utils import navigate_until_text_and_compare, instructions_builder
 def test_credential_deployment_new(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     keys = [
         bytes.fromhex(
@@ -111,7 +111,7 @@ def test_credential_deployment_new(
 def test_credential_deployment_existing(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     keys = [
         bytes.fromhex(
@@ -205,7 +205,7 @@ def test_credential_deployment_existing(
 
 @pytest.mark.active_test_scope
 def test_credential_update(backend, navigator, test_name, default_screenshot_path):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     keys = [
         bytes.fromhex(
