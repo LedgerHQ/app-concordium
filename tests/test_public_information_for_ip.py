@@ -1,6 +1,6 @@
 import pytest
 
-from application_client.boilerplate_command_sender import BoilerplateCommandSender
+from application_client.command_sender import CommandSender
 from utils import navigate_until_text_and_compare
 from ragger.navigator import NavInsID
 
@@ -22,7 +22,7 @@ def test_sign_public_information_for_ip(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     data_1 = "0800000451000000000000000000000000000000000000000200000000000000008196e718f392ec8d07216b22b555cbb71bcee88037566d3f758b9786b945e3b614660f4bf954dbe57bc2304e5a863d2e89a1f69196a1d0423f4936aa664da95de16f40a639dba085073c5a7c8e710c2a402136cc89a39c12ed044e1035649c0f03"

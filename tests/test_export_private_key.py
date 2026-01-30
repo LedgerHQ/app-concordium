@@ -1,10 +1,10 @@
 import pytest
 
-from application_client.boilerplate_command_sender import (
-    BoilerplateCommandSender,
+from application_client.command_sender import (
+    CommandSender,
     Errors,
 )
-from application_client.boilerplate_response_unpacker import (
+from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
@@ -19,7 +19,7 @@ from utils import navigate_until_text_and_compare
 def test_export_standard_private_key_legacy_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_legacy(export_type="standard", identity_index=0):
         navigate_until_text_and_compare(
             backend,
@@ -40,7 +40,7 @@ def test_export_standard_private_key_legacy_path(
 def test_export_recovery_private_key_legacy_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_legacy(export_type="recovery", identity_index=0):
         navigate_until_text_and_compare(
             backend,
@@ -61,7 +61,7 @@ def test_export_recovery_private_key_legacy_path(
 def test_export_prfkey_and_idcredsed_private_key_legacy_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_legacy(
         export_type="prfkey_and_idcredsec", identity_index=0
     ):
@@ -87,7 +87,7 @@ def test_export_prfkey_and_idcredsed_private_key_legacy_path(
 def test_export_identity_credential_creation_private_key_new_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_new_path(
         "identity_credential_creation", idp_index=0, identity_index=1
     ):
@@ -108,7 +108,7 @@ def test_export_identity_credential_creation_private_key_new_path(
 def test_export_account_creation_private_key_new_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_new_path(
         "account_creation", idp_index=0, identity_index=1, account_index=2
     ):
@@ -129,7 +129,7 @@ def test_export_account_creation_private_key_new_path(
 def test_export_id_recovery_private_key_new_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_new_path(
         "id_recovery", idp_index=0, identity_index=1
     ):
@@ -150,7 +150,7 @@ def test_export_id_recovery_private_key_new_path(
 def test_export_account_credential_discovery_private_key_new_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_new_path(
         "account_credential_discovery", idp_index=0, identity_index=1
     ):
@@ -171,7 +171,7 @@ def test_export_account_credential_discovery_private_key_new_path(
 def test_export_creation_of_zk_proof_private_key_new_path(
     backend, navigator, test_name, default_screenshot_path
 ):
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     with client.export_private_key_new_path(
         "creation_of_zk_proof", idp_index=0, identity_index=1, account_index=2
     ):

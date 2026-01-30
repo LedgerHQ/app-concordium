@@ -1,12 +1,11 @@
 import pytest
 
-from application_client.boilerplate_transaction import Transaction
-from application_client.boilerplate_command_sender import (
-    BoilerplateCommandSender,
+from application_client.command_sender import (
+    CommandSender,
     Errors,
     InsType,
 )
-from application_client.boilerplate_response_unpacker import (
+from application_client.response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
@@ -27,7 +26,7 @@ def test_sign_tx_simple_transfer_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/1105/0/0/0/0/2/0/0"
 
@@ -63,7 +62,7 @@ def test_sign_tx_simple_transfer_new_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/44/919/0/0/0/0"
 
@@ -98,7 +97,7 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/1105/0/0/0/0/2/0/0"
 
@@ -140,7 +139,7 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # Define the path for the transaction
     path = "m/1105/0/0/0/0/2/0/0"
 
@@ -231,7 +230,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # Define the path for the transaction
     path = "m/1105/0/0/0/0/2/0/0"
 
