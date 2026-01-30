@@ -3,7 +3,7 @@
 #include "globals.h"
 
 accountSender_t global_account_sender;
-static nbgl_contentTagValue_t pairs[10]];
+static nbgl_contentTagValue_t pairs[10];
 static signTransferWithScheduleContext_t* ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
