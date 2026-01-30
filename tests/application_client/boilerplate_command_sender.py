@@ -112,7 +112,6 @@ class InsType(IntEnum):
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
     REGISTER_DATA = 0x35
     EXPORT_PRIVATE_KEY_NEW = 0x37
-    SIGN_PLT_TRANSACTION = 0x38
     GET_APP_VERSION = 0x40
 
 
@@ -150,11 +149,6 @@ class Errors(IntEnum):
     SW_INVALID_NAME_LENGTH = 0x6B0A
     SW_INVALID_PARAMS_LENGTH = 0x6B0B
     SW_INVALID_COININFO = 0x6B0C
-
-    # PLT-specific error codes
-    SW_PLT_CBOR_ERROR = 0x6B0D
-    SW_PLT_BUFFER_ERROR = 0x6B0E
-    SW_PLT_DATA_ERROR = 0x6B0F
 
     # Device State Errors
     SW_DEVICE_LOCKED = 0x530C
@@ -1260,33 +1254,3 @@ class BoilerplateCommandSender:
 
     def get_async_response(self) -> Optional[RAPDU]:
         return self.backend.last_async_response
-
-    @contextmanager
-    def sign_plt_transaction(
-        self, path: str, transaction: bytes
-    ) -> Generator[None, None, None]:
-        data = pack_derivation_path(path)
-        index = 0
-        transaction = data + transaction
-        transaction_chunks = split_message(transaction, MAX_APDU_LEN)
-        print(
-            "[boilerplate_command_sender.py] (sign_plt_transaction) - numOfChunks:",
-            len(transaction_chunks),
-        )
-        for chunk in transaction_chunks[:-1]:
-            self.backend.exchange(
-                cla=CLA,
-                ins=InsType.SIGN_PLT_TRANSACTION,
-                p1=index,
-                p2=P2.P2_MORE,
-                data=chunk,
-            )
-            index += 1
-        with self.backend.exchange_async(
-            cla=CLA,
-            ins=InsType.SIGN_PLT_TRANSACTION,
-            p1=index,
-            p2=P2.P2_NONE,
-            data=transaction_chunks[-1],
-        ) as response:
-            yield response

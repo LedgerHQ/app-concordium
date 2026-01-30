@@ -140,20 +140,9 @@ The functional tests are implemented with Ledger's [Ragger](https://github.com/L
 
 ### Fuzzing
 
-The app includes standalone fuzz testing capabilities in the `fuzzing/` directory. Two fuzzers are provided:
+The app includes standalone fuzz testing capabilities in the `fuzzing/` directory. One fuzzer is provided:
 
 1. `standalone_export_pk_new_path_fuzzer` - Tests the private key export functionality
-2. `standalone_plt_fuzzer` - Tests the Protocol Level Token (PLT) handling
-
-#### PLT Transaction Constraints
-
-The Protocol Level Token (PLT) feature supports complex multi-operation transactions with automatic display optimization:
-
-- **Individual display**: Up to 10 operations (Stax/Flex) or 5 operations (Nano X/S+) shown with structured field-by-field display
-- **JSON fallback**: Transactions exceeding device limits automatically use JSON format display
-- **Device compatibility**: Optimized for both BAGL (Nano series) and NBGL (Stax/Flex) devices with device-specific operation limits
-
-For detailed PLT constraints and technical specifications, see [`doc/ins_plt.md`](doc/ins_plt.md).
 
 To build and run the fuzzers:
 
@@ -170,21 +159,18 @@ cmake ..
 # Build the fuzzers
 make
 
-# Run a fuzzer (e.g., the PLT fuzzer)
-./standalone_plt_fuzzer
+# Run a fuzzer 
+./standalone_export_pk_new_path_fuzzer
 ```
 
-The fuzzers are designed to be compatible with ClusterFuzzLite and support various sanitizers (Address, Undefined Behavior, Memory) which can be enabled via environment variables:
+The fuzzers are designed to be compatible with ClusterFuzzLite and support various sanitizers (Address, Memory) which can be enabled via environment variables:
 
 ```shell
 # Run with Address Sanitizer
-SANITIZER=address ./standalone_plt_fuzzer
-
-# Run with Undefined Behavior Sanitizer
-SANITIZER=undefined ./standalone_plt_fuzzer
+SANITIZER=address ./standalone_export_pk_new_path_fuzzer
 
 # Run with Memory Sanitizer
-SANITIZER=memory ./standalone_plt_fuzzer
+SANITIZER=memory ./standalone_export_pk_new_path_fuzzer
 ```
 
 ### macOS / Windows
