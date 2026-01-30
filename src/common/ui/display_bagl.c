@@ -734,8 +734,7 @@ UX_STEP_NOCB(ux_sign_flow_1_step,
 
 UX_STEP_NOCB(ux_sign_flow_2_step,
              bnnn_paging,
-             {.title = "To",
-              .text = (char *) global.withDataBlob.signTransferContext.displayStr});
+             {.title = "To", .text = (char *) global.withDataBlob.signTransferContext.displayStr});
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
