@@ -226,7 +226,6 @@ enum {
     ERROR_INVALID_MODULE_REF = 0x6B09,
     ERROR_INVALID_COININFO = 0x6B0C,
 
-
     // Error codes from the Ledger firmware
     ERROR_DEVICE_LOCKED = 0x530C,
     SW_WRONG_DATA_LENGTH = 0x6A87

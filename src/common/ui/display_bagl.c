@@ -936,5 +936,4 @@ void uiUpdateContractDisplay() {
     ux_flow_init(0, ux_update_contract, NULL);
 }
 
-
 #endif
