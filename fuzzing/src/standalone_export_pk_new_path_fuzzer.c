@@ -261,7 +261,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     volatile unsigned int flags = 0;
     handleExportPrivateKeyNewPath((uint8_t *)command_data, p1, lc, &flags);
 
-    printf("Fuzzer iteration completed succesfully\n");
+    printf("Fuzzer iteration completed successfully\n");
     return 0;
 }
 
