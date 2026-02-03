@@ -5,11 +5,6 @@ static keyDerivationPath_t *keyPath = &path;
 static accountSender_t *accountSender = &global_account_sender;
 static const uint32_t HARDENED_OFFSET = 0x80000000;
 
-// Helper function to check if a character is a valid hex digit
-static inline bool is_hex_digit(char c) {
-    return ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
-}
-
 int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     if (dataLength < 1) {
         THROW(ERROR_INVALID_PATH);
@@ -94,22 +89,6 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
  */
 int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpdateType) {
     return hashHeaderAndType(cdata, dataLength, UPDATE_HEADER_LENGTH, validUpdateType);
-}
-
-int handle_header_and_kind(uint8_t *cdata, uint8_t dataLength, uint8_t kind) {
-    // Parse the key derivation path, which should always be the first thing received
-    // in a command to the Ledger application.
-    int keyPathLength = parseKeyDerivationPath(cdata, dataLength);
-    cdata += keyPathLength;
-    uint8_t remainingDataLength = dataLength - keyPathLength;
-    // Initialize the hash that will be the hash of the whole transaction, which will be
-    // signed if the user approves.
-    if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
-        THROW(ERROR_FAILED_CX_OPERATION);
-    }
-    int headerLength = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, kind);
-
-    return keyPathLength + headerLength;
 }
 
 int handleHeaderAndToAddress(uint8_t *cdata,
@@ -405,90 +384,4 @@ size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst) {
     memmove(dst + numLength, " / ", 3);
     numberToText(dst + numLength + 3, sizeOfDst - (numLength + 3), denominator);
     return 16;
-}
-
-bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, size_t output_size) {
-    // Hex string must have even length (each byte = 2 hex chars)
-    if (hex_len % 2 != 0) {
-        PRINTF("Invalid hex string length: %d (must be even)\n", (int) hex_len);
-        return false;
-    }
-
-    // Calculate number of bytes
-    size_t byte_count = hex_len / 2;
-
-    // Check if we have enough space in output buffer
-    if (byte_count > output_size) {
-        PRINTF("Output buffer too small: need %d bytes, have %d\n",
-               (int) byte_count,
-               (int) output_size);
-        return false;
-    }
-
-    // Convert hex pairs to bytes
-    for (size_t i = 0; i < byte_count; i++) {
-        // Get high and low nibbles
-        char high = hex_str[i * 2];
-        char low = hex_str[i * 2 + 1];
-
-        // Validate hex characters
-        if (!is_hex_digit(high) || !is_hex_digit(low)) {
-            PRINTF("Invalid hex character at position %d: '%c%c'\n", (int) i, high, low);
-            return false;
-        }
-
-        uint8_t byte_val = 0;
-
-        // High nibble
-        if (high >= '0' && high <= '9')
-            byte_val = (high - '0') << 4;
-        else if (high >= 'a' && high <= 'f')
-            byte_val = (high - 'a' + 10) << 4;
-        else if (high >= 'A' && high <= 'F')
-            byte_val = (high - 'A' + 10) << 4;
-
-        // Low nibble
-        if (low >= '0' && low <= '9')
-            byte_val |= (low - '0');
-        else if (low >= 'a' && low <= 'f')
-            byte_val |= (low - 'a' + 10);
-        else if (low >= 'A' && low <= 'F')
-            byte_val |= (low - 'A' + 10);
-
-        output[i] = byte_val;
-    }
-
-    return true;
-}
-
-bool hex_string_to_ascii(const char *hex_str, size_t hex_len, char *output, size_t output_size) {
-    // Hex string must have even length (each byte = 2 hex chars)
-    if (hex_len % 2 != 0) {
-        PRINTF("Invalid hex string length: %d (must be even)\n", (int) hex_len);
-        return false;
-    }
-
-    // Calculate number of bytes
-    size_t byte_count = hex_len / 2;
-
-    // Check if we have enough space in output buffer
-    if (byte_count > output_size) {
-        PRINTF("Output buffer too small: need %d bytes, have %d\n",
-               (int) byte_count,
-               (int) output_size);
-        return false;
-    }
-    uint8_t bytes[100];
-
-    if (!hex_string_to_bytes(hex_str, hex_len, bytes, sizeof(bytes))) {
-        return false;
-    }
-
-    // Actually convert to text (not nibbles!)
-    for (size_t i = 0; i < byte_count; i++) {
-        output[i] = (char) bytes[i];
-    }
-    output[byte_count] = '\0';  // Null terminate
-
-    return true;
 }

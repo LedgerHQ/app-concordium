@@ -170,27 +170,6 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
  */
 int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpdateType);
 
-/**
- * Parses the key derivation path and initializes the transaction hash, then processes the account
- * transaction header and kind.
- *
- * This function is typically used at the start of handling a transaction command. It performs the
- * following steps:
- * 1. Parses the key derivation path from the beginning of the input buffer.
- * 2. Initializes the SHA-256 hash context for the transaction.
- * 3. Processes and hashes the account transaction header and verifies the transaction kind.
- *
- * @param cdata         Pointer to the input buffer containing the key derivation path followed by
- * the transaction header.
- * @param dataLength    Length of the input buffer.
- * @param kind          The expected transaction kind to validate against.
- * @return              The total number of bytes consumed from the input buffer (key path +
- * header).
- *
- * Throws ERROR_FAILED_CX_OPERATION if hash initialization fails.
- * Throws ERROR_INVALID_TRANSACTION if the transaction header or kind is invalid.
- */
-int handle_header_and_kind(uint8_t *cdata, uint8_t dataLength, uint8_t kind);
 
 /**
  * Adds the account transaction header and the recipient address to the transaction hash, and
@@ -233,28 +212,3 @@ void getBlsPrivateKey(uint32_t *keyPathInput,
  * @param sizeOfDst the size of dst
  */
 size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst);
-
-/**
- * Converts a hex string to bytes array
- * @param hex_str [in] the hex string to convert (without 0x prefix)
- * @param hex_len the length of the hex string
- * @param output [out] where to write the output bytes
- * @param output_size the size of the output buffer
- * @return true if conversion succeeded, false otherwise
- */
-bool hex_string_to_bytes(const char *hex_str, size_t hex_len, uint8_t *output, size_t output_size);
-
-/**
- * Converts a hexadecimal string to its corresponding ASCII text representation.
- * Each pair of hex characters is interpreted as a byte and converted to its ASCII character.
- *
- * Example: "48656C6C6F" -> "Hello"
- *
- * @param hex_str      [in] The input hexadecimal string (without 0x prefix)
- * @param hex_len      The length of the hexadecimal string (must be even)
- * @param output       [out] The buffer to write the resulting ASCII string (null-terminated)
- * @param output_size  The size of the output buffer (must be at least (hex_len / 2) + 1)
- * @return             true if conversion succeeds, false if input is invalid or output buffer is
- * too small
- */
-bool hex_string_to_ascii(const char *hex_str, size_t hex_len, char *output, size_t output_size);
