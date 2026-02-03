@@ -24,7 +24,7 @@ typedef struct {
     bool showIntro;
     uint8_t publicKeysLength;
     char publicKey[68];
-    uint8_t threshold[4];
+    uint8_t threshold[COMMON_THRESHOLD_SIZE];
     char idCredPub[48 * 2 + 1];
     char credId[48 * 2 + 1];
 
