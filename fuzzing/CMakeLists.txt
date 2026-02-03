@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
-project(StandaloneFuzzer VERSION 1.0 DESCRIPTION "Standalone Export Private Key Fuzzer" LANGUAGES C)
+project(StandaloneFuzzer VERSION 1.1 DESCRIPTION "Standalone Export Private Key Fuzzer" LANGUAGES C)
 
-if (NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
-  message(FATAL_ERROR "Fuzzer needs to be built with Clang")
+if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+  find_program(CLANG_EXECUTABLE clang)
+  if(CLANG_EXECUTABLE)
+    set(CMAKE_C_COMPILER ${CLANG_EXECUTABLE} CACHE STRING "C compiler" FORCE)
+    set(CMAKE_CXX_COMPILER clang++ CACHE STRING "C++ compiler" FORCE)
+  else()
+    message(FATAL_ERROR "Fuzzer needs to be built with Clang")
+  endif()
 endif()
 
 # Favor ClusterFuzzLite-provided flags if present; otherwise use safe defaults.
