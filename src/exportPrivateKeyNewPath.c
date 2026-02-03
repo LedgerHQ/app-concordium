@@ -167,6 +167,10 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                                                                 account,
                                                                 ctx->outputPrivateKeys,
                                                                 sizeof(ctx->outputPrivateKeys));
+    if (ctx->privateKeysLength == 0) {
+        THROW(ERROR_INVALID_PARAM);
+    }
+
     ////// Set up the display //////
     offset = 0;
     /// Add the identity provider to the display
