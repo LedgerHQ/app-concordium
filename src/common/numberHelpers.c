@@ -174,7 +174,11 @@ size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t numb
 size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount) {
     if (dstLength < 5) return 0;  // Prevent overflow
     size_t offset = decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, 6);
-    memmove(dst + offset, " CCD\0", 5);
+    if ((offset >= 14) && (offset < 18)) {
+        memmove(dst + offset, "\nCCD\0", 5);
+    } else {
+        memmove(dst + offset, " CCD\0", 5);
+    }
     offset += 4;
     return offset;
 }
