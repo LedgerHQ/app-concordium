@@ -46,11 +46,11 @@ typedef struct {
     uint8_t credentialDeploymentCount;
     uint8_t credentialIdCount;
     char credentialId[102];
-    uint8_t threshold[4];
+    uint8_t threshold[COMMON_THRESHOLD_SIZE];
     updateCredentialState_t updateCredentialState;
 
     char accountVerificationKey[68];
-    uint8_t signatureThreshold[4];
+    uint8_t signatureThreshold[COMMON_THRESHOLD_SIZE];
 
     uint8_t anonymityRevocationThreshold[13];
     uint16_t anonymityRevocationListLength;
@@ -60,8 +60,8 @@ typedef struct {
     char arIdentity[4 * 2 + 1];
     char encIdCredPubShare[96 * 2 + 1];
 
-    uint8_t validTo[8];
-    uint8_t createdAt[8];
+    uint8_t validTo[COMMON_TIMESTAMP_SIZE];
+    uint8_t createdAt[COMMON_TIMESTAMP_SIZE];
 
     uint16_t attributeListLength;
 
