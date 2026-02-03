@@ -976,9 +976,9 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &content,
                        &ICON_APP_HOME,
-                       "Review Transfer",
+                       "Review transaction to send CCD",
                        NULL,  // No subtitle
-                       "Sign Transfer",
+                       "Sign transaction to send CCD",
                        review_choice_sign);
 
     *flags |= IO_ASYNCH_REPLY;

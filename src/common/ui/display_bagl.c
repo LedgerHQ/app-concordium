@@ -79,7 +79,7 @@ void uiVerifyAddress(volatile unsigned int *flags) {
 }
 
 // Common initial view for signing flows.
-UX_STEP_NOCB(ux_sign_flow_shared_review, nn, {"Review", "transaction"});
+UX_STEP_NOCB(ux_sign_flow_shared_review, nn, {"Review transaction to", "send CCD"});
 
 // Common signature flow for all transactions allowing the user to either sign the transaction hash
 // that is currently being processed, or declining to do so (sending back a user rejection error to
@@ -91,7 +91,7 @@ UX_STEP_CB(ux_sign_flow_shared_sign,
 UX_STEP_CB(ux_sign_flow_shared_decline,
            pnn,
            sendUserRejection(),
-           {&C_icon_crossmark, "Decline to", "sign transaction"});
+           {&C_icon_crossmark, "Reject", "transaction"});
 UX_FLOW(ux_sign_flow_shared, &ux_sign_flow_shared_sign, &ux_sign_flow_shared_decline);
 
 UX_STEP_NOCB(ux_export_private_key_purpose_step,
