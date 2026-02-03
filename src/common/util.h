@@ -170,7 +170,6 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
  */
 int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpdateType);
 
-
 /**
  * Adds the account transaction header and the recipient address to the transaction hash, and
  * writes the base58 encoded recipient address for later display.
