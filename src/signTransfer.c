@@ -10,8 +10,13 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_AMOUNT            0x03
 
 void handleSignTransfer(uint8_t *cdata, uint8_t lc, volatile unsigned int *flags) {
-    uint8_t offset =
-        handleHeaderAndToAddress(cdata, lc, TRANSFER, ctx->displayStr, sizeof(ctx->displayStr));
+    uint8_t offset = handleHeaderAndToAddress(cdata,
+                                              lc,
+                                              TRANSFER,
+                                              ctx->displayStr,
+                                              sizeof(ctx->displayStr),
+                                              ctx->energy_amount_str,
+                                              sizeof(ctx->energy_amount_str));
     cdata += offset;
     uint8_t remainingDataLength = lc - offset;
 
@@ -49,7 +54,9 @@ void handleSignTransferWithMemo(uint8_t *cdata,
                                                   remainingDataLength,
                                                   TRANSFER_WITH_MEMO,
                                                   ctx->displayStr,
-                                                  sizeof(ctx->displayStr));
+                                                  sizeof(ctx->displayStr),
+                                                  ctx->energy_amount_str,
+                                                  sizeof(ctx->energy_amount_str));
         cdata += offset;
         remainingDataLength -= offset;
         // hash the memo length

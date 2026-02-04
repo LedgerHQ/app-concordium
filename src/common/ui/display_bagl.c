@@ -16,7 +16,12 @@ UX_FLOW(ux_display_memo, &ux_display_memo_step);
 
 UX_STEP_NOCB(ux_sign_flow_account_sender_view,
              bnnn_paging,
-             {.title = "Sender", .text = (char *) global_account_sender.sender});
+             {.title = "From", .text = (char *) global_account_sender.sender});
+
+UX_STEP_NOCB(ux_sign_flow_fees_view,
+             bnnn_paging,
+             {.title = "Max fees",
+              .text = (char *) global.withDataBlob.signTransferContext.energy_amount_str});
 
 // UI definitions for comparison of public-key on the device
 // with the public-key that the caller received.
@@ -74,7 +79,7 @@ void uiVerifyAddress(volatile unsigned int *flags) {
 }
 
 // Common initial view for signing flows.
-UX_STEP_NOCB(ux_sign_flow_shared_review, nn, {"Review", "transaction"});
+UX_STEP_NOCB(ux_sign_flow_shared_review, nn, {"Review transaction to", "send CCD"});
 
 // Common signature flow for all transactions allowing the user to either sign the transaction hash
 // that is currently being processed, or declining to do so (sending back a user rejection error to
@@ -86,7 +91,7 @@ UX_STEP_CB(ux_sign_flow_shared_sign,
 UX_STEP_CB(ux_sign_flow_shared_decline,
            pnn,
            sendUserRejection(),
-           {&C_icon_crossmark, "Decline to", "sign transaction"});
+           {&C_icon_crossmark, "Reject", "transaction"});
 UX_FLOW(ux_sign_flow_shared, &ux_sign_flow_shared_sign, &ux_sign_flow_shared_decline);
 
 UX_STEP_NOCB(ux_export_private_key_purpose_step,
@@ -729,8 +734,7 @@ UX_STEP_NOCB(ux_sign_flow_1_step,
 
 UX_STEP_NOCB(ux_sign_flow_2_step,
              bnnn_paging,
-             {.title = "Recipient",
-              .text = (char *) global.withDataBlob.signTransferContext.displayStr});
+             {.title = "To", .text = (char *) global.withDataBlob.signTransferContext.displayStr});
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
@@ -743,7 +747,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     if (displayMemo) {
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
-
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_sign;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_decline;
 

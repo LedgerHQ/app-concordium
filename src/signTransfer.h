@@ -28,5 +28,6 @@ typedef enum {
 typedef struct {
     unsigned char displayStr[57];
     uint8_t displayAmount[30];
+    uint8_t energy_amount_str[30];
     simpleTransferState_t state;
 } signTransferContext_t;
