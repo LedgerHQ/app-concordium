@@ -139,7 +139,7 @@ void uiExportPrivateKey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiExportPrivateKeysNewPath(volatile unsigned int* flags) {
+void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
@@ -156,8 +156,8 @@ void uiExportPrivateKeysNewPath(volatile unsigned int* flags) {
            global.exportPrivateKeyContext.display_sign_verb,
            EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
 
-    pairs[pairIndex].item = (char*) global.exportPrivateKeyContext.display_credid_title;
-    pairs[pairIndex].value = (char*) global.exportPrivateKeyContext.display_credid;
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
     pairIndex++;
 
     // Create the page content
@@ -172,9 +172,9 @@ void uiExportPrivateKeysNewPath(volatile unsigned int* flags) {
     nbgl_useCaseReview(TYPE_OPERATION,
                        &content,
                        &ICON_APP_HOME,
-                       (char*) global.exportPrivateKeyContext.display_review_operation,
+                       (char *) global.exportPrivateKeyContext.display_review_operation,
                        NULL,
-                       (char*) global.exportPrivateKeyContext.display_sign,
+                       (char *) global.exportPrivateKeyContext.display_sign,
                        review_export_private_key_new_path);
     *flags |= IO_ASYNCH_REPLY;
 }
