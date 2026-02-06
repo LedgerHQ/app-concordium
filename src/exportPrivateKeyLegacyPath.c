@@ -107,11 +107,11 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     identity = U4BE(dataBuffer, offset);
     uint32_t *keyDerivationPath;
     size_t pathLength;
-    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_OFFSET,
-                                      LEGACY_COIN_TYPE | HARDENED_OFFSET,
-                                      ACCOUNT_SUBTREE | HARDENED_OFFSET,
-                                      NORMAL_ACCOUNTS | HARDENED_OFFSET,
-                                      identity | HARDENED_OFFSET};
+    keyDerivationPath = (uint32_t[5]) {LEGACY_PURPOSE | HARDENED_OFFSET,
+                                       LEGACY_COIN_TYPE | HARDENED_OFFSET,
+                                       ACCOUNT_SUBTREE | HARDENED_OFFSET,
+                                       NORMAL_ACCOUNTS | HARDENED_OFFSET,
+                                       identity | HARDENED_OFFSET};
     pathLength = 5;
     memmove(ctx->path, keyDerivationPath, pathLength * sizeof(uint32_t));
     ctx->pathLength = pathLength * sizeof(uint32_t);
@@ -132,26 +132,33 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
             EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN);
     memmove(ctx->display_sign, "Sign operation", EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN);
 
-    if (p1 == P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC) {
-        memmove(ctx->display_sign_verb, "to create credentials?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
-        memmove(ctx->display_review_verb,
-                "to create credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-    } else if (p1 == P1_LEGACY_PRF_KEY_RECOVERY) {
-        memmove(ctx->display_sign_verb,
-                "to recover credentials?",
-                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
-        memmove(ctx->display_review_verb,
-                "to recover credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-    } else if (p1 == P1_LEGACY_PRF_KEY) {
-        memmove(ctx->display_sign_verb,
-                "to decrypt credentials?",
-                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
-        memmove(ctx->display_review_verb,
-                "to decrypt credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+    switch (p1) {
+        case P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC:
+            memmove(ctx->display_sign_verb,
+                    "to create credentials?",
+                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+            memmove(ctx->display_review_verb,
+                    "to create credentials",
+                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+            break;
+        case P1_LEGACY_PRF_KEY_RECOVERY:
+            memmove(ctx->display_sign_verb,
+                    "to recover credentials?",
+                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+            memmove(ctx->display_review_verb,
+                    "to recover credentials",
+                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+            break;
+        case P1_LEGACY_PRF_KEY:
+            memmove(ctx->display_sign_verb,
+                    "to decrypt credentials?",
+                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+            memmove(ctx->display_review_verb,
+                    "to decrypt credentials",
+                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+            break;
+        default:
+            THROW(SWO_INCORRECT_P1_P2);
     }
-
     uiExportPrivateKey(flags);
 }

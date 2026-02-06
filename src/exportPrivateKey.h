@@ -65,7 +65,7 @@ typedef struct {
     uint8_t display_sign[EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN];
     bool exportBoth;
     bool exportSeed;
-    uint32_t path[7];
+    uint32_t path[MAX_DERIVATION_PATH_LENGTH + 1];
     uint8_t pathLength;
     bool isNewPath;
     uint8_t outputPrivateKeys[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];

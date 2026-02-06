@@ -90,12 +90,12 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
     // iterate over the keys to export
     for (int keyIndex = 0; keyIndex < keysToExportLength; keyIndex++) {
         // Edit the derivation path according to the key to export
-        uint8_t tempDeriviationPathLength = editDerivationPathPerKeyType(derivationPath,
-                                                                         derivationPathLength,
-                                                                         keysToExport[keyIndex],
-                                                                         account);
+        uint8_t tempDerivationPathLength = editDerivationPathPerKeyType(derivationPath,
+                                                                        derivationPathLength,
+                                                                        keysToExport[keyIndex],
+                                                                        account);
         if (tempDeriviationPathLength == 0) {
-            PRINTF("The erivation path length is too long\n");
+            PRINTF("The derivation path length is too long\n");
             THROW(ERROR_BUFFER_OVERFLOW);
         }
 
@@ -115,7 +115,8 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
         }
 
         for (int i = 0; i < 32; i++) {
-            outputPrivateKey[tx++] = tempPrivateKey[i];
+            outputPrivateKey[tx] = tempPrivateKey[i];
+            tx++
         }
     }
     explicit_bzero(&tempPrivateKey, sizeof(tempPrivateKey));
@@ -238,9 +239,6 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
 }
 
 void sendPrivateKeysNewPath(void) {
-    if ((size_t) ctx->privateKeysLength > sizeof(G_io_apdu_buffer)) {
-        THROW(ERROR_BUFFER_OVERFLOW);
-    }
     memmove(G_io_apdu_buffer, ctx->outputPrivateKeys, ctx->privateKeysLength);
     sendSuccess(ctx->privateKeysLength);
     explicit_bzero(ctx->outputPrivateKeys, sizeof(ctx->outputPrivateKeys));
