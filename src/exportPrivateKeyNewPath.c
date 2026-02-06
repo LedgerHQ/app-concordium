@@ -94,7 +94,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                                                                         derivationPathLength,
                                                                         keysToExport[keyIndex],
                                                                         account);
-        if (tempDeriviationPathLength == 0) {
+        if (tempDerivationPathLength == 0) {
             PRINTF("The derivation path length is too long\n");
             THROW(ERROR_BUFFER_OVERFLOW);
         }
@@ -102,21 +102,21 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
         outputPrivateKey[tx++] = 32;  // length of the private key
         if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
             // export raw key
-            getPrivateKey(derivationPath, tempDeriviationPathLength, &tempPrivateKeyEd25519);
+            getPrivateKey(derivationPath, tempDerivationPathLength, &tempPrivateKeyEd25519);
             for (int i = 0; i < 32; i++) {
                 tempPrivateKey[i] = tempPrivateKeyEd25519.d[i];
             }
         } else {
             // export bls key
             getBlsPrivateKey(derivationPath,
-                             tempDeriviationPathLength,
+                             tempDerivationPathLength,
                              tempPrivateKey,
                              sizeof(tempPrivateKey));
         }
 
         for (int i = 0; i < 32; i++) {
             outputPrivateKey[tx] = tempPrivateKey[i];
-            tx++
+            tx++;
         }
     }
     explicit_bzero(&tempPrivateKey, sizeof(tempPrivateKey));
