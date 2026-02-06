@@ -4,7 +4,7 @@
 
 accountSender_t global_account_sender;
 static nbgl_contentTagValue_t pairs[10];
-static signTransferWithScheduleContext_t* ctx_sign_transfer_with_schedule =
+static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
 static void review_choice(bool confirm) {
@@ -88,8 +88,8 @@ void uiComparePubkey(void) {
                               review_choice);
 }
 
-void uiGeneratePubkey(volatile unsigned int* flags) {
-    nbgl_useCaseAddressReview((char*) global.exportPublicKeyContext.display,  // Address to display
+void uiGeneratePubkey(volatile unsigned int *flags) {
+    nbgl_useCaseAddressReview((char *) global.exportPublicKeyContext.display,  // Address to display
                               NULL,                     // No additional tag-value list
                               &ICON_APP_HOME,           // Icon to display
                               "Public Key",             // Review title
@@ -99,7 +99,7 @@ void uiGeneratePubkey(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiExportPrivateKey(volatile unsigned int* flags) {
+void uiExportPrivateKey(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
@@ -116,8 +116,8 @@ void uiExportPrivateKey(volatile unsigned int* flags) {
            global.exportPrivateKeyContext.display_sign_verb,
            EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
 
-    pairs[pairIndex].item = (char*) global.exportPrivateKeyContext.display_credid_title;
-    pairs[pairIndex].value = (char*) global.exportPrivateKeyContext.display_credid;
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
     pairIndex++;
 
     // Create the page content
@@ -132,9 +132,9 @@ void uiExportPrivateKey(volatile unsigned int* flags) {
     nbgl_useCaseReview(TYPE_OPERATION,
                        &content,
                        &ICON_APP_HOME,
-                       (char*) global.exportPrivateKeyContext.display_review_operation,
+                       (char *) global.exportPrivateKeyContext.display_review_operation,
                        NULL,
-                       (char*) global.exportPrivateKeyContext.display_sign,
+                       (char *) global.exportPrivateKeyContext.display_sign,
                        review_export_private_key);
     *flags |= IO_ASYNCH_REPLY;
 }
@@ -181,14 +181,14 @@ void uiExportPrivateKeysNewPath(volatile unsigned int* flags) {
 
 void startConfigureBakerCommissionDisplay(void) {
     // Get context from global state
-    signConfigureBaker_t* ctx = &global.signConfigureBaker;
+    signConfigureBaker_t *ctx = &global.signConfigureBaker;
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
     if (ctx->firstDisplay) {
         // Add sender address
         pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char*) global_account_sender.sender;
+        pairs[pairIndex].value = (char *) global_account_sender.sender;
         pairIndex++;
         ctx->firstDisplay = false;
     }
@@ -203,21 +203,21 @@ void startConfigureBakerCommissionDisplay(void) {
     if (ctx->hasTransactionFeeCommission) {
         pairs[pairIndex].item = "Transaction fee";
         pairs[pairIndex].value =
-            (char*) global.signConfigureBaker.commissionRates.transactionFeeCommissionRate;
+            (char *) global.signConfigureBaker.commissionRates.transactionFeeCommissionRate;
         pairIndex++;
     }
 
     if (ctx->hasBakingRewardCommission) {
         pairs[pairIndex].item = "Baking reward";
         pairs[pairIndex].value =
-            (char*) global.signConfigureBaker.commissionRates.bakingRewardCommissionRate;
+            (char *) global.signConfigureBaker.commissionRates.bakingRewardCommissionRate;
         pairIndex++;
     }
 
     if (ctx->hasFinalizationRewardCommission) {
         pairs[pairIndex].item = "Finalization reward";
         pairs[pairIndex].value =
-            (char*) global.signConfigureBaker.commissionRates.finalizationRewardCommissionRate;
+            (char *) global.signConfigureBaker.commissionRates.finalizationRewardCommissionRate;
         pairIndex++;
     }
 
@@ -253,20 +253,20 @@ void startConfigureBakerCommissionDisplay(void) {
 
 void startConfigureBakerSuspendedDisplay(void) {
     // Get context from global state
-    signConfigureBaker_t* ctx = &global.signConfigureBaker;
+    signConfigureBaker_t *ctx = &global.signConfigureBaker;
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
     if (ctx->firstDisplay) {
         // Add sender address
         pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char*) global_account_sender.sender;
+        pairs[pairIndex].value = (char *) global_account_sender.sender;
         pairIndex++;
         ctx->firstDisplay = false;
     }
 
     pairs[pairIndex].item = "Validator status";
-    pairs[pairIndex].value = (char*) global.signConfigureBaker.suspended;
+    pairs[pairIndex].value = (char *) global.signConfigureBaker.suspended;
     pairIndex++;
 
     // Create the page content
@@ -289,13 +289,13 @@ void startConfigureBakerSuspendedDisplay(void) {
 
 void startConfigureBakerDisplay(void) {
     // Get context from global state
-    signConfigureBaker_t* ctx = &global.signConfigureBaker;
+    signConfigureBaker_t *ctx = &global.signConfigureBaker;
 
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
     // Add sender address
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
 
     ctx->firstDisplay = false;
@@ -307,7 +307,7 @@ void startConfigureBakerDisplay(void) {
         } else {
             pairs[pairIndex].item = "Amount to stake";
             pairs[pairIndex].value =
-                (char*) global.signConfigureBaker.capitalRestakeDelegation.displayCapital;
+                (char *) global.signConfigureBaker.capitalRestakeDelegation.displayCapital;
         }
         pairIndex++;
     }
@@ -315,14 +315,14 @@ void startConfigureBakerDisplay(void) {
     if (ctx->hasRestakeEarnings) {
         pairs[pairIndex].item = "Restake earnings";
         pairs[pairIndex].value =
-            (char*) global.signConfigureBaker.capitalRestakeDelegation.displayRestake;
+            (char *) global.signConfigureBaker.capitalRestakeDelegation.displayRestake;
         pairIndex++;
     }
 
     if (ctx->hasOpenForDelegation) {
         pairs[pairIndex].item = "Pool status";
         pairs[pairIndex].value =
-            (char*) global.signConfigureBaker.capitalRestakeDelegation.displayOpenForDelegation;
+            (char *) global.signConfigureBaker.capitalRestakeDelegation.displayOpenForDelegation;
         pairIndex++;
     }
 
@@ -372,7 +372,7 @@ void startConfigureBakerDisplay(void) {
 
 void startConfigureBakerUrlDisplay(bool lastUrlPage) {
     // Get context from global state
-    signConfigureBaker_t* ctx = &global.signConfigureBaker;
+    signConfigureBaker_t *ctx = &global.signConfigureBaker;
 
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
@@ -380,14 +380,14 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
     if (ctx->firstDisplay) {
         // Add sender address
         pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char*) global_account_sender.sender;
+        pairs[pairIndex].value = (char *) global_account_sender.sender;
         pairIndex++;
         ctx->firstDisplay = false;
     }
 
     if (!lastUrlPage) {
         pairs[pairIndex].item = "URL";
-        pairs[pairIndex].value = (char*) global.signConfigureBaker.url.urlDisplay;
+        pairs[pairIndex].value = (char *) global.signConfigureBaker.url.urlDisplay;
         pairIndex++;
     } else {
         if (ctx->url.urlLength == 0) {
@@ -395,7 +395,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
             pairs[pairIndex].value = "";
         } else {
             pairs[pairIndex].item = "URL";
-            pairs[pairIndex].value = (char*) global.signConfigureBaker.url.urlDisplay;
+            pairs[pairIndex].value = (char *) global.signConfigureBaker.url.urlDisplay;
         }
         pairIndex++;
     }
@@ -440,13 +440,13 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
 
 void startConfigureDelegationDisplay(void) {
     // Get context from global state
-    signConfigureDelegationContext_t* ctx = &global.signConfigureDelegation;
+    signConfigureDelegationContext_t *ctx = &global.signConfigureDelegation;
 
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
     // Add sender address
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
 
     // Add capital amount if present
@@ -456,7 +456,7 @@ void startConfigureDelegationDisplay(void) {
             pairs[pairIndex].value = "Stop delegation";
         } else {
             pairs[pairIndex].item = "Amount to delegate";
-            pairs[pairIndex].value = (char*) ctx->displayCapital;
+            pairs[pairIndex].value = (char *) ctx->displayCapital;
         }
         pairIndex++;
     }
@@ -464,14 +464,14 @@ void startConfigureDelegationDisplay(void) {
     // Add restake earnings if present
     if (ctx->hasRestakeEarnings) {
         pairs[pairIndex].item = "Restake earnings";
-        pairs[pairIndex].value = (char*) ctx->displayRestake;
+        pairs[pairIndex].value = (char *) ctx->displayRestake;
         pairIndex++;
     }
 
     // Add delegation target if present
     if (ctx->hasDelegationTarget) {
         pairs[pairIndex].item = "Delegation target";
-        pairs[pairIndex].value = (char*) ctx->displayDelegationTarget;
+        pairs[pairIndex].value = (char *) ctx->displayDelegationTarget;
         pairIndex++;
     }
 
@@ -493,13 +493,13 @@ void startConfigureDelegationDisplay(void) {
                        review_choice_sign);
 }
 
-void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int* flags) {
+void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
     // Add threshold information
     pairs[pairIndex].item = "Threshold";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.threshold;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.threshold;
     pairIndex++;
 
     // Create the page content
@@ -523,13 +523,13 @@ void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiSignUpdateCredentialInitialDisplay(volatile unsigned int* flags) {
+void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
     // Add sender address
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
 
     // Create the page content
@@ -552,13 +552,13 @@ void uiSignUpdateCredentialInitialDisplay(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiSignUpdateCredentialIdDisplay(volatile unsigned int* flags) {
+void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
     // Add credential ID information
     pairs[pairIndex].item = "Credential ID";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.credentialId;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.credentialId;
     pairIndex++;
 
     // Create the page content
@@ -581,11 +581,11 @@ void uiSignUpdateCredentialIdDisplay(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int* flags) {
+void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
 
     // Create the page content
@@ -610,26 +610,26 @@ void uiSignCredentialDeploymentNewIntroDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.signatureThreshold;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.signatureThreshold;
     pairIndex++;
     pairs[pairIndex].item = "RegIdCred";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.regIdCred;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.regIdCred;
     pairIndex++;
     pairs[pairIndex].item = "Identity provider";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.identityProviderIndex;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.identityProviderIndex;
     pairIndex++;
     pairs[pairIndex].item = "AR threshold";
     pairs[pairIndex].value =
-        (char*) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
+        (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
     pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.arIdentity;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
     pairIndex++;
     pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.encIdCredPubShare;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
     pairIndex++;
 
     // Create the page content
@@ -653,29 +653,29 @@ void uiSignCredentialDeploymentExistingIntroDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.signatureThreshold;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.signatureThreshold;
     pairIndex++;
     pairs[pairIndex].item = "RegIdCred";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.regIdCred;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.regIdCred;
     pairIndex++;
     pairs[pairIndex].item = "Identity provider";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.identityProviderIndex;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.identityProviderIndex;
     pairIndex++;
     pairs[pairIndex].item = "AR threshold";
     pairs[pairIndex].value =
-        (char*) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
+        (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
     pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.arIdentity;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
     pairIndex++;
     pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.encIdCredPubShare;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
     pairIndex++;
     pairs[pairIndex].item = "Address";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountAddress;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountAddress;
     pairIndex++;
 
     // Create the page content
@@ -699,26 +699,26 @@ void uiSignCredentialDeploymentNewDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.signatureThreshold;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.signatureThreshold;
     pairIndex++;
     pairs[pairIndex].item = "RegIdCred";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.regIdCred;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.regIdCred;
     pairIndex++;
     pairs[pairIndex].item = "Identity provider";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.identityProviderIndex;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.identityProviderIndex;
     pairIndex++;
     pairs[pairIndex].item = "AR threshold";
     pairs[pairIndex].value =
-        (char*) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
+        (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
     pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.arIdentity;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
     pairIndex++;
     pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.encIdCredPubShare;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
     pairIndex++;
 
     // Create the page content
@@ -742,29 +742,29 @@ void uiSignCredentialDeploymentExistingDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.signatureThreshold;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.signatureThreshold;
     pairIndex++;
     pairs[pairIndex].item = "RegIdCred";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.regIdCred;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.regIdCred;
     pairIndex++;
     pairs[pairIndex].item = "Identity provider";
     pairs[pairIndex].value = global.signCredentialDeploymentContext.identityProviderIndex;
     pairIndex++;
     pairs[pairIndex].item = "AR threshold";
     pairs[pairIndex].value =
-        (char*) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
+        (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
     pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.arIdentity;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
     pairIndex++;
     pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.encIdCredPubShare;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
     pairIndex++;
     pairs[pairIndex].item = "Address";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountAddress;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountAddress;
     pairIndex++;
 
     // Create the page content
@@ -784,11 +784,11 @@ void uiSignCredentialDeploymentExistingDisplay(void) {
                        review_choice_sign);
 }
 
-void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int* flags) {
+void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signCredentialDeploymentContext.accountVerificationKey;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountVerificationKey;
     pairIndex++;
 
     // Create the page content
@@ -813,19 +813,19 @@ void uiSignPublicInformationForIpCompleteDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.publicKey;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.publicKey;
     pairIndex++;
     pairs[pairIndex].item = "Key type";
     pairs[pairIndex].value = global.signPublicInformationForIp.keyType;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.threshold;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.threshold;
     pairIndex++;
     pairs[pairIndex].item = "Id Cred Pub";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.idCredPub;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.idCredPub;
     pairIndex++;
     pairs[pairIndex].item = "Credential ID";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.credId;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.credId;
     pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -853,10 +853,10 @@ void uiReviewPublicInformationForIpDisplay(void) {
     pairs[pairIndex].value = global.signPublicInformationForIp.keyType;
     pairIndex++;
     pairs[pairIndex].item = "Id Cred Pub";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.idCredPub;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.idCredPub;
     pairIndex++;
     pairs[pairIndex].item = "Credential ID";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.credId;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.credId;
     pairIndex++;
 
     // Create the page content
@@ -880,13 +880,13 @@ void uiSignPublicInformationForIpFinalDisplay(void) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Public key";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.publicKey;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.publicKey;
     pairIndex++;
     pairs[pairIndex].item = "Key type";
     pairs[pairIndex].value = global.signPublicInformationForIp.keyType;
     pairIndex++;
     pairs[pairIndex].item = "Signature threshold";
-    pairs[pairIndex].value = (char*) global.signPublicInformationForIp.threshold;
+    pairs[pairIndex].value = (char *) global.signPublicInformationForIp.threshold;
     pairIndex++;
 
     // Create the page content
@@ -933,10 +933,10 @@ void uiSignPublicInformationForIpPublicKeyDisplay(void) {
                             sendSuccessNoIdleCallback);
 }
 
-void uiRegisterDataInitialDisplay(volatile unsigned int* flags) {
+void uiRegisterDataInitialDisplay(volatile unsigned int *flags) {
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -956,13 +956,13 @@ void uiRegisterDataInitialDisplay(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiRegisterDataPayloadDisplay(volatile unsigned int* flags) {
+void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
     // Get context from global state
-    signRegisterData_t* ctx = &global.withDataBlob.signRegisterData;
+    signRegisterData_t *ctx = &global.withDataBlob.signRegisterData;
 
     uint8_t index = 0;
     pairs[index].item = "Data";
-    pairs[index].value = (char*) global.withDataBlob.cborContext.display;
+    pairs[index].value = (char *) global.withDataBlob.cborContext.display;
     index++;
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -994,22 +994,25 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int* flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void startTransferDisplay(bool displayMemo, volatile unsigned int* flags) {
+void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
-    pairs[index].item = "Sender";
-    pairs[index].value = (char*) global_account_sender.sender;
-    index++;
-    pairs[index].item = "Recipient";
-    pairs[index].value = (char*) global.withDataBlob.signTransferContext.displayStr;
+    pairs[index].item = "From";
+    pairs[index].value = (char *) global_account_sender.sender;
     index++;
     pairs[index].item = "Amount";
-    pairs[index].value = (char*) global.withDataBlob.signTransferContext.displayAmount;
+    pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayAmount;
+    index++;
+    pairs[index].item = "To";
+    pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayStr;
     index++;
     if (displayMemo) {
         pairs[index].item = "Memo";
-        pairs[index].value = (char*) global.withDataBlob.cborContext.display;
+        pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
     }
+    pairs[index].item = "Max fees";
+    pairs[index].value = (char *) global.withDataBlob.signTransferContext.energy_amount_str;
+    index++;
 
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -1022,25 +1025,25 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int* flags) {
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &content,
                        &ICON_APP_HOME,
-                       "Review Transfer",
+                       "Review transaction to send CCD",
                        NULL,  // No subtitle
-                       "Sign Transfer",
+                       "Sign transaction to send CCD",
                        review_choice_sign);
 
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void uiSignTransferToPublicDisplay(volatile unsigned int* flags) {
+void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
     // Setup data to display
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
     pairs[pairIndex].item = "Unshield amount";
-    pairs[pairIndex].value = (char*) global.signTransferToPublic.amount;
+    pairs[pairIndex].value = (char *) global.signTransferToPublic.amount;
     pairIndex++;
     pairs[pairIndex].item = "Recipient";
-    pairs[pairIndex].value = (char*) global.signTransferToPublic.recipientAddress;
+    pairs[pairIndex].value = (char *) global.signTransferToPublic.recipientAddress;
     pairIndex++;
 
     // Create the page content
@@ -1075,10 +1078,11 @@ void uiSignScheduledTransferPairFlowDisplay(void) {
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Release time (UTC)";
     pairs[pairIndex].value =
-        (char*) global.withDataBlob.signTransferWithScheduleContext.displayTimestamp;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayTimestamp;
     pairIndex++;
     pairs[pairIndex].item = "Amount";
-    pairs[pairIndex].value = (char*) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+    pairs[pairIndex].value =
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
     pairIndex++;
 
     // Create the page content
@@ -1103,10 +1107,11 @@ void uiSignScheduledTransferPairFlowSignDisplay(void) {
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Release time (UTC)";
     pairs[pairIndex].value =
-        (char*) global.withDataBlob.signTransferWithScheduleContext.displayTimestamp;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayTimestamp;
     pairIndex++;
     pairs[pairIndex].item = "Amount";
-    pairs[pairIndex].value = (char*) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+    pairs[pairIndex].value =
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
     pairIndex++;
 
     // Create the page content
@@ -1126,10 +1131,10 @@ void uiSignScheduledTransferPairFlowSignDisplay(void) {
                        review_choice_sign);
 }
 
-void uiVerifyAddress(volatile unsigned int* flags) {
+void uiVerifyAddress(volatile unsigned int *flags) {
     uint8_t index = 0;
     pairs[index].item = "Identity";
-    pairs[index].value = (char*) global.verifyAddressContext.display;
+    pairs[index].value = (char *) global.verifyAddressContext.display;
     index++;
 
     // Create the page content
@@ -1140,7 +1145,7 @@ void uiVerifyAddress(volatile unsigned int* flags) {
     content.nbMaxLinesForValue = 0;
     content.startIndex = 0;
     // Setup the review screen
-    nbgl_useCaseAddressReview((char*) global.verifyAddressContext.address,
+    nbgl_useCaseAddressReview((char *) global.verifyAddressContext.address,
                               &content,
                               &ICON_APP_HOME,
                               "Verify Address",
@@ -1152,14 +1157,14 @@ void uiVerifyAddress(volatile unsigned int* flags) {
 void startInitialScheduledTransferDisplay(bool displayMemo) {
     uint8_t index = 0;
     pairs[index].item = "Sender";
-    pairs[index].value = (char*) global_account_sender.sender;
+    pairs[index].value = (char *) global_account_sender.sender;
     index++;
     pairs[index].item = "Recipient";
-    pairs[index].value = (char*) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+    pairs[index].value = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
     index++;
     if (displayMemo) {
         pairs[index].item = "Memo";
-        pairs[index].value = (char*) global.withDataBlob.cborContext.display;
+        pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
     }
     // Create the page content
@@ -1181,9 +1186,9 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
 
 void uiDeployModuleDisplay(void) {
     pairs[0].item = "Sender";
-    pairs[0].value = (char*) global_account_sender.sender;
+    pairs[0].value = (char *) global_account_sender.sender;
     pairs[1].item = "Version";
-    pairs[1].value = (char*) global.deployModule.versionDisplay;
+    pairs[1].value = (char *) global.deployModule.versionDisplay;
 
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -1205,16 +1210,16 @@ void uiDeployModuleDisplay(void) {
 void uiUpdateContractDisplay(void) {
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
     pairs[pairIndex].item = "Amount";
-    pairs[pairIndex].value = (char*) global.updateContract.amountDisplay;
+    pairs[pairIndex].value = (char *) global.updateContract.amountDisplay;
     pairIndex++;
     pairs[pairIndex].item = "Index";
-    pairs[pairIndex].value = (char*) global.updateContract.indexDisplay;
+    pairs[pairIndex].value = (char *) global.updateContract.indexDisplay;
     pairIndex++;
     pairs[pairIndex].item = "Sub index";
-    pairs[pairIndex].value = (char*) global.updateContract.subIndexDisplay;
+    pairs[pairIndex].value = (char *) global.updateContract.subIndexDisplay;
     pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -1236,13 +1241,13 @@ void uiUpdateContractDisplay(void) {
 void uiInitContractDisplay(void) {
     uint8_t pairIndex = 0;
     pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char*) global_account_sender.sender;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
     pairIndex++;
     pairs[pairIndex].item = "Amount";
-    pairs[pairIndex].value = (char*) global.initContract.amountDisplay;
+    pairs[pairIndex].value = (char *) global.initContract.amountDisplay;
     pairIndex++;
     pairs[pairIndex].item = "Module ref";
-    pairs[pairIndex].value = (char*) global.initContract.moduleRefDisplay;
+    pairs[pairIndex].value = (char *) global.initContract.moduleRefDisplay;
     pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;

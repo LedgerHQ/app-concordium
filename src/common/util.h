@@ -1,6 +1,7 @@
 #pragma once
 
 #include "globals.h"
+#include "signTransfer.h"
 
 #define MAX_MEMO_SIZE 256
 #define MAX_DATA_SIZE (MAX_MEMO_SIZE)
@@ -178,13 +179,16 @@ int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpd
  * @param dataLength the length of the incoming command data
  * @param kind the transaction type
  * @param recipientDst the destination where to write the base58 encoded recipient address
+ * @param energy_amount, the destination where to write the fees amount
  * @param recipientSize the size of the recipient destination
  */
 int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,
                              uint8_t kind,
                              uint8_t *recipientDst,
-                             size_t recipientSize);
+                             size_t recipientSize,
+                             uint8_t *feesDst,
+                             size_t feesSize);
 
 /**
  * Calculates a BLS12-381 private-key using the seed at the provided key path.
