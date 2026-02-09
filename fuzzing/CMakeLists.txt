@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(StandaloneFuzzer VERSION 1.1 DESCRIPTION "Standalone Export Private Key Fuzzer" LANGUAGES C)
+project(StandaloneFuzzer VERSION 1.1.1 DESCRIPTION "Standalone Fuzzer" LANGUAGES C)
 
 if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
   find_program(CLANG_EXECUTABLE clang)
