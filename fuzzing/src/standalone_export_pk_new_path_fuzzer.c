@@ -36,7 +36,7 @@ typedef enum {
 #define P1_CREATION_OF_ZK_PROOF         0x04
 
 // Derivation path constants
-#define NEW_PURPOSE     1105
+#define NEW_PURPOSE     44
 #define NEW_COIN_TYPE   919
 #define HARDENED_OFFSET 0x80000000
 
