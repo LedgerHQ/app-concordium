@@ -36,7 +36,7 @@ typedef enum {
 #define P1_CREATION_OF_ZK_PROOF         0x04
 
 // Derivation path constants
-#define NEW_PURPOSE     1105
+#define NEW_PURPOSE     44
 #define NEW_COIN_TYPE   919
 #define HARDENED_OFFSET 0x80000000
 
@@ -55,7 +55,7 @@ typedef enum {
 // Mock explicit_bzero - secure memory clearing
 void explicit_bzero(void *ptr, size_t size) {
     if (ptr) {
-        volatile uint8_t *p = (volatile uint8_t *)ptr;
+        volatile uint8_t *p = (volatile uint8_t *) ptr;
         for (size_t i = 0; i < size; i++) {
             p[i] = 0;
         }
@@ -64,13 +64,13 @@ void explicit_bzero(void *ptr, size_t size) {
 
 // Mock bin2dec - convert binary to decimal string
 size_t bin2dec(uint8_t *dst, size_t dst_size, uint32_t value) {
-    int ret = snprintf((char *)dst, dst_size, "%u", value);
-    return (ret > 0 && ret < (int)dst_size) ? ret + 1 : 0;
+    int ret = snprintf((char *) dst, dst_size, "%u", value);
+    return (ret > 0 && ret < (int) dst_size) ? ret + 1 : 0;
 }
 
 // Mock number helpers - simplified versions
 void numberToText(uint8_t *dst, size_t dst_size, uint64_t number) {
-    snprintf((char *)dst, dst_size, "%llu", number);
+    snprintf((char *) dst, dst_size, "%llu", number);
 }
 
 uint8_t lengthOfNumber(uint64_t number) {
@@ -107,9 +107,9 @@ int getBlsPrivateKey(uint32_t *derivationPath,
 }
 
 // Utility macro for reading big-endian 32-bit integers
-#define U4BE(buf, off)                                                                \
-    ((uint32_t)(((buf)[off] << 24) | ((buf)[off + 1] << 16) | ((buf)[off + 2] << 8) | \
-                ((buf)[off + 3])))
+#define U4BE(buf, off)                                                                 \
+    ((uint32_t) (((buf)[off] << 24) | ((buf)[off + 1] << 16) | ((buf)[off + 2] << 8) | \
+                 ((buf)[off + 3])))
 
 // ========== STEP 4: MOCK exportNewPathPrivateKeysForPurpose ==========
 // Simplified version of the real function
@@ -220,7 +220,7 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     // Generate the private keys
     uint8_t outputBuffer[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     int bytesWritten = exportNewPathPrivateKeysForPurpose(
-        (derivation_path_key_t)(p1 % 4),  // Convert p1 to valid purpose
+        (derivation_path_key_t) (p1 % 4),  // Convert p1 to valid purpose
         identityProvider,
         identity,
         account,
@@ -259,7 +259,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Call the target function
     volatile unsigned int flags = 0;
-    handleExportPrivateKeyNewPath((uint8_t *)command_data, p1, lc, &flags);
+    handleExportPrivateKeyNewPath((uint8_t *) command_data, p1, lc, &flags);
 
     printf("Fuzzer iteration completed successfully\n");
     return 0;
