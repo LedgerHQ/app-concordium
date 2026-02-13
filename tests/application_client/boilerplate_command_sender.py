@@ -229,7 +229,7 @@ class BoilerplateCommandSender:
             self.backend.exchange(
                 cla=CLA,
                 ins=InsType.SIGN_TRANSFER_WITH_MEMO,
-                p1=index,
+                p1=0x02,
                 p2=P2.P2_NONE,
                 data=chunk,
             )
@@ -237,7 +237,7 @@ class BoilerplateCommandSender:
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER_WITH_MEMO,
-            p1=index,
+            p1=0x03,
             p2=P2.P2_NONE,
             data=amount,
         ) as response:
