@@ -3,8 +3,10 @@
 #include "globals.h"
 #include "signTransfer.h"
 
-#define MAX_MEMO_SIZE 256
-#define MAX_DATA_SIZE (MAX_MEMO_SIZE)
+#define CBOR_2BYTE_HEADER    2
+#define MAX_MEMO_STRING_SIZE 255
+#define MAX_MEMO_CBOR_SIZE   CBOR_2BYTE_HEADER + MAX_MEMO_STRING_SIZE
+#define MAX_DATA_SIZE        (MAX_MEMO_CBOR_SIZE)
 
 /**
  * BLS12-381 subgroup G1's order:

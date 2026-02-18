@@ -104,8 +104,17 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     # Create the transaction that will be sent to the device for signing
     header_and_to_address = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
     header_and_to_address = bytes.fromhex(header_and_to_address)
-    memo = "6474657374"
-    memo = bytes.fromhex(memo)
+
+    memo_payload = (
+        "The quick brown fox jumps over the lazy dog. Pack my box with five dozen "
+        "liquor jugs. Jackdaws love my big sphinx of quartz. Quick zephyrs blow, "
+        "vexing daft Jim. Sphinx of black quartz, judge my vow. How quickly daft "
+        "jumping zebras vex!"
+    )
+
+    payload_bytes = memo_payload.encode("utf-8")
+    memo = bytes([0x78, len(memo_payload)]) + payload_bytes
+    # memo = bytes.fromhex(memo)
     amount = "ffffffffffffffff"
     amount = bytes.fromhex(amount)
 
@@ -129,7 +138,7 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     print("response", response_hex)
     assert (
         response_hex
-        == "a588094eef4ed6053df2ab4b851bc5ec09b311c204d2fa94a9c7d7c8feebf74de26d2d2a547f18c4e959b24388394305ebd3dca99653de1cb1aa689bb6674207"
+        == "6c0b0ada297d35d79a76df87b30c4ae3c9b29fdfe5647e56ea3f9c1334366bfb942716dc4d236395ffaee5a4671b90118c28295cc12094cb7188a8354e92f600"
     )
     # assert check_signature_validity(public_key, der_sig, transaction)
 

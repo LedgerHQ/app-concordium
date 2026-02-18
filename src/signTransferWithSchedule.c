@@ -124,7 +124,7 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
         memo_ctx->cborLength = U2BE(cdata, 0);
-        if (memo_ctx->cborLength > MAX_MEMO_SIZE) {
+        if (memo_ctx->cborLength > MAX_MEMO_CBOR_SIZE) {
             THROW(ERROR_INVALID_PARAM);
         }
 
