@@ -11,9 +11,9 @@
 /**
  * BLS12-381 subgroup G1's order:
  */
-static const uint8_t r[32] = {0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8,
-                              0x08, 0x09, 0xa1, 0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe,
-                              0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
+static const uint8_t bls12_381_r[32] = {
+    0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1, 0xd8, 0x05,
+    0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
 
 /**
  * Converts bytes into uint64_t (big endian).
@@ -176,13 +176,15 @@ int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpd
 /**
  * Adds the account transaction header and the recipient address to the transaction hash, and
  * writes the base58 encoded recipient address for later display.
- * @param cdata the incoming command data pointing to the start of the input, i.e. with the key path
- * at the start
- * @param dataLength the length of the incoming command data
- * @param kind the transaction type
- * @param recipientDst the destination where to write the base58 encoded recipient address
- * @param energy_amount, the destination where to write the fees amount
- * @param recipientSize the size of the recipient destination
+ * @param [in]  cdata the incoming command data pointing to the start of the input, i.e. with the
+ * key path at the start
+ * @param [in]  dataLength the length of the incoming command data
+ * @param [in]  kind the transaction type
+ * @param [out] recipientDst the destination where to write the base58 encoded recipient address
+ * @param [in]  recipientSize the size of the recipient destination buffer in bytes
+ * @param [out] feesDst       the destination where the encoded fees amount will be written
+ * @param [in]  feesSize      the size of the fees destination buffer in bytes
+ *
  */
 int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,

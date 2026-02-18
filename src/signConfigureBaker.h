@@ -31,13 +31,13 @@ typedef struct {
 
 typedef struct {
     uint16_t urlLength;
-    uint8_t urlDisplay[256];
+    uint8_t urlDisplay[COMMON_URL_DISPLAY_SIZE];
 } configureBakerUrl_t;
 
 typedef struct {
-    uint8_t transactionFeeCommissionRate[8];
-    uint8_t bakingRewardCommissionRate[8];
-    uint8_t finalizationRewardCommissionRate[8];
+    uint8_t transactionFeeCommissionRate[COMMON_COMMISSION_SIZE];
+    uint8_t bakingRewardCommissionRate[COMMON_COMMISSION_SIZE];
+    uint8_t finalizationRewardCommissionRate[COMMON_COMMISSION_SIZE];
 } configureBakerCommisionRates_t;
 
 typedef struct {

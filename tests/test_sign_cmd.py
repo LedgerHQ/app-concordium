@@ -1,12 +1,11 @@
 import pytest
 
-from application_client.boilerplate_transaction import Transaction
-from application_client.boilerplate_command_sender import (
-    BoilerplateCommandSender,
+from application_client.command_sender import (
+    CommandSender,
     Errors,
     InsType,
 )
-from application_client.boilerplate_response_unpacker import (
+from application_client.response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
@@ -27,7 +26,7 @@ def test_sign_tx_simple_transfer_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/1105/0/0/0/0/2/0/0"
 
@@ -63,7 +62,7 @@ def test_sign_tx_simple_transfer_new_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/44/919/0/0/0/0"
 
@@ -98,7 +97,7 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # The path used for this entire test
     path: str = "m/1105/0/0/0/0/2/0/0"
 
@@ -137,7 +136,6 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
     response = client.get_async_response().data
     response_hex = response.hex()
     print("response", response_hex)
-    # TODO: verify the signature
     assert (
         response_hex
         == "6c0b0ada297d35d79a76df87b30c4ae3c9b29fdfe5647e56ea3f9c1334366bfb942716dc4d236395ffaee5a4671b90118c28295cc12094cb7188a8354e92f600"
@@ -150,7 +148,7 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # Define the path for the transaction
     path = "m/1105/0/0/0/0/2/0/0"
 
@@ -198,8 +196,8 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
     screenshots_so_far = 3
     if backend.device.is_nano:
         screenshots_so_far = 6
-#    elif backend.device.type == DeviceType.APEX_P:
-#        screenshots_so_far = 4
+    #    elif backend.device.type == DeviceType.APEX_P:
+    #        screenshots_so_far = 4
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -230,8 +228,6 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
     # The device as yielded the result, parse it and ensure that the signature is correct
     response = client.get_async_response().data
     response_hex = response.hex()
-    print("km------------response", response_hex)
-    # TODO: verify the signature
     assert (
         response_hex
         == "e22fa38f78a79db71e84376c4eec2382166cdc412994207e7631b0ba3828f069b17b6f30351a64c50e5efacec3fe25161e9f7131e0235cd740739b24e0b06308"
@@ -243,7 +239,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Initialize the command sender client
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     # Define the path for the transaction
     path = "m/1105/0/0/0/0/2/0/0"
 
@@ -281,7 +277,6 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
         num_pairs=len(pairs),
         memo_length=len(memo),
     )
-    print("km------------response", response)
     assert response.status == 0x9000
     # Send the part with the memo
     for chunk in memo_chunks:
@@ -333,8 +328,6 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     # The device as yielded the result, parse it and ensure that the signature is correct
     response = client.get_async_response().data
     response_hex = response.hex()
-    print("km------------response", response_hex)
-    # TODO: verify the signature
     assert (
         response_hex
         == "9056db36dfa7b0ba722660b2becb227ed490dcaff9e332a7fba4c6d534ff0ff3368b21da8e7ebb62891be561261abd7c0435dfb46e596b1116c9996269d2a70b"

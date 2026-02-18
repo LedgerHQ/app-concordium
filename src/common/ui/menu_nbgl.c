@@ -21,7 +21,7 @@
 #include "globals.h"
 #include "display.h"
 
-static tx_state_t* tx_state = &global_tx_state;
+static tx_state_t *tx_state = &global_tx_state;
 
 //  -----------------------------------------------------------
 //  ----------------------- HOME PAGE -------------------------
@@ -36,8 +36,8 @@ void app_quit(void) {
 //  --------------------- SETTINGS MENU -----------------------
 //  -----------------------------------------------------------
 #define SETTING_INFO_NB 2
-static const char* const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer"};
-static const char* const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Hoodies"};
+static const char *const INFO_TYPES[SETTING_INFO_NB] = {"Version", "Developer"};
+static const char *const INFO_CONTENTS[SETTING_INFO_NB] = {APPVERSION, "Hoodies"};
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = SETTING_INFO_NB,
     .infoTypes = INFO_TYPES,

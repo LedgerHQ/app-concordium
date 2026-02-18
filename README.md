@@ -132,7 +132,46 @@ python3 -m ledgerblue.runScript --scp --fileName bin/app.apdu --elfFile bin/app.
 
 ## Test
 
-The concordium app comes with functional tests implemented with Ledger's [Ragger](https://github.com/LedgerHQ/ragger) test framework.
+The concordium app comes with both functional tests and fuzz testing capabilities.
+
+### Functional Tests
+
+The functional tests are implemented with Ledger's [Ragger](https://github.com/LedgerHQ/ragger) test framework.
+
+### Fuzzing
+
+The app includes standalone fuzz testing capabilities in the `fuzzing/` directory. One fuzzer is provided:
+
+1. `standalone_export_pk_new_path_fuzzer` - Tests the private key export functionality
+
+To build and run the fuzzers:
+
+```shell
+# Navigate to fuzzing directory
+cd fuzzing
+
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake (requires Clang)
+cmake ..
+
+# Build the fuzzers
+make
+
+# Run a fuzzer 
+./standalone_export_pk_new_path_fuzzer
+```
+
+The fuzzers are designed to be compatible with ClusterFuzzLite and support various sanitizers (Address, Memory) which can be enabled via environment variables:
+
+```shell
+# Run with Address Sanitizer
+SANITIZER=address ./standalone_export_pk_new_path_fuzzer
+
+# Run with Memory Sanitizer
+SANITIZER=memory ./standalone_export_pk_new_path_fuzzer
+```
 
 ### macOS / Windows
 
@@ -158,6 +197,42 @@ On Linux, you can use [Ledger's VS Code extension](#with-vscode) to run the test
 Install the tests requirements :
 
 ```shell
+pip install -r tests/requirements.txt
+```
+
+**Troubleshooting Installation Issues:**
+
+If you encounter build errors with `coincurve` (a dependency of `ecdsa`), try the following solutions:
+
+**On macOS:**
+```shell
+# Install system dependencies
+brew install libffi openssl
+
+# Set environment variables for compilation
+export LDFLAGS="-L$(brew --prefix openssl)/lib"
+export CPPFLAGS="-I$(brew --prefix openssl)/include"
+
+# Then install requirements
+pip install -r tests/requirements.txt
+```
+
+**On Ubuntu/Debian:**
+```shell
+# Install system dependencies
+sudo apt-get update
+sudo apt-get install build-essential libffi-dev libssl-dev
+
+# Then install requirements
+pip install -r tests/requirements.txt
+```
+
+**Alternative approach (if coincurve continues to fail):**
+```shell
+# Install coincurve separately with pre-compiled wheels
+pip install coincurve --only-binary=coincurve
+
+# Then install the rest
 pip install -r tests/requirements.txt
 ```
 

@@ -40,6 +40,7 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
  */
 int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, uint8_t validType) {
     if (dataLength < headerLength + 1) {
+        PRINTF("Issue with length\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     updateHash((cx_hash_t *) &tx_state->hash, cdata, headerLength);
@@ -47,6 +48,7 @@ int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, 
 
     uint8_t type = cdata[0];
     if (type != validType) {
+        PRINTF("Received kind is different than the expected one\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -70,10 +72,10 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
     size_t outputSize = sizeof(accountSender->sender);
     if (base58check_encode(cdata, 32, accountSender->sender, &outputSize) == -1) {
         // The received address bytes are not a valid base58 encoding.
+        PRINTF("The received address bytes are not valid base85 encoded\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     accountSender->sender[55] = '\0';
-
     return hashHeaderAndType(cdata,
                              dataLength,
                              ACCOUNT_TRANSACTION_HEADER_LENGTH,
@@ -118,7 +120,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
     remainingDataLength -= headerLength;
 
     // Extract the recipient address and add to the hash.
-    uint8_t toAddress[32];
+    uint8_t toAddress[COMMON_HASH_SIZE];
     if (remainingDataLength < 32) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
@@ -206,7 +208,7 @@ void ensureNoError(cx_err_t errorCode) {
 void getPrivateKey(uint32_t *keyPathInput,
                    uint8_t keyPathLength,
                    cx_ecfp_private_key_t *privateKey) {
-    uint8_t privateKeyData[64];
+    uint8_t privateKeyData[COMMON_SIGNATURE_SIZE];
 
     // Invoke the device methods for generating a private key.
     // Wrap in try/finally to ensure that private key information is cleaned up, even if a system
@@ -282,7 +284,7 @@ void sign(uint8_t *input, uint8_t *signatureOnInput) {
     END_TRY;
 }
 
-#define l_CONST        48  // ceil((3 * ceil(log2(r))) / 16)
+#define l_CONST        48  // ceil((3 * ceil(log2(bls12_381_r))) / 16)
 #define BLS_KEY_LENGTH 32
 #define SEED_LENGTH    32
 
@@ -357,11 +359,11 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
                        sk,
                        sizeof(sk));
 
-        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), r, sizeof(r)));
+        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), bls12_381_r, sizeof(bls12_381_r)));
     } while (cx_math_is_zero(sk, sizeof(sk)));
 
-    // Skip the first 16 bytes, because they are 0 due to calculating modulo r, which is 32 bytes
-    // (and sk has 48 bytes).
+    // Skip the first 16 bytes, because they are 0 due to calculating modulo bls12_381_r, which is
+    // 32 bytes (and sk has 48 bytes).
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
 }
 

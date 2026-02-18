@@ -18,7 +18,7 @@ static cborContext_t *ctx = &global.withDataBlob.cborContext;
 void buildAndSignTransactionHash() {
     hash((cx_hash_t *) &tx_state->hash, CX_LAST, NULL, 0, tx_state->transactionHash, 32);
 
-    uint8_t signedHash[64];
+    uint8_t signedHash[COMMON_SIGNATURE_SIZE];
     sign(tx_state->transactionHash, signedHash);
     if (sizeof(signedHash) > sizeof(G_io_apdu_buffer)) {
         THROW(ERROR_BUFFER_OVERFLOW);

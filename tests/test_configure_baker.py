@@ -1,6 +1,6 @@
 import pytest
 
-from application_client.boilerplate_command_sender import BoilerplateCommandSender
+from application_client.command_sender import CommandSender
 from utils import navigate_until_text_and_compare
 from ragger.navigator import NavInsID
 
@@ -24,7 +24,7 @@ def test_sign_configure_baker_capital_restake_open_status_and_keys(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     transaction = "0000FFFFFFFFFFFF01027873cd57848d7aea7be03fbb3f1e8b9e69987fc73f13e473356776a16f26c96ba47cdf9133572e9ad5c02c3a7ffd1d05db7bb98860d918092454146153d62788f224c0157c65853ed4a0245ab3e0a593a3f85fa81cc4cb99eeaa643bfc793eab32f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c082801fc695a8c51d4599cbe032a39832ad49bab900d88105b01d025b760b0d0d555b8c828f2d8fe29cc78c6307d979e6358b8bba9cf4d8200f272cc85b2a3813eff"
@@ -61,7 +61,7 @@ def test_sign_configure_baker_stop_baking(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     transaction = "0000000000000000"
@@ -97,7 +97,7 @@ def test_sign_configure_baker_capital_restake_open_status_without_keys(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     transaction = "0000FFFFFFFFFFFF0102"
@@ -133,7 +133,7 @@ def test_sign_configure_baker_only_keys(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     transaction = (
@@ -172,7 +172,7 @@ def test_sign_configure_baker_url_only(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     url_bytes = url.encode("utf-8")
@@ -207,7 +207,7 @@ def test_sign_configure_baker_commission_rate_only(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction that will be sent to the device for signing
     url_bytes = url.encode("utf-8")
@@ -244,7 +244,7 @@ def test_sign_configure_baker_suspended_only(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     bitmap = "0100"
     bitmap = bytes.fromhex(bitmap)
 
@@ -274,7 +274,7 @@ def test_sign_configure_baker_all_parameters(
     backend, navigator, default_screenshot_path, test_name
 ):
 
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
 
     # Create the transaction with all keys
     transaction = "0000FFFFFFFFFFFF01027873cd57848d7aea7be03fbb3f1e8b9e69987fc73f13e473356776a16f26c96ba47cdf9133572e9ad5c02c3a7ffd1d05db7bb98860d918092454146153d62788f224c0157c65853ed4a0245ab3e0a593a3f85fa81cc4cb99eeaa643bfc793eab32f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c082801fc695a8c51d4599cbe032a39832ad49bab900d88105b01d025b760b0d0d555b8c828f2d8fe29cc78c6307d979e6358b8bba9cf4d8200f272cc85b2a3813eff"

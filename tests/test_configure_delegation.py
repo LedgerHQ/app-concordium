@@ -1,6 +1,6 @@
 import pytest
 
-from application_client.boilerplate_command_sender import BoilerplateCommandSender
+from application_client.command_sender import CommandSender
 from utils import navigate_until_text_and_compare
 
 
@@ -13,7 +13,7 @@ def test_sign_configure_delegation_capital(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -43,7 +43,7 @@ def test_sign_configure_delegation_stop_delegation(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -73,7 +73,7 @@ def test_sign_configure_delegation_restake(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -103,7 +103,7 @@ def test_sign_configure_delegation_target(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -133,7 +133,7 @@ def test_sign_configure_delegation_capital_target(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -163,7 +163,7 @@ def test_sign_configure_delegation_capital_restake_target(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
@@ -193,7 +193,7 @@ def test_sign_configure_delegation_passive_delegation(
     backend, navigator, default_screenshot_path, test_name
 ):
     # Use the app interface instead of raw interface
-    client = BoilerplateCommandSender(backend)
+    client = CommandSender(backend)
     path: str = "m/44/919/0/0/0/0"
 
     # Create the transaction that will be sent to the device for signing
