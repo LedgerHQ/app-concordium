@@ -63,10 +63,11 @@
 #include "initContract.h"
 #include "updateContract.h"
 
-#define LEGACY_PURPOSE   1105
-#define LEGACY_COIN_TYPE 0
-#define NEW_PURPOSE      44
-#define NEW_COIN_TYPE    919
+#define LEGACY_PURPOSE        1105
+#define LEGACY_COIN_TYPE      0
+#define NEW_PURPOSE           44
+#define NEW_MAINNET_COIN_TYPE 919
+#define NEW_TESTNET_COIN_TYPE 1
 
 #define MAX_CDATA_LENGTH 255
 

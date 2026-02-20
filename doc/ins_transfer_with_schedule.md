@@ -1,7 +1,7 @@
 # Transfer with schedule
 
-A transaction to send GTU from one account to another with a schedule, i.e. each transfer
-of a GTU amount can be set to be released at a specific point in time.
+A transaction to send CCD from one account to another with a schedule, i.e. each transfer
+of a CCD amount can be set to be released at a specific point in time.
 
 ## Protocol description
 
