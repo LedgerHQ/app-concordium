@@ -1,7 +1,7 @@
 #include "globals.h"
 
-#define LEGACY_ACCOUNT_SUBTREE 0
-#define LEGACY_NORMAL_ACCOUNTS 0
+#define LEGACY_ACCOUNT_SUBTREE     0
+#define LEGACY_NORMAL_ACCOUNTS     0
 #define MAX_DERIVATION_PATH_LENGTH 6
 
 static verifyAddressContext_t *ctx = &global.verifyAddressContext;
@@ -103,7 +103,6 @@ void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p2,
                          uint8_t lc,
                          volatile unsigned int *flags) {
-
     size_t offset = 0;
     bool is_new_path = p1 == 0x01;
     uint32_t identityProvider = 0;
@@ -150,10 +149,10 @@ void handleVerifyAddress(uint8_t *cdata,
         prfKeyPath[4] = NEW_PRF_KEY | HARDENED_OFFSET;
 
         getIdentityAccountDisplayNewPath(ctx->display,
-                sizeof(ctx->display),
-                identityProvider,
-                identity,
-                credCounter);
+                                         sizeof(ctx->display),
+                                         identityProvider,
+                                         identity,
+                                         credCounter);
     } else {
         prfKeyPath[0] = LEGACY_PURPOSE | HARDENED_OFFSET;
         prfKeyPath[1] = LEGACY_COIN_TYPE | HARDENED_OFFSET;
