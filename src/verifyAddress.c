@@ -1,7 +1,8 @@
 #include "globals.h"
 
-#define LEGACY_ACCOUNT_SUBTREE 0
-#define LEGACY_NORMAL_ACCOUNTS 0
+#define LEGACY_ACCOUNT_SUBTREE     0
+#define LEGACY_NORMAL_ACCOUNTS     0
+#define MAX_DERIVATION_PATH_LENGTH 6
 
 static verifyAddressContext_t *ctx = &global.verifyAddressContext;
 
@@ -97,7 +98,11 @@ end:
     return error;
 }
 
-void handleVerifyAddress(uint8_t *cdata, uint8_t p1, uint8_t lc, volatile unsigned int *flags) {
+void handleVerifyAddress(uint8_t *cdata,
+                         uint8_t p1,
+                         uint8_t p2,
+                         uint8_t lc,
+                         volatile unsigned int *flags) {
     size_t offset = 0;
     bool is_new_path = p1 == 0x01;
     uint32_t identityProvider = 0;
@@ -122,29 +127,40 @@ void handleVerifyAddress(uint8_t *cdata, uint8_t p1, uint8_t lc, volatile unsign
     uint32_t credCounter = U4BE(cdata, offset);
 
     size_t prfKeyPathLen = is_new_path ? 5 : 6;
-    uint32_t *prfKeyPath;
-    if (is_new_path) {
-        prfKeyPath = (uint32_t[5]){NEW_PURPOSE | HARDENED_OFFSET,
-                                   NEW_COIN_TYPE | HARDENED_OFFSET,
-                                   identityProvider | HARDENED_OFFSET,
-                                   identity | HARDENED_OFFSET,
-                                   NEW_PRF_KEY | HARDENED_OFFSET};
-    } else {
-        prfKeyPath = (uint32_t[6]){LEGACY_PURPOSE | HARDENED_OFFSET,
-                                   LEGACY_COIN_TYPE | HARDENED_OFFSET,
-                                   LEGACY_ACCOUNT_SUBTREE | HARDENED_OFFSET,
-                                   LEGACY_NORMAL_ACCOUNTS | HARDENED_OFFSET,
-                                   identity | HARDENED_OFFSET,
-                                   LEGACY_PRF_KEY | HARDENED_OFFSET};
-    }
+    uint32_t prfKeyPath[MAX_DERIVATION_PATH_LENGTH];
 
     if (is_new_path) {
+        prfKeyPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
+
+        switch (p2) {
+            case P2_MAINNET:
+                prfKeyPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
+                break;
+            case P2_TESTNET:
+                prfKeyPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
+                break;
+            default:
+                PRINTF("Invalid network type: %d\n", p2);
+                THROW(ERROR_INVALID_PARAM);
+        }
+
+        prfKeyPath[2] = identityProvider | HARDENED_OFFSET;
+        prfKeyPath[3] = identity | HARDENED_OFFSET;
+        prfKeyPath[4] = NEW_PRF_KEY | HARDENED_OFFSET;
+
         getIdentityAccountDisplayNewPath(ctx->display,
                                          sizeof(ctx->display),
                                          identityProvider,
                                          identity,
                                          credCounter);
     } else {
+        prfKeyPath[0] = LEGACY_PURPOSE | HARDENED_OFFSET;
+        prfKeyPath[1] = LEGACY_COIN_TYPE | HARDENED_OFFSET;
+        prfKeyPath[2] = LEGACY_ACCOUNT_SUBTREE | HARDENED_OFFSET;
+        prfKeyPath[3] = LEGACY_NORMAL_ACCOUNTS | HARDENED_OFFSET;
+        prfKeyPath[4] = identity | HARDENED_OFFSET;
+        prfKeyPath[5] = LEGACY_PRF_KEY | HARDENED_OFFSET;
+
         getIdentityAccountDisplay(ctx->display, sizeof(ctx->display), identity, credCounter);
     }
 

@@ -34,6 +34,7 @@ int editDerivationPathPerKeyType(uint32_t *derivationPath,
 }
 
 int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
+                                       uint8_t networkDesignation,
                                        uint32_t identityProvider,
                                        uint32_t identity,
                                        uint32_t account,
@@ -49,7 +50,20 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
     // Set the derivation path
     derivationPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
-    derivationPath[1] = NEW_COIN_TYPE | HARDENED_OFFSET;
+
+    // choose the appropriate coin type based on the network selection in p2
+    switch (networkDesignation) {
+        case P2_MAINNET:
+            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
+            break;
+        case P2_TESTNET:
+            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
+            break;
+        default:
+            PRINTF("Invalid network type: %d\n", networkDesignation);
+            THROW(ERROR_INVALID_PARAM);
+    }
+
     derivationPath[2] = identityProvider | HARDENED_OFFSET;
     derivationPath[3] = identity | HARDENED_OFFSET;
 
@@ -126,11 +140,18 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
 void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                                    uint8_t p1,
+                                   uint8_t p2,
                                    uint8_t lc,
                                    volatile unsigned int *flags) {
+    /////// validate p1 parameter //////
     if ((p1 != P1_IDENTITY_CREDENTIAL_CREATION && p1 != P1_ACCOUNT_CREATION &&
          p1 != P1_ID_RECOVERY && p1 != P1_ACCOUNT_CREDENTIAL_DISCOVERY &&
          p1 != P1_CREATION_OF_ZK_PROOF)) {
+        THROW(ERROR_INVALID_PARAM);
+    }
+
+    /////// validate p2 parameter //////
+    if ((p2 != P2_MAINNET && p2 != P2_TESTNET)) {
         THROW(ERROR_INVALID_PARAM);
     }
 
@@ -163,6 +184,7 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     }
 
     ctx->privateKeysLength = exportNewPathPrivateKeysForPurpose(p1,
+                                                                p2,
                                                                 identityProvider,
                                                                 identity,
                                                                 account,

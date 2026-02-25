@@ -90,6 +90,8 @@ class P2(IntEnum):
     P2_CREDENTIAL_ID_COUNT = 0x03  # Number of credential IDs
     P2_CREDENTIAL_ID = 0x04  # Credential ID
     P2_THRESHOLD = 0x05  # Threshold value
+    P2_MAINNET = 0x00
+    P2_TESTNET = 0x01
 
 
 class InsType(IntEnum):
@@ -608,6 +610,7 @@ class CommandSender:
             "account_credential_discovery",
             "creation_of_zk_proof",
         ],
+        network_indicator: Literal["mainnet", "testnet"],
         identity_index: int,
         idp_index: int,
         account_index: int = None,
@@ -625,6 +628,12 @@ class CommandSender:
             p1 = P1.P1_CREATION_OF_ZK_PROOF
         else:
             raise ValueError(f"Invalid export type: {export_type}")
+        if network_indicator == "mainnet":
+            p2 = P2.P2_MAINNET
+        elif network_indicator == "testnet":
+            p2 = P2.P2_TESTNET
+        else:
+            raise ValueError(f"Invalid network indicator: {network_indicator}")
         ins = InsType.EXPORT_PRIVATE_KEY_NEW
         data += idp_index.to_bytes(4, byteorder="big")
         data += identity_index.to_bytes(4, byteorder="big")
@@ -634,7 +643,7 @@ class CommandSender:
             cla=CLA,
             ins=ins,
             p1=p1,
-            p2=P2.P2_NONE,
+            p2=p2,
             data=data,
         ) as response:
             yield response

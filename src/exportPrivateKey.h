@@ -21,15 +21,19 @@
 // Export the BLS keys
 #define P2_LEGACY_KEY 0x02
 
-//// NEW PATHS ////
+//// NEW P1 PATHS ////
 #define P1_IDENTITY_CREDENTIAL_CREATION 0x00
 #define P1_ACCOUNT_CREATION             0x01
 #define P1_ID_RECOVERY                  0x02
 #define P1_ACCOUNT_CREDENTIAL_DISCOVERY 0x03
 #define P1_CREATION_OF_ZK_PROOF         0x04
 
+//// NEW P2 PATHS ////
+#define P2_MAINNET 0x00
+#define P2_TESTNET 0x01
+
 /**
- * Handles the export of private keys that are allowed to leave the device.
+ * Handles the export of id related private keys that are allowed to leave the device.
  * The export paths are restricted so that the method cannot access any account paths.
  * @param p1 has to be 0x00 for export of PRF key for decryption, 0x01 for export of PRF key for
  * recovering credentials and 0x02 for export of PRF key and IdCredSec.
@@ -43,8 +47,22 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
                                       uint8_t lc,
                                       volatile unsigned int *flags);
 
+/**
+ * Handles the export of sets of id related private keys that are allowed to leave the device.
+ * The export paths are restricted so that the method cannot access any account paths.
+ * @param p1 has to be:
+ * 0x00 for export of keys for Identity Creation,
+ * 0x01 for export of keys for Account Creation,
+ * 0x02 for export of keys for Identity Recovery,
+ * 0x03 for export of keys for Account Credential Discovery,
+ * 0x04 for export of keys for Creation of ZK Proofs.
+ * @param p2 determines the cointype to use for derivation:
+ * If set to 0x00, then mainnet derivations (m/44'/919') are used.
+ * If set to 0x01, then testnet derivations (m/44'/1') are used.
+ */
 void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                                    uint8_t p1,
+                                   uint8_t p2,
                                    uint8_t lc,
                                    volatile unsigned int *flags);
 

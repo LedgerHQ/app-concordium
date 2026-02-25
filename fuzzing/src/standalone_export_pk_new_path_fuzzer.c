@@ -35,9 +35,14 @@ typedef enum {
 #define P1_ACCOUNT_CREDENTIAL_DISCOVERY 0x03
 #define P1_CREATION_OF_ZK_PROOF         0x04
 
+//// NEW P2 PATHS ////
+#define P2_MAINNET 0x00
+#define P2_TESTNET 0x01
+
 // Derivation path constants
 #define NEW_PURPOSE     44
-#define NEW_COIN_TYPE   919
+#define NEW_MAINNET_COIN_TYPE   919
+#define NEW_TESTNET_COIN_TYPE   1
 #define HARDENED_OFFSET 0x80000000
 
 // ========== STEP 3: MOCK IMPLEMENTATIONS ==========
@@ -115,13 +120,15 @@ int getBlsPrivateKey(uint32_t *derivationPath,
 // Simplified version of the real function
 
 int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
+                                       uint8_t networkDesignation,
                                        uint32_t identityProvider,
                                        uint32_t identity,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
                                        size_t outputPrivateKeySize) {
-    printf("MOCK exportNewPathPrivateKeysForPurpose: purpose=%d, idp=%u, id=%u, account=%u\n",
+    printf("MOCK exportNewPathPrivateKeysForPurpose: purpose=%d, network=%d, idp=%u, id=%u, account=%u\n",
            purpose,
+           networkDesignation,
            identityProvider,
            identity,
            account);
@@ -131,7 +138,17 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
     uint8_t pathLength = 4;
 
     derivationPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
-    derivationPath[1] = NEW_COIN_TYPE | HARDENED_OFFSET;
+
+    // choose the appropriate coin type based on the network selection in p2
+    switch(networkDesignation) {
+        case P2_MAINNET:
+            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
+        break;
+        case P2_TESTNET:
+            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
+        break;
+    }
+
     derivationPath[2] = identityProvider | HARDENED_OFFSET;
     derivationPath[3] = identity | HARDENED_OFFSET;
 
@@ -175,15 +192,20 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
 
 void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                                    uint8_t p1,
+                                   uint8_t p2,
                                    uint8_t lc,
                                    volatile unsigned int *flags) {
     printf("=== handleExportPrivateKeyNewPath ===\n");
-    printf("p1=%d, lc=%d\n", p1, lc);
+    printf("p1=%d, p2=%d, lc=%d\n", p1, p2, lc);
 
     // Validate p1 parameter
     if (p1 != P1_IDENTITY_CREDENTIAL_CREATION && p1 != P1_ACCOUNT_CREATION &&
         p1 != P1_ID_RECOVERY && p1 != P1_ACCOUNT_CREDENTIAL_DISCOVERY &&
         p1 != P1_CREATION_OF_ZK_PROOF) {
+        THROW(ERROR_INVALID_PARAM);
+    }
+    // Validate p2 parameter
+    if ((p2 != 0 && p2 != 1)) {
         THROW(ERROR_INVALID_PARAM);
     }
 
@@ -221,6 +243,7 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     uint8_t outputBuffer[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     int bytesWritten = exportNewPathPrivateKeysForPurpose(
         (derivation_path_key_t) (p1 % 4),  // Convert p1 to valid purpose
+        (p2 == P2_MAINNET) ? P2_MAINNET : P2_TESTNET,  // Ensure valid network
         identityProvider,
         identity,
         account,
@@ -242,24 +265,25 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
 // ========== STEP 6: THE FUZZER ==========
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    // Need at least 9 bytes for a meaningful test
-    if (size < 9) return 0;
+    // Need at least 10 bytes for a meaningful test
+    if (size < 10) return 0;
 
     printf("\n=== FUZZER ITERATION (size=%zu) ===\n", size);
 
     // Extract parameters from fuzz input
     uint8_t p1 = data[0];
+    uint8_t p2 = data[1];
 
     // Clamp lc to available data
-    uint8_t lc = size - 1;
+    uint8_t lc = size - 2;
 
-    const uint8_t *command_data = data + 1;
+    const uint8_t *command_data = data + 2;
 
-    printf("Fuzzing with p1=%d, lc=%d\n", p1, lc);
+    printf("Fuzzing with p1=%d, p2=%d, lc=%d\n", p1, p2, lc);
 
     // Call the target function
     volatile unsigned int flags = 0;
-    handleExportPrivateKeyNewPath((uint8_t *) command_data, p1, lc, &flags);
+    handleExportPrivateKeyNewPath((uint8_t *) command_data, p1, p2, lc, &flags);
 
     printf("Fuzzer iteration completed successfully\n");
     return 0;

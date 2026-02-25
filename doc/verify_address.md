@@ -11,7 +11,8 @@ The address is the credId's sh256 hash, and is displayed in base58.
 
 - Single command
 
-| INS    | P1     | P2     | CDATA                                                             | Comment                                    |
-| ------ | ------ | ------ | ----------------------------------------------------------------- | ------------------------------------------ |
-| `0x00` | `0x00` | `0x00` | `identity[uint32] credCounter[uint32]`                            | Legacy derivation path                     |
-| `0x00` | `0x01` | `0x00` | `identityProvider[32 bytes] identity[uint32] credCounter[uint32]` | New derivation path with identity provider |
+| INS    | P1     | P2     | CDATA                                                             | Comment                                            |
+| ------ | ------ | ------ | ----------------------------------------------------------------- | -------------------------------------------------- |
+| `0x00` | `0x00` | `0x00` | `identity[uint32] credCounter[uint32]`                            | Legacy derivation path                             |
+| `0x00` | `0x01` | `0x00` | `identityProvider[32 bytes] identity[uint32] credCounter[uint32]` | New MainNet derivation path with identity provider |
+| `0x00` | `0x01` | `0x01` | `identityProvider[32 bytes] identity[uint32] credCounter[uint32]` | New TestNet derivation path with identity provider |

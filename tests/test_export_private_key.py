@@ -45,7 +45,7 @@ def test_export_recovery_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-             "Sign operation",
+            "Sign operation",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -89,7 +89,7 @@ def test_export_identity_credential_creation_private_key_new_path(
 ):
     client = CommandSender(backend)
     with client.export_private_key_new_path(
-        "identity_credential_creation", idp_index=0, identity_index=1
+        "identity_credential_creation", "mainnet", idp_index=0, identity_index=1
     ):
         navigate_until_text_and_compare(
             backend,
@@ -110,7 +110,7 @@ def test_export_account_creation_private_key_new_path(
 ):
     client = CommandSender(backend)
     with client.export_private_key_new_path(
-        "account_creation", idp_index=0, identity_index=1, account_index=2
+        "account_creation", "mainnet", idp_index=0, identity_index=1, account_index=2
     ):
         navigate_until_text_and_compare(
             backend,
@@ -131,7 +131,7 @@ def test_export_id_recovery_private_key_new_path(
 ):
     client = CommandSender(backend)
     with client.export_private_key_new_path(
-        "id_recovery", idp_index=0, identity_index=1
+        "id_recovery", "mainnet", idp_index=0, identity_index=1
     ):
         navigate_until_text_and_compare(
             backend,
@@ -152,7 +152,7 @@ def test_export_account_credential_discovery_private_key_new_path(
 ):
     client = CommandSender(backend)
     with client.export_private_key_new_path(
-        "account_credential_discovery", idp_index=0, identity_index=1
+        "account_credential_discovery", "mainnet", idp_index=0, identity_index=1
     ):
         navigate_until_text_and_compare(
             backend,
@@ -173,7 +173,11 @@ def test_export_creation_of_zk_proof_private_key_new_path(
 ):
     client = CommandSender(backend)
     with client.export_private_key_new_path(
-        "creation_of_zk_proof", idp_index=0, identity_index=1, account_index=2
+        "creation_of_zk_proof",
+        "mainnet",
+        idp_index=0,
+        identity_index=1,
+        account_index=2,
     ):
         navigate_until_text_and_compare(
             backend,

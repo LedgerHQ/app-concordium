@@ -39,38 +39,46 @@ The new path supports more diverse key export scenarios for different use cases 
 
 | INS    | P1     | P2     | CDATA                                                              | Comment                                                                                                   |
 | ------ | ------ | ------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `0x37` | `0x00` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | Identity Credential Creation: Export IDCredSec (BLS) + PRFKey (BLS) + Signature Blinding Randomness (BLS) |
-| `0x37` | `0x01` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (Ed25519)            |
-| `0x37` | `0x02` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | ID Recovery: Export IDCredSec (BLS) + Signature Blinding Randomness (BLS)                                 |
-| `0x37` | `0x03` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | Account Credential Discovery: Export PRFKey (BLS)                                                         |
-| `0x37` | `0x04` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | Zero-knowledge proofs: Export Commitment Randomness (Ed25519)                                             |
+| `0x37` | `0x00` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet Identity Credential Creation: Export IDCredSec (BLS) + PRFKey (BLS) + Signature Blinding Randomness (BLS) |
+| `0x37` | `0x01` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (Ed25519)        |
+| `0x37` | `0x02` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet ID Recovery: Export IDCredSec (BLS) + Signature Blinding Randomness (BLS)                            |
+| `0x37` | `0x03` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet Account Credential Discovery: Export PRFKey (BLS)                                       |
+| `0x37` | `0x04` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Zero-knowledge proofs: Export Commitment Randomness (Ed25519)                                   |
+| `0x37` | `0x00` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet Identity Credential Creation: Export IDCredSec (BLS) + PRFKey (BLS) + Signature Blinding Randomness (BLS) |
+| `0x37` | `0x01` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (Ed25519)        |
+| `0x37` | `0x02` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet ID Recovery: Export IDCredSec (BLS) + Signature Blinding Randomness (BLS)                            |
+| `0x37` | `0x03` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet Account Credential Discovery: Export PRFKey (BLS)                                       |
+| `0x37` | `0x04` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Zero-knowledge proofs: Export Commitment Randomness (Ed25519)                                   |
 
 ### Key Derivation Paths
 
+If P2 = 0x00 then keys are exported for MainNet use with Coin Type `919'` derivation paths.
+
+If P2 = 0x01 then keys are exported for TestNet use with Coin Type `1'` derivation paths.
 #### Identity Credential Creation (P1=0x00)
 
-- IDCredSec: `m/44'/919'/{IDP}'/{ID}'/2'` (BLS field element)
-- PRFKey: `m/44'/919'/{IDP}'/{ID}'/3'` (BLS field element)
-- Signature Blinding Randomness: `m/44'/919'/{IDP}'/{ID}'/4'` (BLS field element)
+- IDCredSec: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/2'` (BLS field element)
+- PRFKey: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/3'` (BLS field element)
+- Signature Blinding Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/4'` (BLS field element)
 
 #### Account Creation (P1=0x01)
 
-- PRFKey: `m/44'/919'/{IDP}'/{ID}'/3'` (BLS field element)
-- IDCredSec: `m/44'/919'/{IDP}'/{ID}'/2'` (BLS field element)
-- Commitment Randomness: `m/44'/919'/{IDP}'/{ID}'/5'/{Account Credential Index}'` (Ed25519)
+- PRFKey: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/3'` (BLS field element)
+- IDCredSec: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/2'` (BLS field element)
+- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (Ed25519)
 
 #### ID Recovery (P1=0x02)
 
-- IDCredSec: `m/44'/919'/{IDP}'/{ID}'/2'` (BLS field element)
-- Signature Blinding Randomness: `m/44'/919'/{IDP}'/{ID}'/4'` (BLS field element)
+- IDCredSec: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/2'` (BLS field element)
+- Signature Blinding Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/4'` (BLS field element)
 
 #### Account Credential Discovery (P1=0x03)
 
-- PRFKey: `m/44'/919'/{IDP}'/{ID}'/3'` (BLS field element)
+- PRFKey: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/3'` (BLS field element)
 
 #### Zero-knowledge proofs (P1=0x04)
 
-- Commitment Randomness: `m/44'/919'/{IDP}'/{ID}'/5'/{Account Credential Index}'` (Ed25519)
+- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (Ed25519)
 
 ### Key Export Format
 
