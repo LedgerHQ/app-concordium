@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include "glyphs.h"
 
+extern const bagl_icon_details_t C_app_concordium_64px;
+extern const bagl_icon_details_t C_app_concordium_48px;
+
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_HOME C_app_concordium_64px
 #elif defined(TARGET_APEX_P)

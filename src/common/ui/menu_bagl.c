@@ -18,6 +18,7 @@
 #ifdef HAVE_BAGL
 
 #include "globals.h"
+#include "menu_bagl.h"
 
 static tx_state_t *tx_state = &global_tx_state;
 

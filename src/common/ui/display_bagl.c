@@ -1,6 +1,8 @@
 #ifdef HAVE_BAGL
 #include "globals.h"
 
+#include "dispaly_bagl.h"
+
 accountSender_t global_account_sender;
 
 UX_STEP_NOCB(ux_display_memo_step_nocb,
