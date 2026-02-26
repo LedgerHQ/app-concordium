@@ -75,7 +75,7 @@ void handleGetPublicKey(uint8_t *cdata,
                 THROW(ERROR_INVALID_PATH);
             }
 
-            uint32_t purpose = keyPath->rawKeyDerivationPath[PATH_INDEX_PURPOSE];
+            uint32_t purpose = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
             if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }

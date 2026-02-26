@@ -102,7 +102,7 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 
     int length = lengthOfNumber(amount);
 
-    // If the amount is less than than the resolution, then the
+    // If the amount is less than the resolution, then the
     // amount has to be prefixed by '0.' as it will purely consist
     // of the decimals.
     if (amount < resolution) {
