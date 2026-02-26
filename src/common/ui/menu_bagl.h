@@ -14,6 +14,6 @@ extern const bagl_icon_details_t C_icon_certificate;
 extern const bagl_icon_details_t C_icon_dashboard_x;
 extern const bagl_icon_details_t C_icon_back;
 
-void ui_menu_main();
+void ui_menu_main(void);
 
 #endif  // MENU_BAGL_H

@@ -1,10 +1,11 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "glyphs.h"
 
-extern const bagl_icon_details_t C_app_concordium_64px;
-extern const bagl_icon_details_t C_app_concordium_48px;
+extern const nbgl_icon_details_t C_app_concordium_64px;
+extern const nbgl_icon_details_t C_app_concordium_48px;
 
 #if defined(TARGET_STAX) || defined(TARGET_FLEX)
 #define ICON_APP_HOME C_app_concordium_64px
@@ -36,7 +37,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage);
 void startConfigureBakerSuspendedDisplay(void);
 void startConfigureBakerDisplay(void);
 
-void startConfigureDelegationDisplay();
+void startConfigureDelegationDisplay(void);
 
 void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags);
