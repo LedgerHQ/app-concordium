@@ -12,19 +12,52 @@ from ragger.navigator import NavInsID
 
 
 def split_message(message: bytes, max_size: int) -> List[bytes]:
+    """
+    Splits a bytes message into a list of chunks, each with a maximum size of `max_size`.
+
+    Args:
+        message (bytes): The message to be split.
+        max_size (int): The maximum size of each chunk.
+
+    Returns:
+        List[bytes]: A list of byte chunks, each of length at most `max_size`.
+
+    Example:
+        >>> split_message(b'abcdefgh', 3)
+        [b'abc', b'def', b'gh']
+    """
     return [message[x : x + max_size] for x in range(0, len(message), max_size)]
 
 
 # Check if a signature of a given message is valid
-def check_signature_validity(
-    public_key: bytes, signature: bytes, message: bytes
-) -> bool:
-    pk: VerifyingKey = VerifyingKey.from_string(
-        public_key, curve=SECP256k1, hashfunc=sha256
-    )
-    return pk.verify(
-        signature=signature, data=message, hashfunc=keccak_256, sigdecode=sigdecode_der
-    )
+# def check_signature_validity(
+#     public_key: bytes, signature: bytes, message: bytes
+# ) -> bool:
+#     pk: VerifyingKey = VerifyingKey.from_string(
+#         public_key, curve=SECP256k1, hashfunc=sha256
+#     )
+#     return pk.verify(
+#         signature=signature, data=message, hashfunc=keccak_256, sigdecode=sigdecode_der
+#     )
+
+
+def build_tx_with_payload(
+    payload: str,
+    sender: str = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7",
+):
+    # Create the transaction that will be sent to the device for signing
+    _payload = bytes.fromhex(payload)
+    if len(sender) != 64:
+        raise Exception("The sender address should be 64characters")
+
+    HEADER = sender
+    HEADER += "000000000000000a"  # SequenceNumber
+    HEADER += "0000000000000064"  # EnergyAmount
+    HEADER += len(_payload).to_bytes(4, "big").hex()  # PayloadSize
+    HEADER += "0000000063de5da7"  # Expiry
+
+    transaction = bytes.fromhex(HEADER) + _payload
+    return transaction
 
 
 def instructions_builder(
@@ -215,7 +248,7 @@ def verify_version(version: str) -> None:
 #     l_bytes = l_CONST.to_bytes(2, 'big')
 
 #     # The order 'r' of the BLS12-381 curve
-#     r = int("0x73eda753299d7d483339d80809a1d80553bd402fffe5bfeffff00000001", 16)
+#     bls12_381_r = int("0x73eda753299d7d483339d80809a1d80553bd402fffe5bfeffff00000001", 16)
 
 #     while True:
 #         # Hash the salt
@@ -318,7 +351,6 @@ def verify_version(version: str) -> None:
 #     if(path_parts[1] == "1105'"):
 #         # Get the regular private key and convert it to BLS
 #         private_key = get_private_key_from_path(path)
-#         print("km-Private key: ", private_key)
 #         return bls_key_gen(private_key)
 
 #     # New scheme (44') - not implemented yet

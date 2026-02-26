@@ -196,13 +196,15 @@ int hashUpdateHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t validUpd
 /**
  * Adds the account transaction header and the recipient address to the transaction hash, and
  * writes the base58 encoded recipient address for later display.
- * @param cdata the incoming command data pointing to the start of the input, i.e. with the key path
- * at the start
- * @param dataLength the length of the incoming command data
- * @param kind the transaction type
- * @param recipientDst the destination where to write the base58 encoded recipient address
- * @param energy_amount, the destination where to write the fees amount
- * @param recipientSize the size of the recipient destination
+ * @param [in]  cdata the incoming command data pointing to the start of the input, i.e. with the
+ * key path at the start
+ * @param [in]  dataLength the length of the incoming command data
+ * @param [in]  kind the transaction type
+ * @param [out] recipientDst the destination where to write the base58 encoded recipient address
+ * @param [in]  recipientSize the size of the recipient destination buffer in bytes
+ * @param [out] feesDst       the destination where the encoded fees amount will be written
+ * @param [in]  feesSize      the size of the fees destination buffer in bytes
+ *
  */
 int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,

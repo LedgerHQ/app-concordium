@@ -19,6 +19,20 @@
 #include <parser.h>
 #include <base58.h>
 #include <glyphs.h>
+
+// Common buffer size constants used across the application
+#define COMMON_PRIVATE_KEY_SIZE    32   // Standard private key size
+#define COMMON_PUBLIC_KEY_SIZE     32   // Standard public key size
+#define COMMON_SIGNATURE_SIZE      64   // Standard signature size
+#define COMMON_HASH_SIZE           32   // Standard hash size
+#define COMMON_ADDRESS_SIZE        57   // Standard address size
+#define COMMON_DISPLAY_SIZE        255  // Standard display buffer size
+#define COMMON_AMOUNT_DISPLAY_SIZE 30   // Standard amount display size
+#define COMMON_URL_DISPLAY_SIZE    256  // Standard URL display size
+#define COMMON_MODULE_REF_SIZE     32   // Standard module reference size
+#define COMMON_THRESHOLD_SIZE      4    // Standard threshold size
+#define COMMON_TIMESTAMP_SIZE      8    // Standard timestamp size
+#define COMMON_COMMISSION_SIZE     8    // Standard commission rate size
 #include <limits.h>
 #include <format.h>
 
@@ -50,10 +64,11 @@
 #include "initContract.h"
 #include "updateContract.h"
 
-#define LEGACY_PURPOSE   1105
-#define LEGACY_COIN_TYPE 0
-#define NEW_PURPOSE      44
-#define NEW_COIN_TYPE    919
+#define LEGACY_PURPOSE        1105
+#define LEGACY_COIN_TYPE      0
+#define NEW_PURPOSE           44
+#define NEW_MAINNET_COIN_TYPE 919
+#define NEW_TESTNET_COIN_TYPE 1
 
 #define MAX_CDATA_LENGTH 255
 
@@ -80,12 +95,19 @@
  */
 #define KEY_LENGTH 32
 
+/**
+ * P2 value for more data
+ */
+#define P2_MORE 0x80
+
 typedef enum {
     LEGACY_ID_CRED_SEC = 0,
     LEGACY_PRF_KEY = 1,
     // New path
     NEW_ID_CRED_SEC = 2,
-    NEW_PRF_KEY = 3
+    NEW_PRF_KEY = 3,
+    NEW_SIGNATURE_BLINDING_RANDOMNESS = 4,
+    NEW_COMMITMENT_RANDOMNESS = 5,
 } derivation_path_keys_t;
 
 typedef enum {
@@ -101,7 +123,7 @@ typedef enum {
     TRANSFER_WITH_MEMO = 22,
     TRANSFER_WITH_SCHEDULE_WITH_MEMO = 24,
     CONFIGURE_BAKER = 25,
-    CONFIGURE_DELEGATION = 26
+    CONFIGURE_DELEGATION = 26,
 } transactionKind_e;
 
 typedef struct {
@@ -121,7 +143,7 @@ extern keyDerivationPath_t path;
 // and to keep track of the state of a multi command APDU flow.
 typedef struct {
     cx_sha256_t hash;
-    uint8_t transactionHash[32];
+    uint8_t transactionHash[COMMON_HASH_SIZE];
     int currentInstruction;
 } tx_state_t;
 extern tx_state_t global_tx_state;
@@ -129,14 +151,14 @@ extern tx_state_t global_tx_state;
 // Helper struct that is used to hold the account sender
 // address from an account transaction header.
 typedef struct {
-    uint8_t sender[57];
+    uint8_t sender[COMMON_ADDRESS_SIZE];
 } accountSender_t;
 extern accountSender_t global_account_sender;
 
 typedef struct {
     uint32_t cborLength;
     uint32_t displayUsed;
-    uint8_t display[255];
+    uint8_t display[COMMON_DISPLAY_SIZE];
     uint8_t majorType;
 } cborContext_t;
 
@@ -204,6 +226,7 @@ enum {
     ERROR_INVALID_NAME_LENGTH = 0x6B0A,
     ERROR_INVALID_PARAMS_LENGTH = 0x6B0B,
     ERROR_INVALID_MODULE_REF = 0x6B09,
+
     // Error codes from the Ledger firmware
     ERROR_DEVICE_LOCKED = 0x530C,
     SW_WRONG_DATA_LENGTH = 0x6A87

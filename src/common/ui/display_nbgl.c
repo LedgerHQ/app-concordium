@@ -48,6 +48,15 @@ static void review_export_private_key(bool confirm) {
     }
 }
 
+static void review_export_private_key_new_path(bool confirm) {
+    // Answer, display a status page and go back to main
+    if (confirm) {
+        sendPrivateKeysNewPath();
+    } else {
+        sendUserRejection();
+    }
+}
+
 static void review_choice_sign(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
@@ -131,6 +140,46 @@ void uiExportPrivateKey(volatile unsigned int *flags) {
                        NULL,
                        (char *) global.exportPrivateKeyContext.display_sign,
                        review_export_private_key);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
+    // Create tag-value pairs for the content
+    uint8_t pairIndex = 0;
+
+    global.exportPrivateKeyContext
+        .display_review_operation[EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN - 1] = ' ';
+    memcpy(global.exportPrivateKeyContext.display_review_operation +
+               EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
+           global.exportPrivateKeyContext.display_review_verb,
+           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+
+    global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
+
+    memcpy(global.exportPrivateKeyContext.display_sign + EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN,
+           global.exportPrivateKeyContext.display_sign_verb,
+           EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
+
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
+    pairIndex++;
+
+    // Create the page content
+    nbgl_contentTagValueList_t content;
+    content.nbPairs = pairIndex;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = true;
+
+    nbgl_useCaseReview(TYPE_OPERATION,
+                       &content,
+                       &ICON_APP_HOME,
+                       (char *) global.exportPrivateKeyContext.display_review_operation,
+                       NULL,
+                       (char *) global.exportPrivateKeyContext.display_sign,
+                       review_export_private_key_new_path);
     *flags |= IO_ASYNCH_REPLY;
 }
 

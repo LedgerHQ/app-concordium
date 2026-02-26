@@ -40,6 +40,7 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
  */
 int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, uint8_t validType) {
     if (dataLength < headerLength + 1) {
+        PRINTF("Issue with length\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     updateHash((cx_hash_t *) &tx_state->hash, cdata, headerLength);
@@ -47,6 +48,7 @@ int hashHeaderAndType(uint8_t *cdata, uint8_t dataLength, uint8_t headerLength, 
 
     uint8_t type = cdata[0];
     if (type != validType) {
+        PRINTF("Received kind is different than the expected one\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -70,6 +72,7 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
     size_t outputSize = sizeof(accountSender->sender);
     if (base58check_encode(cdata, ADDRESS_LENGTH, accountSender->sender, &outputSize) == -1) {
         // The received address bytes are not a valid base58 encoding.
+        PRINTF("The received address bytes are not valid base85 encoded\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
     accountSender->sender[BASE58_ADDRESS_LENGTH] = '\0';

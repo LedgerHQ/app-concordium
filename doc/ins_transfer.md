@@ -1,6 +1,6 @@
 # Transfer transaction
 
-A transaction to transfer GTU from one account to another.
+A transaction to transfer CCD from one account to another.
 
 ## Protocol description
 
@@ -8,11 +8,11 @@ A transaction to transfer GTU from one account to another.
 
 | INS    | P1     | P2     | CDATA                                                                                                                                  | Comment                                                        |
 | ------ | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `0x02` | `0x00` | `0x00` | `path_length[uint8]` <br> `path[uint32 * $path_length]` <br> `sender_address [uint256]` <br> `nonce [uint64]` <br> `energy_amount [uint64]` <br> `payload_size[uint32]` <br> `expiry_date[uint64]` <br> `transaction_kind[uint8]` <br> `recipient_address[uint256]` <br> `amount[uint64]` | The amount is in µGTU. The recipient address has to be base58. |
+| `0x02` | `0x00` | `0x00` | `path_length[uint8]` <br> `path[uint32 * $path_length]` <br> `sender_address [uint256]` <br> `nonce [uint64]` <br> `energy_amount [uint64]` <br> `payload_size[uint32]` <br> `expiry_date[uint64]` <br> `transaction_kind[uint8]` <br> `recipient_address[uint256]` <br> `amount[uint64]` | The amount is in µCCD. The recipient address has to be base58. |
 
 # Transfer with memo
 
-A transaction to transfer GTU from one account to another, with a memo attached.
+A transaction to transfer CCD from one account to another, with a memo attached.
 Uses the same INS number, but a different P1 for the initial call, and has a different transaction kind (22);
 
 ## Protocol description
@@ -23,7 +23,7 @@ Uses the same INS number, but a different P1 for the initial call, and has a dif
 | ------ | ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | `0x02` | `0x01` | `0x00` |  `path_length[uint8]` <br> `path[uint32 * $path_length]` <br> `sender_address [uint256]` <br> `nonce [uint64]` <br> `energy_amount [uint64]` <br> `payload_size[uint32]` <br> `expiry_date[uint64]` <br> `transaction_kind[uint8]` <br> `recipient_address[uint256]` <br> `memo_length[uint16]` | The recipient address has to be base58. |
 | `0x02` | `0x02` | `0x00` | `memo[1...255 bytes]`                                                                                                                       | The memo is assumed to be CBOR encoded. |
-| `0x02` | `0x03` | `0x00` | `amount[uint64]`                                                                                                                            | The amount is in µGTU.                  |
+| `0x02` | `0x03` | `0x00` | `amount[uint64]`                                                                                                                            | The amount is in µCCD.                  |
 
 
 ## Sample command disassembly. Actual for v5.4.0 of the app

@@ -126,6 +126,42 @@ void uiExportPrivateKey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+UX_STEP_NOCB(ux_export_private_key_new_path_purpose_step,
+             pnn,
+             {
+                 &C_app_concordium_16px,
+                 (char *) global.exportPrivateKeyContext.display_review_operation,
+                 (char *) global.exportPrivateKeyContext.display_review_verb,
+             });
+UX_STEP_NOCB(ux_export_private_key_new_path_credid_step,
+             bnnn_paging,
+             {
+                 .title = (char *) global.exportPrivateKeyContext.display_credid_title,
+                 .text = (char *) global.exportPrivateKeyContext.display_credid,
+             });
+UX_STEP_CB(ux_export_private_key_new_path_approve_step,
+           pb,
+           sendPrivateKeysNewPath(),
+           {
+               &C_icon_validate_14,
+               (char *) global.exportPrivateKeyContext.display_sign,
+           });
+UX_STEP_CB(ux_export_private_key_new_path_reject_step,
+           pb,
+           sendUserRejection(),
+           {
+               &C_icon_crossmark,
+               "Reject operation",
+           });
+UX_FLOW(ux_export_private_key_new_path,
+        &ux_export_private_key_new_path_purpose_step,
+        &ux_export_private_key_new_path_credid_step,
+        &ux_export_private_key_new_path_approve_step,
+        &ux_export_private_key_new_path_reject_step);
+void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_export_private_key_new_path, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
 // Baker
 
 static signConfigureBaker_t *ctx_conf_baker = &global.signConfigureBaker;

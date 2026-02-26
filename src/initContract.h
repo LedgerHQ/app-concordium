@@ -1,4 +1,5 @@
 #pragma once
+#include "globals.h"
 typedef enum {
     INIT_CONTRACT_INITIAL = 60,
     INIT_CONTRACT_NAME_FIRST = 61,
@@ -17,9 +18,9 @@ void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc);
 
 typedef struct {
     uint64_t amount;
-    uint8_t moduleRef[32];
-    char amountDisplay[30];
-    char moduleRefDisplay[65];
+    uint8_t moduleRef[COMMON_MODULE_REF_SIZE];
+    char amountDisplay[COMMON_AMOUNT_DISPLAY_SIZE];
+    char moduleRefDisplay[COMMON_MODULE_REF_SIZE * 2 + 1];
     uint32_t nameLength;
     uint32_t remainingNameLength;
     uint32_t paramsLength;
