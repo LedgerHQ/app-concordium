@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+
 typedef struct {
     int tm_sec;  /* seconds,  range 0 to 59          */
     int tm_min;  /* minutes, range 0 to 59           */

@@ -9,6 +9,7 @@
  *  The musl LICENSE is provided in licenses/musl-MIT.txt
  */
 #include "globals.h"
+#include "time.h"
 
 /* 2000-03-01 (mod 400 year, immediately after feb29 */
 #define LEAPOCH (946684800LL + 86400 * (31 + 29))
