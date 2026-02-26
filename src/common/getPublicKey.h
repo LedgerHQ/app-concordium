@@ -15,6 +15,9 @@
 #define PATH_INDEX_IDENTITY_LEGACY  4
 #define PATH_INDEX_ACCOUNT_LEGACY  6
 
+#define GOV_ROOT_LEN    10
+#define GOV_LEVEL_LEN   13
+
 /**
  * Handles the derivation and export of account and governance public keys.
  * @param cdata please see /doc/ins_public_key.md for details

@@ -82,13 +82,13 @@ void handleGetPublicKey(uint8_t *cdata,
 
             switch (purpose) {
                 case 0:
-                    memmove(ctx->display, "Gov. root", 10);
+                    memmove(ctx->display, "Gov. root", GOV_ROOT_LEN);
                     break;
                 case 1:
-                    memmove(ctx->display, "Gov. level 1", 13);
+                    memmove(ctx->display, "Gov. level 1", GOV_LEVEL_LEN);
                     break;
                 case 2:
-                    memmove(ctx->display, "Gov. level 2", 13);
+                    memmove(ctx->display, "Gov. level 2", GOV_LEVEL_LEN);
                     break;
                 default:
                     THROW(ERROR_INVALID_PATH);

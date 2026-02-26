@@ -17,7 +17,7 @@ typedef struct {
 /**
  * Converts seconds since epoch to a time struct.
  */
-int secondsToTm(long long, tm *);
+int secondsToTm(long long t, tm *out);
 
 /**
  * Writes a time struct to dst as human readable text in

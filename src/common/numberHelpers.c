@@ -1,6 +1,6 @@
 #include "globals.h"
 
-size_t lengthOfNumber(uint64_t number) {
+static size_t lengthOfNumber(uint64_t number) {
     if (number == 0) {
         return 1;
     }
@@ -52,7 +52,7 @@ size_t bin2dec(uint8_t *dst, size_t dstLength, uint64_t number) {
     return characterLength + 1;
 }
 
-size_t decimalDigitsDisplay(uint8_t *dst,
+static size_t decimalDigitsDisplay(uint8_t *dst,
                             size_t dstLength,
                             uint64_t decimalPart,
                             uint8_t decimalDigitsLength) {
@@ -134,9 +134,8 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 
     offset = wholeNumberLength;
 
-    // The first 6 digits should be without thousand separators,
-    // as they are part of the decimal part of the number. Write those
-    // characters first to the destination output and separate with '.'
+    // The first decimalDigitsLength digits are the decimal part (no thousand separators).
+    // Write the whole number first, then separate with '.'
     uint64_t decimalPart = amount % resolution;
     if (decimalPart != 0) {
         dst[offset] = '.';
@@ -165,12 +164,12 @@ size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t numb
                                            number,
                                            PERCENTAGE_RESOLUTION,
                                            PERCENTAGE_DECIMAL_PLACES);
-    if (dstLength < offset + 2) {
+    if (dstLength < offset + PERCENTAGE_SUFFIX_LEN) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     dst[offset] = '%';
     dst[offset + 1] = '\0';
-    return offset + 2;
+    return offset + PERCENTAGE_SUFFIX_LEN;
 }
 
 /**
