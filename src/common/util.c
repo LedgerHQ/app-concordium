@@ -135,12 +135,12 @@ int handleHeaderAndToAddress(uint8_t *cdata,
     return keyPathLength + headerLength + 32;
 }
 
-void sendUserRejection() {
+void sendUserRejection(void) {
     sendUserRejectionNoIdle();
     ui_menu_main();
 }
 
-void sendUserRejectionNoIdle() {
+void sendUserRejectionNoIdle(void) {
     G_io_apdu_buffer[0] = ERROR_REJECTED_BY_USER >> 8;
     G_io_apdu_buffer[1] = ERROR_REJECTED_BY_USER & 0xFF;
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, 2);
@@ -153,7 +153,7 @@ void sendSuccess(uint8_t tx) {
     ui_menu_main();
 }
 
-void sendSuccessNoIdle() {
+void sendSuccessNoIdle(void) {
     sendSuccessResultNoIdle(0);
 }
 
@@ -296,7 +296,7 @@ void hash(cx_hash_t *hashContext,
 }
 
 void updateHash(cx_hash_t *hashContext, const unsigned char *in, unsigned int len) {
-    return hash(hashContext, 0, in, len, NULL, 0);
+    hash(hashContext, 0, in, len, NULL, 0);
 }
 
 // We must declare the functions for the static analyzer to be happy. Ideally we would have

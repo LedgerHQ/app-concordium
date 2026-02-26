@@ -15,7 +15,7 @@ static tx_state_t *tx_state = &global_tx_state;
 static cborContext_t *ctx = &global.withDataBlob.cborContext;
 
 // Hashes transaction, signs it and sends the signature back to the computer.
-void buildAndSignTransactionHash() {
+void buildAndSignTransactionHash(void) {
     hash((cx_hash_t *) &tx_state->hash, CX_LAST, NULL, 0, tx_state->transactionHash, 32);
 
     uint8_t signedHash[64];

@@ -29,7 +29,7 @@ static const uint8_t r[32] = {0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x
  *
  * After sending the rejection the display will return to the menu.
  */
-void sendUserRejection();
+void sendUserRejection(void);
 
 /**
  * Send a user rejection back to the caller, which will indicate to
@@ -39,12 +39,12 @@ void sendUserRejection();
  *
  * After sending the rejection the display will do nothing.
  */
-void sendUserRejectionNoIdle();
+void sendUserRejectionNoIdle(void);
 /**
  * Send a success back to the caller without returning the display to the
  * commands to avoid resetting the display back to the menu between commands.
  */
-void sendSuccessNoIdle();
+void sendSuccessNoIdle(void);
 
 /**
  * Send a success with a result back to the caller without returning the display to the
