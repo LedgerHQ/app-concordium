@@ -1,7 +1,7 @@
 #ifdef HAVE_BAGL
 #include "globals.h"
 
-#include "dispaly_bagl.h"
+#include "display_bagl.h"
 
 accountSender_t global_account_sender;
 

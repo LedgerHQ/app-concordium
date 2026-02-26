@@ -7,9 +7,9 @@
 #define APPVERSION "UNKNOWN"
 #endif  // APPVERSION
 
-extern const nbgl_icon_details_t C_app_concordium_64px
+extern const nbgl_icon_details_t C_app_concordium_64px;
 
-// Stub. APPVERSION is defined in makefile
+// Stub. APPNAME is defined in makefile
 #ifndef APPNAME
 #define APPNAME "UNKNOWN"
 #endif  // APPNAME

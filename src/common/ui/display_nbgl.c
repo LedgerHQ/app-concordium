@@ -2,7 +2,7 @@
 #include "display.h"
 #include "globals.h"
 
-#include "menu_bagl.h"
+#include "menu_nbgl.h"
 
 accountSender_t global_account_sender;
 static nbgl_contentTagValue_t pairs[10];
