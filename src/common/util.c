@@ -287,14 +287,14 @@ void sign(uint8_t *input, uint8_t *signatureOnInput) {
 }
 
 // BLS12-381 key generation constants
-#define l_CONST        48  // ceil((3 * ceil(log2(r))) / 16)
+#define l_CONST        48  // ceil((3 * ceil(log2(BLS_G1_ORDER))) / 16)
 #define BLS_KEY_LENGTH 32
 #define SEED_LENGTH    32
 
-/** BLS12-381 subgroup G1's order */
-static const uint8_t r[32] = {0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8,
-                              0x08, 0x09, 0xa1, 0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe,
-                              0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
+/** BLS12-381 subgroup G1's order (shared with verifyAddress.c) */
+const uint8_t BLS_G1_ORDER[32] = {0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8,
+                                         0x08, 0x09, 0xa1, 0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe,
+                                         0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
 
 void hash(cx_hash_t *hashContext,
           uint32_t mode,
@@ -365,10 +365,10 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
                        sk,
                        sizeof(sk));
 
-        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), r, sizeof(r)));
+        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), BLS_G1_ORDER, sizeof(BLS_G1_ORDER)));
     } while (cx_math_is_zero(sk, sizeof(sk)));
 
-    // Skip the first 16 bytes, because they are 0 due to calculating modulo r, which is 32 bytes
+    // Skip the first 16 bytes, because they are 0 due to calculating modulo BLS_G1_ORDER
     // (and sk has 48 bytes).
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
 }
