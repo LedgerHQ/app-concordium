@@ -1,14 +1,14 @@
 #pragma once
 #include "globals.h"
 
-#define GTU_DISPLAY_LENGTH        5
-#define GTU_DECIMAL_PLACES        6
-#define GTU_RESOLUTION            1000000
+#define GTU_DISPLAY_LENGTH 5
+#define GTU_DECIMAL_PLACES 6
+#define GTU_RESOLUTION     1000000
 
 #define PERCENTAGE_RESOLUTION     1000
 #define PERCENTAGE_DECIMAL_PLACES 3
 #define MAX_PERCENTAGE_NUMERATOR  100000
-#define PERCENTAGE_SUFFIX_LEN    2  // "%" + '\0'
+#define PERCENTAGE_SUFFIX_LEN     2  // "%" + '\0'
 
 #define MIN_DECIMAL_DISPLAY_LENGTH 2
 

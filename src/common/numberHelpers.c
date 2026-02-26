@@ -53,9 +53,9 @@ size_t bin2dec(uint8_t *dst, size_t dstLength, uint64_t number) {
 }
 
 static size_t decimalDigitsDisplay(uint8_t *dst,
-                            size_t dstLength,
-                            uint64_t decimalPart,
-                            uint8_t decimalDigitsLength) {
+                                   size_t dstLength,
+                                   uint64_t decimalPart,
+                                   uint8_t decimalDigitsLength) {
     // Fill with zeroes if the number is less than decimalDigits,
     // so that input like 5304 become 005304 in their display version.
     size_t length = lengthOfNumber(decimalPart);

@@ -86,7 +86,7 @@ int secondsToTm(long long t, tm *out) {
     return 0;
 }
 
-#define MIN_TWO_DIGIT_DECIMAL 10
+#define MIN_TWO_DIGIT_DECIMAL    10
 #define TIMESTAMP_DISPLAY_LENGTH 20  // "YYYY-MM-DD HH:MM:SS" + '\0'
 
 /**
