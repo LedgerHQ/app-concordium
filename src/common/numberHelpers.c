@@ -33,14 +33,14 @@ size_t numberToTextWithUnit(uint8_t *dst,
                             size_t unitLength) {
     size_t len = numberToText(dst, dstLength, number);
 
-    if (dstLength - len < unitLength + 2) {
+    if (dstLength - len < unitLength + UNIT_SPACE_AND_NULL_LEN) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     memmove(dst + len, " ", 1);
     memmove(dst + len + 1, unit, unitLength);
     memmove(dst + len + 1 + unitLength, "\0", 1);
 
-    return len + unitLength + 2;
+    return len + unitLength + UNIT_SPACE_AND_NULL_LEN;
 }
 
 size_t bin2dec(uint8_t *dst, size_t dstLength, uint64_t number) {
@@ -108,7 +108,6 @@ size_t decimalNumberToDisplay(uint8_t *dst,
     if (amount < resolution) {
         dst[0] = '0';
         dst[1] = '.';
-        // We decrement the length an extra time, to make sure there is space for the termination.
         return decimalDigitsDisplay(dst + 2, dstLength - 3, amount, decimalDigitsLength) + 2;
     }
 
@@ -172,14 +171,17 @@ size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t numb
  * to relate to in the GUI.
  */
 size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount) {
-    if (dstLength < 5) return 0;  // Prevent overflow
-    size_t offset = decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, 6);
-    if ((offset >= 14) && (offset < 18)) {
-        memmove(dst + offset, "\nCCD\0", 5);
-    } else {
-        memmove(dst + offset, " CCD\0", 5);
+    if (dstLength < GTU_DISPLAY_LENGTH) {
+        THROW(ERROR_BUFFER_OVERFLOW);
     }
-    offset += 4;
+    size_t offset =
+        decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, GTU_DECIMAL_PLACES);
+    if ((offset >= GTU_LINE_BREAK_MIN_OFFSET) && (offset < GTU_LINE_BREAK_MAX_OFFSET)) {
+        memmove(dst + offset, "\nCCD\0", GTU_DISPLAY_LENGTH);
+    } else {
+        memmove(dst + offset, " CCD\0", GTU_DISPLAY_LENGTH);
+    }
+    offset += GTU_DISPLAY_LENGTH - 1;  // Exclude null terminator from return
     return offset;
 }
 
@@ -188,18 +190,17 @@ void toPaginatedHex(uint8_t *byteArray, const uint64_t len, char *asHex, const s
 
     static uint8_t const hex[] = "0123456789abcdef";
 
-    if (asHexSize < len * 2 + len / 16 + 1) {
+    if (asHexSize < len * 2 + len / HEX_PAGINATION_WIDTH + 1) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
     uint8_t offset = 0;
     for (uint64_t i = 0; i < len; i++) {
-        asHex[2 * i + offset] = hex[(byteArray[i] >> 4) & 0x0F];
-        asHex[2 * i + (offset + 1)] = hex[(byteArray[i] >> 0) & 0x0F];
+        asHex[2 * i + offset] = hex[(byteArray[i] >> 4) & NIBBLE_MASK];
+        asHex[2 * i + (offset + 1)] = hex[(byteArray[i] >> 0) & NIBBLE_MASK];
 
-        // Insert a space to force the Ledger to paginate the string every
-        // 16 characters.
-        if ((2 * (i + 1)) % 16 == 0 && i != len - 1) {
+        // Insert newline to force the Ledger to paginate every HEX_PAGINATION_WIDTH chars.
+        if ((2 * (i + 1)) % HEX_PAGINATION_WIDTH == 0 && i != len - 1) {
             asHex[2 * i + (offset + 2)] = '\n';
             offset += 1;
         }

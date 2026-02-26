@@ -89,7 +89,7 @@ int handler(uint8_t INS,
             break;
         case INS_APP_VERSION:
             LEDGER_ASSERT(cdata != NULL, "NULL cdata");
-            if (p1 != 0 || p2 != 0) {
+            if (p1 != P1_DEFAULT || p2 != P2_DEFAULT) {
                 return io_send_sw(SWO_INCORRECT_P1_P2);
             }
 

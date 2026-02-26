@@ -13,6 +13,7 @@
 #include <ux.h>
 #include <io.h>
 #include <format.h>
+#include <lcx_hmac.h>
 #include <os_io_seproxyhal.h>
 #include <lcx_hash.h>
 #include <parser.h>

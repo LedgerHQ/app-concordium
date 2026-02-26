@@ -105,8 +105,7 @@ int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
     int offset = 0;
 
     // Check if we have enough space for full timestamp
-    // Format: "YYYY-MM-DD HH:MM:SS" (19 chars + null terminator)
-    if (dstLength < 20) {
+    if (dstLength < 20) {  // "YYYY-MM-DD HH:MM:SS" + '\0'
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
