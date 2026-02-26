@@ -90,8 +90,8 @@ size_t decimalNumberToDisplay(uint8_t *dst,
                               uint64_t amount,
                               uint32_t resolution,
                               uint8_t decimalDigitsLength) {
-    // In every case we need to write at least 2 characters
-    if (dstLength < 2) {
+    // In every case we need to write at least 2 characters (e.g. "0.")
+    if (dstLength < MIN_DECIMAL_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     // A zero amount should be displayed as a plain '0'.
@@ -108,7 +108,11 @@ size_t decimalNumberToDisplay(uint8_t *dst,
     if (amount < resolution) {
         dst[0] = '0';
         dst[1] = '.';
-        return decimalDigitsDisplay(dst + 2, dstLength - 3, amount, decimalDigitsLength) + 2;
+        return decimalDigitsDisplay(dst + 2,
+                                    dstLength - PREFIX_ZERO_DOT_LEN,
+                                    amount,
+                                    decimalDigitsLength) +
+               2;
     }
 
     size_t offset = 0;
@@ -152,11 +156,15 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 }
 
 size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t number) {
-    if (number > 100000) {
+    if (number > MAX_PERCENTAGE_NUMERATOR) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
 
-    size_t offset = decimalNumberToDisplay(dst, dstLength, number, 1000, 3);
+    size_t offset = decimalNumberToDisplay(dst,
+                                           dstLength,
+                                           number,
+                                           PERCENTAGE_RESOLUTION,
+                                           PERCENTAGE_DECIMAL_PLACES);
     if (dstLength < offset + 2) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
@@ -175,7 +183,7 @@ size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmoun
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     size_t offset =
-        decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, GTU_DECIMAL_PLACES);
+        decimalNumberToDisplay(dst, dstLength, microGtuAmount, GTU_RESOLUTION, GTU_DECIMAL_PLACES);
     if ((offset >= GTU_LINE_BREAK_MIN_OFFSET) && (offset < GTU_LINE_BREAK_MAX_OFFSET)) {
         memmove(dst + offset, "\nCCD\0", GTU_DISPLAY_LENGTH);
     } else {

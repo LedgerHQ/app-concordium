@@ -26,7 +26,7 @@ void sendPublicKey(bool compare) {
     }
 
     if (ctx->signPublicKey) {
-        uint8_t signedPublicKey[64];
+        uint8_t signedPublicKey[ED25519_SIGNATURE_LENGTH];
         sign(publicKey, signedPublicKey);
         if (sizeof(signedPublicKey) > sizeof(G_io_apdu_buffer) - tx) {
             THROW(ERROR_BUFFER_OVERFLOW);
@@ -75,7 +75,7 @@ void handleGetPublicKey(uint8_t *cdata,
                 THROW(ERROR_INVALID_PATH);
             }
 
-            uint32_t purpose = keyPath->rawKeyDerivationPath[3];
+            uint32_t purpose = keyPath->rawKeyDerivationPath[PATH_INDEX_PURPOSE];
             if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }

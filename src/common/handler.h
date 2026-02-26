@@ -36,7 +36,6 @@
 #define INS_SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO 0x34
 #define INS_REGISTER_DATA                        0x35
 
-#define INS_APP_NAME     0x36
 #define INS_GET_APP_NAME 0x21
 
 #define INS_EXPORT_PRIVATE_KEY_NEW 0x37

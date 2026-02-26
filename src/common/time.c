@@ -86,12 +86,15 @@ int secondsToTm(long long t, tm *tm) {
     return 0;
 }
 
+#define MIN_TWO_DIGIT_DECIMAL 10
+#define TIMESTAMP_DISPLAY_LENGTH 20  // "YYYY-MM-DD HH:MM:SS" + '\0'
+
 /**
  * Helper function for prepending numbers that are
  * less than 10 with a '0', so that 5 results in 05.
  */
-int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
-    if (value < 10) {
+static int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
+    if (value < MIN_TWO_DIGIT_DECIMAL) {
         if (dstLength < 1) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
@@ -105,7 +108,7 @@ int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
     int offset = 0;
 
     // Check if we have enough space for full timestamp
-    if (dstLength < 20) {  // "YYYY-MM-DD HH:MM:SS" + '\0'
+    if (dstLength < TIMESTAMP_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 

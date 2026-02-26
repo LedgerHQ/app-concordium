@@ -72,7 +72,10 @@ int handler(uint8_t INS,
             handleSignUpdateCredential(cdata, p1, p2, lc, flags, isInitialCall);
             break;
         case INS_GET_APP_NAME:
-            LEDGER_ASSERT(cdata != NULL, "NULL cdata");
+            LEDGER_ASSERT(cdata == NULL, "APP_NAME expects no command data");
+            if (p1 != P1_DEFAULT || p2 != P2_DEFAULT) {
+                return io_send_sw(SWO_INCORRECT_P1_P2);
+            }
             handleGetAppName();
             break;
         case INS_DEPLOY_MODULE:
@@ -88,7 +91,7 @@ int handler(uint8_t INS,
             handleUpdateContract(cdata, p1, lc);
             break;
         case INS_APP_VERSION:
-            LEDGER_ASSERT(cdata != NULL, "NULL cdata");
+            LEDGER_ASSERT(cdata == NULL, "APP_VERSION expects no command data");
             if (p1 != P1_DEFAULT || p2 != P2_DEFAULT) {
                 return io_send_sw(SWO_INCORRECT_P1_P2);
             }
