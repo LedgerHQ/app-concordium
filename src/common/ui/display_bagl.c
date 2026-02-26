@@ -343,7 +343,7 @@ void startConfigureBakerCommissionDisplay(void) {
  * transaction.
  * - Shows the signing / decline screens.
  */
-void startConfigureBakerSuspendedDisplay() {
+void startConfigureBakerSuspendedDisplay(void) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
@@ -856,7 +856,6 @@ UX_FLOW(ux_deploy_module,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
         &ux_deploy_module_1_step,
-        // &ux_deploy_module_2_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 

@@ -15,4 +15,5 @@ extern const nbgl_icon_details_t C_app_concordium_64px;
 #endif  // APPNAME
 
 void ui_menu_main(void);
+
 #endif  // MENU_NBGL_H

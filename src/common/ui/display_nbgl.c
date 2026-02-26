@@ -4,8 +4,10 @@
 
 #include "menu_nbgl.h"
 
+#define MAX_REVIEW_PAIRS 10
+
 accountSender_t global_account_sender;
-static nbgl_contentTagValue_t pairs[10];
+static nbgl_contentTagValue_t pairs[MAX_REVIEW_PAIRS];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
@@ -704,7 +706,7 @@ void uiSignCredentialDeploymentExistingDisplay(void) {
     pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.regIdCred;
     pairIndex++;
     pairs[pairIndex].item = "Identity provider";
-    pairs[pairIndex].value = global.signCredentialDeploymentContext.identityProviderIndex;
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.identityProviderIndex;
     pairIndex++;
     pairs[pairIndex].item = "AR threshold";
     pairs[pairIndex].value =
