@@ -32,6 +32,9 @@
 
 #define UINT64_MAX_DECIMAL_DIGITS 20
 
+/** BLS12-381 G1 coordinate size in bytes (compressed point) */
+#define BLS_G1_COORD_SIZE 48
+
 /** BLS12-381 subgroup G1's order */
 extern const uint8_t BLS_G1_ORDER[32];
 

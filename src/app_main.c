@@ -83,7 +83,7 @@ void app_main() {
                cmd.data);
 
         bool isInitialCall = false;
-        if (global_tx_state.currentInstruction == -1) {
+        if (global_tx_state.currentInstruction == INSTRUCTION_NONE) {
             explicit_bzero(&global, sizeof(global));
             global_tx_state.currentInstruction = cmd.ins;
             isInitialCall = true;

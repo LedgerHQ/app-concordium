@@ -41,7 +41,7 @@ void sendPublicKey(bool compare) {
         sendSuccessResultNoIdle(tx);
         toPaginatedHex(publicKey, sizeof(publicKey), ctx->publicKey, sizeof(ctx->publicKey));
         // Allow for receiving a new instruction even while comparing public keys.
-        tx_state->currentInstruction = -1;
+        tx_state->currentInstruction = INSTRUCTION_NONE;
         uiComparePubkey();
 
     } else {

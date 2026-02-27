@@ -20,7 +20,7 @@ void exportPrivateKeySeed(void) {
             ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
             getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
             uint8_t tx = 0;
-            for (int i = 0; i < 32; i++) {
+            for (int i = 0; i < KEY_LENGTH; i++) {
                 G_io_apdu_buffer[tx++] = privateKey.d[i];
             }
 
@@ -28,7 +28,7 @@ void exportPrivateKeySeed(void) {
                 lastSubPath = LEGACY_ID_CRED_SEC;
                 ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
                 getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
-                for (int i = 0; i < 32; i++) {
+                for (int i = 0; i < KEY_LENGTH; i++) {
                     G_io_apdu_buffer[tx++] = privateKey.d[i];
                 }
             }
@@ -43,7 +43,7 @@ void exportPrivateKeySeed(void) {
 }
 
 void exportPrivateKeyBls(void) {
-    uint8_t privateKey[COMMON_PRIVATE_KEY_SIZE];
+    uint8_t privateKey[KEY_LENGTH];
     BEGIN_TRY {
         TRY {
             uint8_t lastSubPath = LEGACY_PRF_KEY;
@@ -107,11 +107,11 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     identity = U4BE(dataBuffer, offset);
     uint32_t *keyDerivationPath;
     size_t pathLength;
-    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_OFFSET,
-                                      LEGACY_COIN_TYPE | HARDENED_OFFSET,
-                                      ACCOUNT_SUBTREE | HARDENED_OFFSET,
-                                      NORMAL_ACCOUNTS | HARDENED_OFFSET,
-                                      identity | HARDENED_OFFSET};
+    keyDerivationPath = (uint32_t[5]) {LEGACY_PURPOSE | HARDENED_OFFSET,
+                                       LEGACY_COIN_TYPE | HARDENED_OFFSET,
+                                       ACCOUNT_SUBTREE | HARDENED_OFFSET,
+                                       NORMAL_ACCOUNTS | HARDENED_OFFSET,
+                                       identity | HARDENED_OFFSET};
     pathLength = 5;
     memmove(ctx->path, keyDerivationPath, pathLength * sizeof(uint32_t));
     ctx->pathLength = pathLength * sizeof(uint32_t);

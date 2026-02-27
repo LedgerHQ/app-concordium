@@ -48,7 +48,7 @@ static const nbgl_contentInfoList_t infoList = {
 
 // home page definition
 void ui_menu_main(void) {
-    tx_state->currentInstruction = -1;
+    tx_state->currentInstruction = INSTRUCTION_NONE;
 
     nbgl_useCaseHomeAndSettings(APPNAME,
                                 &ICON_APP_HOME,

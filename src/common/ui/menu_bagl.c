@@ -40,7 +40,7 @@ UX_FLOW(ux_menu_main_flow,
         FLOW_LOOP);
 
 void ui_menu_main(void) {
-    tx_state->currentInstruction = -1;
+    tx_state->currentInstruction = INSTRUCTION_NONE;
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
