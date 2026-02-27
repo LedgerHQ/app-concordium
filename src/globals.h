@@ -20,6 +20,11 @@
 #include <base58.h>
 #include <glyphs.h>
 
+/**
+ * Key length of (Public Key || Verification Key || Account Key)
+ */
+#define KEY_LENGTH 32
+
 // Common buffer size constants used across the application
 #define COMMON_SIGNATURE_SIZE      64          // Standard signature size
 #define COMMON_HASH_SIZE           KEY_LENGTH  // Standard hash size
@@ -87,11 +92,6 @@
  * Maximum length of application name.
  */
 #define MAX_APPNAME_LEN 64
-
-/**
- * Key length of (Public Key || Verification Key || Account Key)
- */
-#define KEY_LENGTH 32
 
 /**
  * P2 value for more data

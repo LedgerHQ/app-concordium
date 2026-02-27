@@ -183,9 +183,9 @@ void handleVerifyAddress(uint8_t *cdata,
     END_TRY;
 
     uint8_t accountAddress[ADDRESS_LENGTH];
-    cx_err_t error = 0;
-    error = cx_hash_sha256(credId, sizeof(credId), accountAddress, sizeof(accountAddress));
-    if (error == 0) {
+    size_t hash_size = 0;
+    hash_size = cx_hash_sha256(credId, sizeof(credId), accountAddress, sizeof(accountAddress));
+    if (hash_size != CX_SHA256_SIZE) {
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     size_t addressLength = sizeof(ctx->address);
