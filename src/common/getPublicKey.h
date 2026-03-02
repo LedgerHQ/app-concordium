@@ -33,6 +33,7 @@ void handleGetPublicKey(uint8_t *cdata,
 void sendPublicKey(bool compare);
 
 typedef struct {
+    uint64_t random_challenge;
     uint8_t display[21];
     char publicKey[68];
     bool signPublicKey;

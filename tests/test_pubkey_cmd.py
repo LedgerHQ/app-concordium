@@ -38,6 +38,15 @@ wallet_refuse_instructions = [
 ]
 
 
+# In this test we check that the GET_CHALLENGE returns an 8-byte random challenge
+@pytest.mark.active_test_scope
+def test_get_challenge(backend):
+    client = CommandSender(backend)
+    response = client.get_challenge()
+    assert response.status == 0x9000
+    assert len(response.data) == 8
+
+
 # In this test we check that the GET_PUBLIC_KEY works in confirmation mode
 @pytest.mark.active_test_scope
 def test_get_legacy_public_key_confirm_accepted(

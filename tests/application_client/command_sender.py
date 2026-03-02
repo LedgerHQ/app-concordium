@@ -109,6 +109,7 @@ class InsType(IntEnum):
     CONFIGURE_BAKER = 0x18
     PUBLIC_INFO_FOR_IP = 0x20
     GET_APP_NAME = 0x21
+    GET_CHALLENGE = 0x23
     SIGN_UPDATE_CREDENTIAL = 0x31
     SIGN_TRANSFER_WITH_MEMO = 0x32
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
@@ -171,6 +172,11 @@ class CommandSender:
     def get_app_version(self) -> RAPDU:
         return self.backend.exchange(
             cla=CLA, ins=InsType.GET_APP_VERSION, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
+        )
+
+    def get_challenge(self) -> RAPDU:
+        return self.backend.exchange(
+            cla=CLA, ins=InsType.GET_CHALLENGE, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
         )
 
     def get_public_key(self, path: str, signPublicKey: bool = False) -> RAPDU:
