@@ -1,6 +1,6 @@
 #include "globals.h"
 
-size_t lengthOfNumber(uint64_t number) {
+static size_t lengthOfNumber(uint64_t number) {
     if (number == 0) {
         return 1;
     }
@@ -33,14 +33,14 @@ size_t numberToTextWithUnit(uint8_t *dst,
                             size_t unitLength) {
     size_t len = numberToText(dst, dstLength, number);
 
-    if (dstLength - len < unitLength + 2) {
+    if (dstLength - len < unitLength + UNIT_SPACE_AND_NULL_LEN) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     memmove(dst + len, " ", 1);
     memmove(dst + len + 1, unit, unitLength);
     memmove(dst + len + 1 + unitLength, "\0", 1);
 
-    return len + unitLength + 2;
+    return len + unitLength + UNIT_SPACE_AND_NULL_LEN;
 }
 
 size_t bin2dec(uint8_t *dst, size_t dstLength, uint64_t number) {
@@ -52,10 +52,10 @@ size_t bin2dec(uint8_t *dst, size_t dstLength, uint64_t number) {
     return characterLength + 1;
 }
 
-size_t decimalDigitsDisplay(uint8_t *dst,
-                            size_t dstLength,
-                            uint64_t decimalPart,
-                            uint8_t decimalDigitsLength) {
+static size_t decimalDigitsDisplay(uint8_t *dst,
+                                   size_t dstLength,
+                                   uint64_t decimalPart,
+                                   uint8_t decimalDigitsLength) {
     // Fill with zeroes if the number is less than decimalDigits,
     // so that input like 5304 become 005304 in their display version.
     size_t length = lengthOfNumber(decimalPart);
@@ -90,8 +90,8 @@ size_t decimalNumberToDisplay(uint8_t *dst,
                               uint64_t amount,
                               uint32_t resolution,
                               uint8_t decimalDigitsLength) {
-    // In every case we need to write at least 2 characters
-    if (dstLength < 2) {
+    // In every case we need to write at least 2 characters (e.g. "0.")
+    if (dstLength < MIN_DECIMAL_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     // A zero amount should be displayed as a plain '0'.
@@ -102,14 +102,17 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 
     int length = lengthOfNumber(amount);
 
-    // If the amount is less than than the resolution, then the
+    // If the amount is less than the resolution, then the
     // amount has to be prefixed by '0.' as it will purely consist
     // of the decimals.
     if (amount < resolution) {
         dst[0] = '0';
         dst[1] = '.';
-        // We decrement the length an extra time, to make sure there is space for the termination.
-        return decimalDigitsDisplay(dst + 2, dstLength - 3, amount, decimalDigitsLength) + 2;
+        return decimalDigitsDisplay(dst + 2,
+                                    dstLength - PREFIX_ZERO_DOT_LEN,
+                                    amount,
+                                    decimalDigitsLength) +
+               2;
     }
 
     size_t offset = 0;
@@ -131,9 +134,8 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 
     offset = wholeNumberLength;
 
-    // The first 6 digits should be without thousand separators,
-    // as they are part of the decimal part of the number. Write those
-    // characters first to the destination output and separate with '.'
+    // The first decimalDigitsLength digits are the decimal part (no thousand separators).
+    // Write the whole number first, then separate with '.'
     uint64_t decimalPart = amount % resolution;
     if (decimalPart != 0) {
         dst[offset] = '.';
@@ -153,17 +155,21 @@ size_t decimalNumberToDisplay(uint8_t *dst,
 }
 
 size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t number) {
-    if (number > 100000) {
+    if (number > MAX_PERCENTAGE_NUMERATOR) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
 
-    size_t offset = decimalNumberToDisplay(dst, dstLength, number, 1000, 3);
-    if (dstLength < offset + 2) {
+    size_t offset = decimalNumberToDisplay(dst,
+                                           dstLength,
+                                           number,
+                                           PERCENTAGE_RESOLUTION,
+                                           PERCENTAGE_DECIMAL_PLACES);
+    if (dstLength < offset + PERCENTAGE_SUFFIX_LEN) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     dst[offset] = '%';
     dst[offset + 1] = '\0';
-    return offset + 2;
+    return offset + PERCENTAGE_SUFFIX_LEN;
 }
 
 /**
@@ -172,14 +178,17 @@ size_t fractionToPercentageDisplay(uint8_t *dst, size_t dstLength, uint32_t numb
  * to relate to in the GUI.
  */
 size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount) {
-    if (dstLength < 5) return 0;  // Prevent overflow
-    size_t offset = decimalNumberToDisplay(dst, dstLength, microGtuAmount, 1000000, 6);
-    if ((offset >= 14) && (offset < 18)) {
-        memmove(dst + offset, "\nCCD\0", 5);
-    } else {
-        memmove(dst + offset, " CCD\0", 5);
+    if (dstLength < GTU_DISPLAY_LENGTH) {
+        THROW(ERROR_BUFFER_OVERFLOW);
     }
-    offset += 4;
+    size_t offset =
+        decimalNumberToDisplay(dst, dstLength, microGtuAmount, GTU_RESOLUTION, GTU_DECIMAL_PLACES);
+    if ((offset >= GTU_LINE_BREAK_MIN_OFFSET) && (offset < GTU_LINE_BREAK_MAX_OFFSET)) {
+        memmove(dst + offset, "\nCCD\0", GTU_DISPLAY_LENGTH);
+    } else {
+        memmove(dst + offset, " CCD\0", GTU_DISPLAY_LENGTH);
+    }
+    offset += GTU_DISPLAY_LENGTH - 1;  // Exclude null terminator from return
     return offset;
 }
 
@@ -188,18 +197,17 @@ void toPaginatedHex(uint8_t *byteArray, const uint64_t len, char *asHex, const s
 
     static uint8_t const hex[] = "0123456789abcdef";
 
-    if (asHexSize < len * 2 + len / 16 + 1) {
+    if (asHexSize < len * 2 + len / HEX_PAGINATION_WIDTH + 1) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
     uint8_t offset = 0;
     for (uint64_t i = 0; i < len; i++) {
-        asHex[2 * i + offset] = hex[(byteArray[i] >> 4) & 0x0F];
-        asHex[2 * i + (offset + 1)] = hex[(byteArray[i] >> 0) & 0x0F];
+        asHex[2 * i + offset] = hex[(byteArray[i] >> 4) & NIBBLE_MASK];
+        asHex[2 * i + (offset + 1)] = hex[(byteArray[i] >> 0) & NIBBLE_MASK];
 
-        // Insert a space to force the Ledger to paginate the string every
-        // 16 characters.
-        if ((2 * (i + 1)) % 16 == 0 && i != len - 1) {
+        // Insert newline to force the Ledger to paginate every HEX_PAGINATION_WIDTH chars.
+        if ((2 * (i + 1)) % HEX_PAGINATION_WIDTH == 0 && i != len - 1) {
             asHex[2 * i + (offset + 2)] = '\n';
             offset += 1;
         }

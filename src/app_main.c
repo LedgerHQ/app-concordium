@@ -22,9 +22,6 @@ tx_state_t global_tx_state;
 
 const internal_storage_t N_storage_real;
 
-// The expected CLA byte
-#define CLA 0xE0
-
 // The Ledger uses APDU commands
 // (https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit) for performing actions.
 // The INS byte contains the instruction code that determines which action to perform.
@@ -51,11 +48,11 @@ void app_main() {
     ui_menu_main();
 
     // Initialize the NVM data if required
-    if (N_storage.initialized != 0x01) {
+    if (N_storage.initialized != STORAGE_INITIALIZED) {
         internal_storage_t storage;
-        storage.dummy1_allowed = 0x00;
-        storage.dummy2_allowed = 0x00;
-        storage.initialized = 0x01;
+        storage.dummy1_allowed = STORAGE_DEFAULT;
+        storage.dummy2_allowed = STORAGE_DEFAULT;
+        storage.initialized = STORAGE_INITIALIZED;
         nvm_write((void *) &N_storage, &storage, sizeof(internal_storage_t));
     }
 
@@ -83,7 +80,7 @@ void app_main() {
                cmd.data);
 
         bool isInitialCall = false;
-        if (global_tx_state.currentInstruction == -1) {
+        if (global_tx_state.currentInstruction == INSTRUCTION_NONE) {
             explicit_bzero(&global, sizeof(global));
             global_tx_state.currentInstruction = cmd.ins;
             isInitialCall = true;

@@ -11,13 +11,13 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     }
     keyPath->pathLength = cdata[0];
 
-    // Concordium does not use key paths with a length greater than 8,
+    // Concordium does not use key paths with a length greater than MAX_KEY_PATH_LENGTH,
     // so if that was received, then throw an error.
-    if (keyPath->pathLength > 8) {
+    if (keyPath->pathLength > MAX_KEY_PATH_LENGTH) {
         THROW(ERROR_INVALID_PATH);
     }
 
-    if (dataLength < 1 + (4 * keyPath->pathLength)) {
+    if (dataLength < 1 + (BYTES_PER_PATH_ELEMENT * keyPath->pathLength)) {
         THROW(ERROR_INVALID_PATH);
     }
 
@@ -25,12 +25,12 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     // derivation path. All paths are hardened, but we save a non-hardened
     // version that can be displayed if needed.
     for (int i = 0; i < keyPath->pathLength; ++i) {
-        uint32_t node = U4BE(cdata, 1 + (i * 4));
+        uint32_t node = U4BE(cdata, 1 + (i * BYTES_PER_PATH_ELEMENT));
         keyPath->rawKeyDerivationPath[i] = node;
         keyPath->keyDerivationPath[i] = node | HARDENED_OFFSET;
     }
 
-    return 1 + (4 * keyPath->pathLength);
+    return 1 + (BYTES_PER_PATH_ELEMENT * keyPath->pathLength);
 }
 
 /**
@@ -70,12 +70,13 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
                                         uint8_t validTransactionKind) {
     // Parse the account sender address from the transaction header, so it can be shown.
     size_t outputSize = sizeof(accountSender->sender);
-    if (base58check_encode(cdata, 32, accountSender->sender, &outputSize) == -1) {
+    if (base58check_encode(cdata, ADDRESS_LENGTH, accountSender->sender, &outputSize) == -1) {
         // The received address bytes are not a valid base58 encoding.
         PRINTF("The received address bytes are not valid base85 encoded\n");
         THROW(ERROR_INVALID_TRANSACTION);
     }
-    accountSender->sender[55] = '\0';
+    accountSender->sender[BASE58_ADDRESS_LENGTH] = '\0';
+
     return hashHeaderAndType(cdata,
                              dataLength,
                              ACCOUNT_TRANSACTION_HEADER_LENGTH,
@@ -112,7 +113,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
     int headerLength = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, kind);
 
     // extract energy amount from header
-    uint64_t energy_amount_u64 = U8BE(cdata, 40);
+    uint64_t energy_amount_u64 = U8BE(cdata, ENERGY_OFFSET_IN_HEADER);
 
     amountToGtuDisplay((uint8_t *) feesDst, feesSize, energy_amount_u64);
 
@@ -120,12 +121,12 @@ int handleHeaderAndToAddress(uint8_t *cdata,
     remainingDataLength -= headerLength;
 
     // Extract the recipient address and add to the hash.
-    uint8_t toAddress[COMMON_HASH_SIZE];
-    if (remainingDataLength < 32) {
+    uint8_t toAddress[ADDRESS_LENGTH];
+    if (remainingDataLength < ADDRESS_LENGTH) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
-    memmove(toAddress, cdata, 32);
-    updateHash((cx_hash_t *) &tx_state->hash, toAddress, 32);
+    memmove(toAddress, cdata, ADDRESS_LENGTH);
+    updateHash((cx_hash_t *) &tx_state->hash, toAddress, ADDRESS_LENGTH);
 
     // The recipient address is in a base58 format, so we need to encode it to be
     // able to display in a human-readable way.
@@ -133,19 +134,19 @@ int handleHeaderAndToAddress(uint8_t *cdata,
         // The received address bytes are not a valid base58 encoding.
         THROW(ERROR_INVALID_TRANSACTION);
     }
-    recipientDst[55] = '\0';
-    return keyPathLength + headerLength + 32;
+    recipientDst[BASE58_ADDRESS_LENGTH] = '\0';
+    return keyPathLength + headerLength + ADDRESS_LENGTH;
 }
 
-void sendUserRejection() {
+void sendUserRejection(void) {
     sendUserRejectionNoIdle();
     ui_menu_main();
 }
 
-void sendUserRejectionNoIdle() {
+void sendUserRejectionNoIdle(void) {
     G_io_apdu_buffer[0] = ERROR_REJECTED_BY_USER >> 8;
     G_io_apdu_buffer[1] = ERROR_REJECTED_BY_USER & 0xFF;
-    io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, 2);
+    io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, ERROR_RESPONSE_LENGTH);
 }
 
 void sendSuccess(uint8_t tx) {
@@ -155,7 +156,7 @@ void sendSuccess(uint8_t tx) {
     ui_menu_main();
 }
 
-void sendSuccessNoIdle() {
+void sendSuccessNoIdle(void) {
     sendSuccessResultNoIdle(0);
 }
 
@@ -208,7 +209,7 @@ void ensureNoError(cx_err_t errorCode) {
 void getPrivateKey(uint32_t *keyPathInput,
                    uint8_t keyPathLength,
                    cx_ecfp_private_key_t *privateKey) {
-    uint8_t privateKeyData[COMMON_SIGNATURE_SIZE];
+    uint8_t privateKeyData[ED25519_SIGNATURE_LENGTH];
 
     // Invoke the device methods for generating a private key.
     // Wrap in try/finally to ensure that private key information is cleaned up, even if a system
@@ -222,10 +223,10 @@ void getPrivateKey(uint32_t *keyPathInput,
                                                              privateKeyData,
                                                              NULL,
                                                              (unsigned char *) "ed25519 seed",
-                                                             12));
+                                                             ED25519_SEED_LENGTH));
             ensureNoError(cx_ecfp_init_private_key_no_throw(CX_CURVE_Ed25519,
                                                             privateKeyData,
-                                                            32,
+                                                            KEY_LENGTH,
                                                             privateKey));
         }
         FINALLY {
@@ -257,11 +258,11 @@ void getPublicKey(uint8_t *publicKeyArray) {
     END_TRY;
 
     // Build the public-key bytes in the expected format.
-    for (int i = 0; i < 32; i++) {
-        publicKeyArray[i] = publicKey.W[64 - i];
+    for (int i = 0; i < KEY_LENGTH; i++) {
+        publicKeyArray[i] = publicKey.W[ED25519_PUBLIC_KEY_CURVE_SIZE - i];
     }
-    if ((publicKey.W[32] & 1) != 0) {
-        publicKeyArray[31] |= 0x80;
+    if ((publicKey.W[KEY_LENGTH] & 1) != 0) {
+        publicKeyArray[KEY_LENGTH - 1] |= ED25519_SIGN_COMPRESSED_BIT;
     }
 }
 
@@ -273,8 +274,12 @@ void sign(uint8_t *input, uint8_t *signatureOnInput) {
     BEGIN_TRY {
         TRY {
             getPrivateKey(keyPath->keyDerivationPath, keyPath->pathLength, &privateKey);
-            ensureNoError(
-                cx_eddsa_sign_no_throw(&privateKey, CX_SHA512, input, 32, signatureOnInput, 64));
+            ensureNoError(cx_eddsa_sign_no_throw(&privateKey,
+                                                 CX_SHA512,
+                                                 input,
+                                                 KEY_LENGTH,
+                                                 signatureOnInput,
+                                                 ED25519_SIGNATURE_LENGTH));
         }
         FINALLY {
             // Clean up the private key, so that we cannot leak it.
@@ -284,9 +289,15 @@ void sign(uint8_t *input, uint8_t *signatureOnInput) {
     END_TRY;
 }
 
-#define l_CONST        48  // ceil((3 * ceil(log2(bls12_381_r))) / 16)
+// BLS12-381 key generation constants
+#define l_CONST        48  // ceil((3 * ceil(log2(BLS_G1_ORDER))) / 16)
 #define BLS_KEY_LENGTH 32
 #define SEED_LENGTH    32
+
+/** BLS12-381 subgroup G1's order (shared with verifyAddress.c) */
+const uint8_t BLS_G1_ORDER[32] = {0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8,
+                                  0x08, 0x09, 0xa1, 0xd8, 0x05, 0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe,
+                                  0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
 
 void hash(cx_hash_t *hashContext,
           uint32_t mode,
@@ -298,7 +309,7 @@ void hash(cx_hash_t *hashContext,
 }
 
 void updateHash(cx_hash_t *hashContext, const unsigned char *in, unsigned int len) {
-    return hash(hashContext, 0, in, len, NULL, 0);
+    hash(hashContext, 0, in, len, NULL, 0);
 }
 
 // We must declare the functions for the static analyzer to be happy. Ideally we would have
@@ -333,12 +344,10 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
     }
 
     uint8_t sk[l_CONST];
-    uint8_t prk[32];
-    uint8_t salt[32] = {
-        66, 76, 83, 45, 83, 73, 71, 45, 75, 69,
-        89, 71, 69, 78, 45, 83, 65, 76, 84, 45};  // Initially set to the byte representation of
-                                                  // "BLS-SIG-KEYGEN-SALT-"
-    size_t saltSize = 20;                         // 20 = size of initial salt seed
+    uint8_t prk[KEY_LENGTH];
+    uint8_t salt[KEY_LENGTH] = {66, 76, 83, 45, 83, 73, 71, 45, 75, 69,
+                                89, 71, 69, 78, 45, 83, 65, 76, 84, 45};  // "BLS-SIG-KEYGEN-SALT-"
+    size_t saltSize = BLS_SALT_INITIAL_LENGTH;
     uint8_t ikm[SEED_LENGTH + 1];
 
     memcpy(ikm, seed, SEED_LENGTH);
@@ -359,11 +368,11 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
                        sk,
                        sizeof(sk));
 
-        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), bls12_381_r, sizeof(bls12_381_r)));
+        ensureNoError(cx_math_modm_no_throw(sk, sizeof(sk), BLS_G1_ORDER, sizeof(BLS_G1_ORDER)));
     } while (cx_math_is_zero(sk, sizeof(sk)));
 
-    // Skip the first 16 bytes, because they are 0 due to calculating modulo bls12_381_r, which is
-    // 32 bytes (and sk has 48 bytes).
+    // Skip the first 16 bytes, because they are 0 due to calculating modulo BLS_G1_ORDER
+    // (and sk has 48 bytes).
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
 }
 
@@ -384,12 +393,17 @@ void getBlsPrivateKey(uint32_t *keyPathInput,
     END_TRY;
 }
 
+#define U64_RATIO_SEPARATOR     " / "
+#define U64_RATIO_SEPARATOR_LEN 3
+
 size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst) {
     uint64_t numerator = U8BE(cdata, 0);
     uint64_t denominator = U8BE(cdata, 8);
-    updateHash((cx_hash_t *) &tx_state->hash, cdata, 16);
+    updateHash((cx_hash_t *) &tx_state->hash, cdata, U64_RATIO_BYTES);
     int numLength = numberToText(dst, sizeOfDst, numerator);
-    memmove(dst + numLength, " / ", 3);
-    numberToText(dst + numLength + 3, sizeOfDst - (numLength + 3), denominator);
-    return 16;
+    memmove(dst + numLength, U64_RATIO_SEPARATOR, U64_RATIO_SEPARATOR_LEN);
+    numberToText(dst + numLength + U64_RATIO_SEPARATOR_LEN,
+                 sizeOfDst - (numLength + U64_RATIO_SEPARATOR_LEN),
+                 denominator);
+    return U64_RATIO_BYTES;
 }

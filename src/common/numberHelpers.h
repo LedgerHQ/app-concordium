@@ -1,6 +1,24 @@
 #pragma once
 #include "globals.h"
 
+#define GTU_DISPLAY_LENGTH 5
+#define GTU_DECIMAL_PLACES 6
+#define GTU_RESOLUTION     1000000
+
+#define PERCENTAGE_RESOLUTION     1000
+#define PERCENTAGE_DECIMAL_PLACES 3
+#define MAX_PERCENTAGE_NUMERATOR  100000
+#define PERCENTAGE_SUFFIX_LEN     2  // "%" + '\0'
+
+#define MIN_DECIMAL_DISPLAY_LENGTH 2
+
+#define GTU_LINE_BREAK_MIN_OFFSET 14
+#define GTU_LINE_BREAK_MAX_OFFSET 18
+#define HEX_PAGINATION_WIDTH      16
+#define NIBBLE_MASK               0x0F
+#define UNIT_SPACE_AND_NULL_LEN   2
+#define PREFIX_ZERO_DOT_LEN       3
+
 /**
  * Writes the input amount of µGTU to the supplied destination as its value in
  * GTU with thousand separators.

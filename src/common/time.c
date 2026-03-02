@@ -9,6 +9,7 @@
  *  The musl LICENSE is provided in licenses/musl-MIT.txt
  */
 #include "globals.h"
+#include "time.h"
 
 /* 2000-03-01 (mod 400 year, immediately after feb29 */
 #define LEAPOCH (946684800LL + 86400 * (31 + 29))
@@ -17,7 +18,7 @@
 #define DAYS_PER_100Y (365 * 100 + 24)
 #define DAYS_PER_4Y   (365 * 4 + 1)
 
-int secondsToTm(long long t, tm *tm) {
+int secondsToTm(long long t, tm *out) {
     long long days, secs;
     int remdays, remsecs, remyears;
     int qc_cycles, c_cycles, q_cycles;
@@ -68,29 +69,32 @@ int secondsToTm(long long t, tm *tm) {
 
     if (years > INT_MAX - 100 || years < INT_MIN + 100) return -1;
 
-    tm->tm_year = years + 100;
-    tm->tm_mon = months + 2;
-    if (tm->tm_mon >= 12) {
-        tm->tm_mon -= 12;
-        tm->tm_year++;
+    out->tm_year = years + 100;
+    out->tm_mon = months + 2;
+    if (out->tm_mon >= 12) {
+        out->tm_mon -= 12;
+        out->tm_year++;
     }
-    tm->tm_mday = remdays + 1;
-    tm->tm_wday = wday;
-    tm->tm_yday = yday;
+    out->tm_mday = remdays + 1;
+    out->tm_wday = wday;
+    out->tm_yday = yday;
 
-    tm->tm_hour = remsecs / 3600;
-    tm->tm_min = remsecs / 60 % 60;
-    tm->tm_sec = remsecs % 60;
+    out->tm_hour = remsecs / 3600;
+    out->tm_min = remsecs / 60 % 60;
+    out->tm_sec = remsecs % 60;
 
     return 0;
 }
+
+#define MIN_TWO_DIGIT_DECIMAL    10
+#define TIMESTAMP_DISPLAY_LENGTH 20  // "YYYY-MM-DD HH:MM:SS" + '\0'
 
 /**
  * Helper function for prepending numbers that are
  * less than 10 with a '0', so that 5 results in 05.
  */
-int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
-    if (value < 10) {
+static int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
+    if (value < MIN_TWO_DIGIT_DECIMAL) {
         if (dstLength < 1) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
@@ -104,8 +108,7 @@ int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
     int offset = 0;
 
     // Check if we have enough space for full timestamp
-    // Format: "YYYY-MM-DD HH:MM:SS" (19 chars + null terminator)
-    if (dstLength < 20) {
+    if (dstLength < TIMESTAMP_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 

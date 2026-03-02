@@ -26,7 +26,7 @@ void sendPublicKey(bool compare) {
     }
 
     if (ctx->signPublicKey) {
-        uint8_t signedPublicKey[64];
+        uint8_t signedPublicKey[ED25519_SIGNATURE_LENGTH];
         sign(publicKey, signedPublicKey);
         if (sizeof(signedPublicKey) > sizeof(G_io_apdu_buffer) - tx) {
             THROW(ERROR_BUFFER_OVERFLOW);
@@ -41,7 +41,7 @@ void sendPublicKey(bool compare) {
         sendSuccessResultNoIdle(tx);
         toPaginatedHex(publicKey, sizeof(publicKey), ctx->publicKey, sizeof(ctx->publicKey));
         // Allow for receiving a new instruction even while comparing public keys.
-        tx_state->currentInstruction = -1;
+        tx_state->currentInstruction = INSTRUCTION_NONE;
         uiComparePubkey();
 
     } else {
@@ -56,55 +56,58 @@ void handleGetPublicKey(uint8_t *cdata,
                         volatile unsigned int *flags) {
     parseKeyDerivationPath(cdata, lc);
 
-    // If P2 == 0x01, then the public-key is signed by its corresponding private key, and
-    // appended to the returned public-key. This is used when it is needed to provide
+    // If P2 == P2_SIGN_PUBLIC_KEY, then the public-key is signed by its corresponding private key,
+    // and appended to the returned public-key. This is used when it is needed to provide
     // proof of the knowledge of the corresponding private key.
-    ctx->signPublicKey = p2 == 0x01;
+    ctx->signPublicKey = p2 == P2_SIGN_PUBLIC_KEY;
 
-    // If P1 == 0x01, then we skip displaying the key being exported. This is used when it
+    // If P1 == P1_SKIP_DISPLAY, then we skip displaying the key being exported. This is used when
     // it is not important for the user to validate the key.
-    if (p1 == 0x01) {
+    if (p1 == P1_SKIP_DISPLAY) {
         sendPublicKey(false);
     } else {
-        // If the key path is of length 5, then it is a request for a governance key.
-        // Also it has to be in the governance subtree, which starts with 1.
-        if (keyPath->pathLength == 5 && keyPath->rawKeyDerivationPath[0] == 1105) {
-            if (keyPath->rawKeyDerivationPath[2] != 1) {
+        // If the key path is of length GOVERNANCE_KEY_PATH_LENGTH, then it is a request for a
+        // governance key. Also it has to be in the governance subtree, which starts with 1.
+        if (keyPath->pathLength == GOVERNANCE_KEY_PATH_LENGTH &&
+            keyPath->rawKeyDerivationPath[0] == LEGACY_PURPOSE) {
+            if (keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_PROVIDER] !=
+                GOVERNANCE_IDENTITY_INDEX) {
                 THROW(ERROR_INVALID_PATH);
             }
 
-            uint32_t purpose = keyPath->rawKeyDerivationPath[3];
-            if (sizeof(ctx->display) < 13) {
+            uint32_t purpose = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
+            if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
                 THROW(ERROR_BUFFER_OVERFLOW);
             }
 
             switch (purpose) {
                 case 0:
-                    memmove(ctx->display, "Gov. root", 10);
+                    memmove(ctx->display, "Gov. root", GOV_ROOT_LEN);
                     break;
                 case 1:
-                    memmove(ctx->display, "Gov. level 1", 13);
+                    memmove(ctx->display, "Gov. level 1", GOV_LEVEL_LEN);
                     break;
                 case 2:
-                    memmove(ctx->display, "Gov. level 2", 13);
+                    memmove(ctx->display, "Gov. level 2", GOV_LEVEL_LEN);
                     break;
                 default:
                     THROW(ERROR_INVALID_PATH);
             }
         } else {
-            if (keyPath->rawKeyDerivationPath[0] == 44 ||
-                keyPath->rawKeyDerivationPath[0] == (44 | HARDENED_OFFSET)) {
-                uint32_t identityProviderIndex = keyPath->rawKeyDerivationPath[2];
-                uint32_t identityIndex = keyPath->rawKeyDerivationPath[3];
-                uint32_t accountIndex = keyPath->rawKeyDerivationPath[5];
+            if (keyPath->rawKeyDerivationPath[0] == NEW_PURPOSE ||
+                keyPath->rawKeyDerivationPath[0] == (NEW_PURPOSE | HARDENED_OFFSET)) {
+                uint32_t identityProviderIndex =
+                    keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_PROVIDER];
+                uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
+                uint32_t accountIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_ACCOUNT_NEW];
                 getIdentityAccountDisplayNewPath(ctx->display,
                                                  sizeof(ctx->display),
                                                  identityProviderIndex,
                                                  identityIndex,
                                                  accountIndex);
             } else {
-                uint32_t identityIndex = keyPath->rawKeyDerivationPath[4];
-                uint32_t accountIndex = keyPath->rawKeyDerivationPath[6];
+                uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_LEGACY];
+                uint32_t accountIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_ACCOUNT_LEGACY];
                 getIdentityAccountDisplay(ctx->display,
                                           sizeof(ctx->display),
                                           identityIndex,

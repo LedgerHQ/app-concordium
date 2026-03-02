@@ -8,12 +8,35 @@
 #define MAX_MEMO_CBOR_SIZE   CBOR_2BYTE_HEADER + MAX_MEMO_STRING_SIZE
 #define MAX_DATA_SIZE        (MAX_MEMO_CBOR_SIZE)
 
-/**
- * BLS12-381 subgroup G1's order:
- */
-static const uint8_t bls12_381_r[32] = {
-    0x73, 0xed, 0xa7, 0x53, 0x29, 0x9d, 0x7d, 0x48, 0x33, 0x39, 0xd8, 0x08, 0x09, 0xa1, 0xd8, 0x05,
-    0x53, 0xbd, 0xa4, 0x02, 0xff, 0xfe, 0x5b, 0xfe, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x01};
+#define ENERGY_OFFSET_IN_HEADER 40
+
+#define ERROR_RESPONSE_LENGTH 2
+
+#define MAX_KEY_PATH_LENGTH    8
+#define BYTES_PER_PATH_ELEMENT 4
+
+#define U64_RATIO_BYTES 16
+
+#define BLS_SALT_INITIAL_LENGTH 20
+
+#define ADDRESS_LENGTH        32
+#define BASE58_ADDRESS_LENGTH 55
+
+#define ED25519_SIGNATURE_LENGTH      64
+#define ED25519_SEED_LENGTH           12
+#define ED25519_PUBLIC_KEY_CURVE_SIZE 64
+#define ED25519_SIGN_COMPRESSED_BIT   0x80
+
+#define BASE58_VERSION_BYTE 1
+#define BASE58_CHECKSUM_LEN 4
+
+#define UINT64_MAX_DECIMAL_DIGITS 20
+
+/** BLS12-381 G1 coordinate size in bytes (compressed point) */
+#define BLS_G1_COORD_SIZE 48
+
+/** BLS12-381 subgroup G1's order */
+extern const uint8_t BLS_G1_ORDER[32];
 
 /**
  * Converts bytes into uint64_t (big endian).
@@ -29,7 +52,7 @@ static const uint8_t bls12_381_r[32] = {
  *
  * After sending the rejection the display will return to the menu.
  */
-void sendUserRejection();
+void sendUserRejection(void);
 
 /**
  * Send a user rejection back to the caller, which will indicate to
@@ -39,12 +62,12 @@ void sendUserRejection();
  *
  * After sending the rejection the display will do nothing.
  */
-void sendUserRejectionNoIdle();
+void sendUserRejectionNoIdle(void);
 /**
  * Send a success back to the caller without returning the display to the
  * commands to avoid resetting the display back to the menu between commands.
  */
-void sendSuccessNoIdle();
+void sendSuccessNoIdle(void);
 
 /**
  * Send a success with a result back to the caller without returning the display to the

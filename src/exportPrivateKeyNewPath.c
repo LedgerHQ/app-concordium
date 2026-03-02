@@ -43,7 +43,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
     uint32_t derivationPath[MAX_DERIVATION_PATH_LENGTH];
     uint8_t derivationPathLength = 4;
     cx_ecfp_private_key_t tempPrivateKeyEd25519;
-    uint8_t tempPrivateKey[COMMON_PRIVATE_KEY_SIZE];
+    uint8_t tempPrivateKey[KEY_LENGTH];
 
     uint8_t keysToExport[MAX_KEYS_TO_EXPORT] = {0, 0, 0};
     uint8_t keysToExportLength = 0;
@@ -113,11 +113,11 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             THROW(ERROR_BUFFER_OVERFLOW);
         }
 
-        outputPrivateKey[tx++] = 32;  // length of the private key
+        outputPrivateKey[tx++] = KEY_LENGTH;
         if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
             // export raw key
             getPrivateKey(derivationPath, tempDerivationPathLength, &tempPrivateKeyEd25519);
-            for (int i = 0; i < 32; i++) {
+            for (int i = 0; i < KEY_LENGTH; i++) {
                 tempPrivateKey[i] = tempPrivateKeyEd25519.d[i];
             }
         } else {
@@ -128,7 +128,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                              sizeof(tempPrivateKey));
         }
 
-        for (int i = 0; i < 32; i++) {
+        for (int i = 0; i < KEY_LENGTH; i++) {
             outputPrivateKey[tx] = tempPrivateKey[i];
             tx++;
         }

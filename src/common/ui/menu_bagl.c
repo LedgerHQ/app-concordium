@@ -18,6 +18,7 @@
 #ifdef HAVE_BAGL
 
 #include "globals.h"
+#include "menu_bagl.h"
 
 static tx_state_t *tx_state = &global_tx_state;
 
@@ -38,8 +39,8 @@ UX_FLOW(ux_menu_main_flow,
         &ux_menu_exit_step,
         FLOW_LOOP);
 
-void ui_menu_main() {
-    tx_state->currentInstruction = -1;
+void ui_menu_main(void) {
+    tx_state->currentInstruction = INSTRUCTION_NONE;
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
@@ -55,7 +56,7 @@ UX_STEP_CB(ux_menu_back_step, pb, ui_menu_main(), {&C_icon_back, "Back"});
 // #2 screen: back button to main menu
 UX_FLOW(ux_menu_about_flow, &ux_menu_info_step, &ux_menu_back_step, FLOW_LOOP);
 
-void ui_menu_about() {
+void ui_menu_about(void) {
     ux_flow_init(0, ux_menu_about_flow, NULL);
 }
 

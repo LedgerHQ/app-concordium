@@ -15,10 +15,10 @@ static tx_state_t *tx_state = &global_tx_state;
 static cborContext_t *ctx = &global.withDataBlob.cborContext;
 
 // Hashes transaction, signs it and sends the signature back to the computer.
-void buildAndSignTransactionHash() {
-    hash((cx_hash_t *) &tx_state->hash, CX_LAST, NULL, 0, tx_state->transactionHash, 32);
+void buildAndSignTransactionHash(void) {
+    hash((cx_hash_t *) &tx_state->hash, CX_LAST, NULL, 0, tx_state->transactionHash, KEY_LENGTH);
 
-    uint8_t signedHash[COMMON_SIGNATURE_SIZE];
+    uint8_t signedHash[ED25519_SIGNATURE_LENGTH];
     sign(tx_state->transactionHash, signedHash);
     if (sizeof(signedHash) > sizeof(G_io_apdu_buffer)) {
         THROW(ERROR_BUFFER_OVERFLOW);
@@ -96,7 +96,7 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
             memmove(ctx->display, "-", 1);
             if (length == UINT64_MAX) {
                 bin2dec(ctx->display + 1, sizeof(ctx->display) - 1, length);
-                memmove(ctx->display + 1 + 20, " - 1", 4);
+                memmove(ctx->display + 1 + UINT64_MAX_DECIMAL_DIGITS, " - 1", 4);
             } else {
                 bin2dec(ctx->display + 1, sizeof(ctx->display) - 1, 1 + length);
             }

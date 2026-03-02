@@ -1,6 +1,8 @@
 #ifdef HAVE_BAGL
 #include "globals.h"
 
+#include "display_bagl.h"
+
 accountSender_t global_account_sender;
 
 UX_STEP_NOCB(ux_display_memo_step_nocb,
@@ -328,7 +330,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
  * transaction.
  * - Shows the signing / decline screens.
  */
-void startConfigureBakerCommissionDisplay() {
+void startConfigureBakerCommissionDisplay(void) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
@@ -377,7 +379,7 @@ void startConfigureBakerCommissionDisplay() {
  * transaction.
  * - Shows the signing / decline screens.
  */
-void startConfigureBakerSuspendedDisplay() {
+void startConfigureBakerSuspendedDisplay(void) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
@@ -419,7 +421,7 @@ UX_STEP_NOCB(ux_sign_configure_delegation_pool_step,
 
 UX_STEP_NOCB(ux_sign_configure_delegation_stop_delegation_step, nn, {"Stop", "delegation"});
 
-void startConfigureDelegationDisplay() {
+void startConfigureDelegationDisplay(void) {
     uint8_t index = 0;
 
     ux_sign_configure_delegation[index++] = &ux_sign_flow_shared_review;
@@ -890,11 +892,10 @@ UX_FLOW(ux_deploy_module,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
         &ux_deploy_module_1_step,
-        // &ux_deploy_module_2_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
-void uiDeployModuleDisplay() {
+void uiDeployModuleDisplay(void) {
     ux_flow_init(0, ux_deploy_module, NULL);
 }
 
@@ -913,7 +914,7 @@ UX_FLOW(ux_init_contract,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
-void uiInitContractDisplay() {
+void uiInitContractDisplay(void) {
     ux_flow_init(0, ux_init_contract, NULL);
 }
 
@@ -936,7 +937,7 @@ UX_FLOW(ux_update_contract,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
-void uiUpdateContractDisplay() {
+void uiUpdateContractDisplay(void) {
     ux_flow_init(0, ux_update_contract, NULL);
 }
 

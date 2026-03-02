@@ -13,25 +13,29 @@
 #include <ux.h>
 #include <io.h>
 #include <format.h>
+#include <lcx_hmac.h>
 #include <os_io_seproxyhal.h>
 #include <lcx_hash.h>
 #include <parser.h>
 #include <base58.h>
 #include <glyphs.h>
 
+/**
+ * Key length of (Public Key || Verification Key || Account Key)
+ */
+#define KEY_LENGTH 32
+
 // Common buffer size constants used across the application
-#define COMMON_PRIVATE_KEY_SIZE    32   // Standard private key size
-#define COMMON_PUBLIC_KEY_SIZE     32   // Standard public key size
-#define COMMON_SIGNATURE_SIZE      64   // Standard signature size
-#define COMMON_HASH_SIZE           32   // Standard hash size
-#define COMMON_ADDRESS_SIZE        57   // Standard address size
-#define COMMON_DISPLAY_SIZE        255  // Standard display buffer size
-#define COMMON_AMOUNT_DISPLAY_SIZE 30   // Standard amount display size
-#define COMMON_URL_DISPLAY_SIZE    256  // Standard URL display size
-#define COMMON_MODULE_REF_SIZE     32   // Standard module reference size
-#define COMMON_THRESHOLD_SIZE      4    // Standard threshold size
-#define COMMON_TIMESTAMP_SIZE      8    // Standard timestamp size
-#define COMMON_COMMISSION_SIZE     8    // Standard commission rate size
+#define COMMON_SIGNATURE_SIZE      64          // Standard signature size
+#define COMMON_HASH_SIZE           KEY_LENGTH  // Standard hash size
+#define COMMON_ADDRESS_SIZE        57          // Standard address size
+#define COMMON_DISPLAY_SIZE        255         // Standard display buffer size
+#define COMMON_AMOUNT_DISPLAY_SIZE 30          // Standard amount display size
+#define COMMON_URL_DISPLAY_SIZE    256         // Standard URL display size
+#define COMMON_MODULE_REF_SIZE     32          // Standard module reference size
+#define COMMON_THRESHOLD_SIZE      4           // Standard threshold size
+#define COMMON_TIMESTAMP_SIZE      8           // Standard timestamp size
+#define COMMON_COMMISSION_SIZE     8           // Standard commission rate size
 #include <limits.h>
 #include <format.h>
 
@@ -88,11 +92,6 @@
  * Maximum length of application name.
  */
 #define MAX_APPNAME_LEN 64
-
-/**
- * Key length of (Public Key || Verification Key || Account Key)
- */
-#define KEY_LENGTH 32
 
 /**
  * P2 value for more data
@@ -199,6 +198,12 @@ typedef struct internal_storage_t {
     uint8_t dummy2_allowed;
     uint8_t initialized;
 } internal_storage_t;
+
+#define STORAGE_INITIALIZED 0x01
+#define STORAGE_DEFAULT     0x00
+
+/** Sentinel for no active instruction (before first command) */
+#define INSTRUCTION_NONE -1
 
 extern const internal_storage_t N_storage_real;
 

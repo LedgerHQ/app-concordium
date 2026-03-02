@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdint.h>
+#include <stddef.h>
+
 typedef struct {
     int tm_sec;  /* seconds,  range 0 to 59          */
     int tm_min;  /* minutes, range 0 to 59           */
@@ -14,7 +17,7 @@ typedef struct {
 /**
  * Converts seconds since epoch to a time struct.
  */
-int secondsToTm(long long, tm *);
+int secondsToTm(long long t, tm *out);
 
 /**
  * Writes a time struct to dst as human readable text in

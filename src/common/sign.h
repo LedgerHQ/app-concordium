@@ -22,4 +22,4 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength);
  */
 void readCborContent(uint8_t *cdata, uint8_t dataLength);
 
-void buildAndSignTransactionHash();
+void buildAndSignTransactionHash(void);
