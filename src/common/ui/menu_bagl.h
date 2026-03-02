@@ -5,7 +5,7 @@
 
 // Stub. APPVERSION is defined in makefile
 #ifndef APPVERSION
-#define APPVERSION "UNKNOWN"
+#error "APPVERSION is not set"
 #endif  // APPVERSION
 
 extern const bagl_icon_details_t C_icon_validate_14;
