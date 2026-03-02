@@ -66,6 +66,7 @@
 #include "deployModule.h"
 #include "initContract.h"
 #include "updateContract.h"
+#include "challenge.h"
 
 #define LEGACY_PURPOSE        1105
 #define LEGACY_COIN_TYPE      0
