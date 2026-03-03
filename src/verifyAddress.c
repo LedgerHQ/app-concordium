@@ -10,8 +10,6 @@
 
 static verifyAddressContext_t *ctx = &global.verifyAddressContext;
 
-static const uint32_t HARDENED_OFFSET = 0x80000000;
-
 // gX and gY are the coordinates of g, which is the first part of the onchainCommitmentKey.
 static const uint8_t gX[BLS_G1_COORD_SIZE] = {
     0x11, 0x4c, 0xbf, 0xe4, 0x4a, 0x02, 0xc6, 0xb1, 0xf7, 0x87, 0x11, 0x17, 0x6d, 0x5f, 0x43, 0x72,
@@ -141,6 +139,24 @@ static void parse_new_path(uint8_t lc,
     prf_key_path[4] = NEW_PRF_KEY;
 }
 
+static void parse_full_path_input(uint8_t lc,
+                                  uint8_t *cdata,
+                                  uint32_t *prf_key_path,
+                                  uint32_t *cred_counter) {
+    if (lc >= 4 * 6 || lc % 4 != 0) {
+        PRINTF("Wrong data length: lc must be a multiple of 4 and at most 24, actual lc: %d\n", lc);
+        THROW(SWO_WRONG_DATA_LENGTH);
+    }
+
+    uint32_t offset = 0;
+
+    //
+    for (size_t i = 0; i < (lc / 4) - 1; i++) {
+        prf_key_path[i] = read_u32_be(cdata, &offset);
+    }
+    *cred_counter = read_u32_be(cdata, &offset);
+}
+
 /**
  * Parse APDU CDATA into a PRF key derivation path based on P1/P2.
  *
@@ -180,7 +196,7 @@ static bool parse_key_path(uint8_t *cdata,
 
         case P1_FULL_PATH:
             valid = (p2 == P2_MAINNET_DEFAULT);
-            // if (valid) parse_full_path_input(lc, cdata, prf_key_path_out);
+            if (valid) parse_full_path_input(lc, cdata, prf_key_path_out, cred_counter_out);
             break;
 
         default:
@@ -215,7 +231,7 @@ void handleVerifyAddress(uint8_t *cdata,
                                          cred_counter_out);
     }
 
-    size_t prf_key_path_len = is_legacy_path ? 6 : 5;
+    uint8_t prf_key_path_len = is_legacy_path ? 6 : 5;
 
     uint8_t credId[BLS_G1_COORD_SIZE];
     uint8_t prf[KEY_LENGTH];
@@ -226,7 +242,8 @@ void handleVerifyAddress(uint8_t *cdata,
     BEGIN_TRY {
         TRY {
             getBlsPrivateKey(prf_key_path_out, prf_key_path_len, prf, sizeof(prf));
-            cx_err_t error = getCredId(prf, sizeof(prf), prf_key_path_out, credId, sizeof(credId));
+            cx_err_t error = getCredId(prf, sizeof(prf), cred_counter_out, credId, sizeof(credId));
+
             if (error != 0) {
                 THROW(ERROR_INVALID_STATE);
             }
