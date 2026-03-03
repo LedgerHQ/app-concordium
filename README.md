@@ -277,5 +277,11 @@ It outputs 3 artifacts:
 - `code-coverage` within HTML details of code coverage
 - `documentation` within HTML auto-generated documentation
 
-## Clanformat locally 
-docker exec app-concordium-container find /app/src -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} \;
+## Useful commands 
+
+Clang-format locally 
+```docker exec app-concordium-container find /app/src -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} \;```
+
+Run a certain test, with full logs and generate new snapshots 
+```source .venv/bin/activate && pytest ./tests/test_verify_address.py --tb=short -v --device nanosp --golden_run -s```
+
