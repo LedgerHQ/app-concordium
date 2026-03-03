@@ -1,5 +1,7 @@
 #include "globals.h"
 
+#include "apdu/helpers.h"
+#include "util/hardened.h"
 #define LEGACY_ACCOUNT_SUBTREE 0
 #define LEGACY_NORMAL_ACCOUNTS 0
 
@@ -100,78 +102,131 @@ end:
     return error;
 }
 
+static void parse_legacy_path(uint8_t lc,
+                              uint8_t *cdata,
+                              uint32_t *prf_key_path,
+                              uint32_t *cred_counter) {
+    check_lc(lc, 8);
+
+    size_t offset = 0;
+    uint32_t identity = read_u32_be(cdata, &offset);
+    *cred_counter = read_u32_be(cdata, &offset);
+
+    prf_key_path[0] = LEGACY_PURPOSE;
+    prf_key_path[1] = LEGACY_COIN_TYPE;
+    prf_key_path[2] = LEGACY_ACCOUNT_SUBTREE;
+    prf_key_path[3] = LEGACY_NORMAL_ACCOUNTS;
+    prf_key_path[4] = identity;
+    prf_key_path[5] = LEGACY_PRF_KEY;
+}
+
+static void parse_new_path(uint8_t lc,
+                           uint8_t *cdata,
+                           bool mainnet,
+                           uint32_t *prf_key_path,
+                           uint32_t *cred_counter) {
+    check_lc(lc, 12);
+
+    uint32_t offset = 0;
+    uint32_t identity_provider = read_u32_be(cdata, &offset);
+    uint32_t identity = read_u32_be(cdata, &offset);
+    *cred_counter = read_u32_be(cdata, &offset);
+
+    uint32_t coin_type = mainnet ? NEW_MAINNET_COIN_TYPE : NEW_TESTNET_COIN_TYPE;
+
+    prf_key_path[0] = NEW_PURPOSE;
+    prf_key_path[1] = coin_type;
+    prf_key_path[2] = identity_provider;
+    prf_key_path[3] = identity;
+    prf_key_path[4] = NEW_PRF_KEY;
+}
+
+/**
+ * Parse APDU CDATA into a PRF key derivation path based on P1/P2.
+ *
+ * @param cdata     APDU command data
+ * @param p1        Path format: P1_LEGACY_PATH, P1_NEW_PATH, or P1_FULL_PATH
+ * @param p2        Network selector (P2_MAINNET_DEFAULT or P2_TESTNET for P1_NEW_PATH)
+ * @param lc        Length of cdata
+ * @param prfKeyPath Output buffer for the parsed derivation path
+ *
+ * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
+ */
+static bool parse_key_path(uint8_t *cdata,
+                           uint8_t p1,
+                           uint8_t p2,
+                           uint8_t lc,
+                           uint32_t *prf_key_path_out,
+                           uint32_t *cred_counter_out) {
+    bool is_legacy_path = false;
+    bool valid = true;
+
+    switch (p1) {
+        case P1_LEGACY_PATH:
+            is_legacy_path = true;
+            valid = (p2 == P2_MAINNET_DEFAULT);
+            if (valid) parse_legacy_path(lc, cdata, prf_key_path_out, cred_counter_out);
+            break;
+
+        case P1_NEW_PATH:
+            if (p2 == P2_MAINNET_DEFAULT) {
+                parse_new_path(lc, cdata, MAINNET, prf_key_path_out, cred_counter_out);
+            } else if (p2 == P2_TESTNET) {
+                parse_new_path(lc, cdata, TESTNET, prf_key_path_out, cred_counter_out);
+            } else {
+                valid = false;
+            }
+            break;
+
+        case P1_FULL_PATH:
+            valid = (p2 == P2_MAINNET_DEFAULT);
+            // if (valid) parse_full_path_input(lc, cdata, prf_key_path_out);
+            break;
+
+        default:
+            valid = false;
+            break;
+    }
+
+    if (!valid) THROW(SWO_WRONG_P1_P2);
+    return is_legacy_path;
+}
+
 void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p1,
                          uint8_t p2,
                          uint8_t lc,
                          volatile unsigned int *flags) {
-    size_t offset = 0;
-    bool is_new_path = p1 == P1_VERIFY_NEW_PATH;
-    uint32_t identityProvider = 0;
-    uint8_t remainingDataLength = lc;
-    if (is_new_path) {
-        if (remainingDataLength < 4) {
-            THROW(ERROR_BUFFER_OVERFLOW);
-        }
-        identityProvider = U4BE(cdata, offset);
-        offset += 4;
-        remainingDataLength -= 4;
-    }
-    if (remainingDataLength < 4) {
-        THROW(ERROR_BUFFER_OVERFLOW);
-    }
-    uint32_t identity = U4BE(cdata, offset);
-    offset += 4;
-    remainingDataLength -= 4;
-    if (remainingDataLength < 4) {
-        THROW(ERROR_BUFFER_OVERFLOW);
-    }
-    uint32_t credCounter = U4BE(cdata, offset);
+    uint32_t prf_key_path_out[MAX_DERIVATION_PATH_LENGTH] = {0};
+    uint32_t cred_counter_out = 0;
 
-    size_t prfKeyPathLen = is_new_path ? 5 : 6;
-    uint32_t prfKeyPath[MAX_DERIVATION_PATH_LENGTH];
+    bool is_legacy_path = parse_key_path(cdata, p1, p2, lc, prf_key_path_out, &cred_counter_out);
 
-    if (is_new_path) {
-        prfKeyPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
-
-        switch (p2) {
-            case P2_MAINNET:
-                prfKeyPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
-                break;
-            case P2_TESTNET:
-                prfKeyPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
-                break;
-            default:
-                PRINTF("Invalid network type: %d\n", p2);
-                THROW(ERROR_INVALID_PARAM);
-        }
-
-        prfKeyPath[2] = identityProvider | HARDENED_OFFSET;
-        prfKeyPath[3] = identity | HARDENED_OFFSET;
-        prfKeyPath[4] = NEW_PRF_KEY | HARDENED_OFFSET;
-
+    if (is_legacy_path) {
+        getIdentityAccountDisplay(ctx->display,
+                                  sizeof(ctx->display),
+                                  prf_key_path_out[4],
+                                  cred_counter_out);
+    } else {
         getIdentityAccountDisplayNewPath(ctx->display,
                                          sizeof(ctx->display),
-                                         identityProvider,
-                                         identity,
-                                         credCounter);
-    } else {
-        prfKeyPath[0] = LEGACY_PURPOSE | HARDENED_OFFSET;
-        prfKeyPath[1] = LEGACY_COIN_TYPE | HARDENED_OFFSET;
-        prfKeyPath[2] = LEGACY_ACCOUNT_SUBTREE | HARDENED_OFFSET;
-        prfKeyPath[3] = LEGACY_NORMAL_ACCOUNTS | HARDENED_OFFSET;
-        prfKeyPath[4] = identity | HARDENED_OFFSET;
-        prfKeyPath[5] = LEGACY_PRF_KEY | HARDENED_OFFSET;
-
-        getIdentityAccountDisplay(ctx->display, sizeof(ctx->display), identity, credCounter);
+                                         prf_key_path_out[2],
+                                         prf_key_path_out[3],
+                                         cred_counter_out);
     }
+
+    size_t prf_key_path_len = is_legacy_path ? 6 : 5;
 
     uint8_t credId[BLS_G1_COORD_SIZE];
     uint8_t prf[KEY_LENGTH];
+
+    for (size_t i = 0; i < prf_key_path_len; i++) {
+        set_hardened(&prf_key_path_out[i]);
+    }
     BEGIN_TRY {
         TRY {
-            getBlsPrivateKey(prfKeyPath, prfKeyPathLen, prf, sizeof(prf));
-            cx_err_t error = getCredId(prf, sizeof(prf), credCounter, credId, sizeof(credId));
+            getBlsPrivateKey(prf_key_path_out, prf_key_path_len, prf, sizeof(prf));
+            cx_err_t error = getCredId(prf, sizeof(prf), prf_key_path_out, credId, sizeof(credId));
             if (error != 0) {
                 THROW(ERROR_INVALID_STATE);
             }
