@@ -27,4 +27,16 @@ static inline void set_hardened(uint32_t *path_part) {
     *path_part |= HARDENED_BIT;
 }
 
+/**
+ * @brief Clear the hardened bit on a 32-bit derivation path part.
+ *
+ * Returns the original path part without the hardened bit.
+ *
+ * @param path_part The 32-bit value representing a part of the derivation path.
+ * @return The same value with the hardened bit cleared.
+ */
+static inline uint32_t clear_hardened(uint32_t path_part) {
+    return path_part & HARDENED_BIT_CLEAR;
+}
+
 #endif  // HARDENED_H

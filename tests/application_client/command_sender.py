@@ -16,6 +16,7 @@ class P1(IntEnum):
     # Parameter 1 for derivation path type for VERIFY_ADDRESS.
     P1_VERIFY_ADDRESS_LEGACY_PATH = 0x00
     P1_VERIFY_ADDRESS_NEW_PATH = 0x01
+    P1_VERIFY_ADDRESS_FULL_PATH = 0x02
     # Parameter 1 for screen confirmation for GET_PUBLIC_KEY.
     P1_CONFIRM = 0x00
     P1_NO_CONFIRM = 0x01
@@ -211,6 +212,23 @@ class CommandSender:
         ) + credential_counter.to_bytes(4, byteorder="big")
         with self.backend.exchange_async(
             cla=CLA, ins=InsType.VERIFY_ADDRESS, p1=p1, p2=P2.P2_NONE, data=data
+        ) as response:
+            yield response
+
+    @contextmanager
+    def verify_address_full_path(self, path_nodes: list[int]) -> Generator[None, None, None]:
+        """Verify address using P1_FULL_PATH (derivation-path format).
+        path_nodes: list of path elements as uint32 (hardened = 0x80000000 | index).
+        Last element is account index (used as cred_counter, unhardened part)."""
+        data = b""
+        for node in path_nodes:
+            data += node.to_bytes(4, byteorder="big")
+        with self.backend.exchange_async(
+            cla=CLA,
+            ins=InsType.VERIFY_ADDRESS,
+            p1=P1.P1_VERIFY_ADDRESS_FULL_PATH,
+            p2=P2.P2_MAINNET,
+            data=data,
         ) as response:
             yield response
 

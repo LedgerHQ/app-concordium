@@ -100,10 +100,22 @@ end:
     return error;
 }
 
-static void parse_legacy_path(uint8_t lc,
-                              uint8_t *cdata,
-                              uint32_t *prf_key_path,
-                              uint32_t *cred_counter) {
+/**
+ * Parse legacy path format: identity[uint32] credCounter[uint32].
+ *
+ * Builds PRF path 1105'/0'/0'/0'/identity'/1'.
+ *
+ * @param lc           Length of cdata (must be 8)
+ * @param cdata        APDU command data
+ * @param prf_key_path Output buffer for the 6-element PRF derivation path, not hardened
+ * @param cred_counter Output credential counter / account index
+ *
+ * @throws SWO_WRONG_DATA_LENGTH if lc != 8
+ */
+static path_type_t parse_legacy_path(uint8_t lc,
+                                     uint8_t *cdata,
+                                     uint32_t *prf_key_path,
+                                     uint32_t *cred_counter) {
     check_lc(lc, 8);
 
     size_t offset = 0;
@@ -116,13 +128,27 @@ static void parse_legacy_path(uint8_t lc,
     prf_key_path[3] = LEGACY_NORMAL_ACCOUNTS;
     prf_key_path[4] = identity;
     prf_key_path[5] = LEGACY_PRF_KEY;
+    return PATH_TYPE_LEGACY;
 }
 
-static void parse_new_path(uint8_t lc,
-                           uint8_t *cdata,
-                           bool mainnet,
-                           uint32_t *prf_key_path,
-                           uint32_t *cred_counter) {
+/**
+ * Parse new path format: identityProvider[uint32] identity[uint32] credCounter[uint32].
+ *
+ * Builds PRF path 44/coinType/identityProvider/identity/3.
+ *
+ * @param lc           Length of cdata (must be 12)
+ * @param cdata        APDU command data
+ * @param mainnet      true for mainnet (919), false for testnet (1)
+ * @param prf_key_path Output buffer for the 5-element PRF derivation path, not hardened
+ * @param cred_counter Output credential counter / account index
+ *
+ * @throws SWO_WRONG_DATA_LENGTH if lc != 12
+ */
+static path_type_t parse_new_path(uint8_t lc,
+                                  uint8_t *cdata,
+                                  bool mainnet,
+                                  uint32_t *prf_key_path,
+                                  uint32_t *cred_counter) {
     check_lc(lc, 12);
 
     uint32_t offset = 0;
@@ -137,24 +163,53 @@ static void parse_new_path(uint8_t lc,
     prf_key_path[2] = identity_provider;
     prf_key_path[3] = identity;
     prf_key_path[4] = NEW_PRF_KEY;
+
+    return PATH_TYPE_NEW;
 }
 
-static void parse_full_path_input(uint8_t lc,
-                                  uint8_t *cdata,
-                                  uint32_t *prf_key_path,
-                                  uint32_t *cred_counter) {
-    if (lc >= 4 * 6 || lc % 4 != 0) {
-        PRINTF("Wrong data length: lc must be a multiple of 4 and at most 24, actual lc: %d\n", lc);
+static inline void check_lc_any_path(uint8_t lc) {
+    if (lc > KEY_PATH_NODE_BYTES * MAX_KEY_PATH_LENGTH || lc % KEY_PATH_NODE_BYTES != 0 ||
+        lc < KEY_PATH_NODE_BYTES * MIN_KEY_PATH_LENGTH) {
+        PRINTF(
+            "Wrong data length: lc must be multiple of 4, less than %d and more than %d, actual "
+            "lc: %d\n",
+            KEY_PATH_NODE_BYTES * MIN_KEY_PATH_LENGTH,
+            MAX_KEY_PATH_LENGTH,
+            KEY_PATH_NODE_BYTES * MIN_KEY_PATH_LENGTH,
+            lc);
         THROW(SWO_WRONG_DATA_LENGTH);
     }
+}
 
-    uint32_t offset = 0;
+/**
+ * Parse full derivation-path format: n path nodes (4 bytes each), last node is cred counter.
+ *
+ * Builds PRF path from nodes.
+ *
+ * CDATA is n*4 bytes: path[0]..path[n-2] (PRF path prefix), path[n-1] (cred counter).
+ *
+ * @param lc           Length of cdata (must be multiple of 4, at most 24)
+ * @param cdata        APDU command data
+ * @param prf_key_path Output buffer for the 5-element PRF derivation path, not hardened
+ * @param cred_counter Output credential counter / account index
+ *
+ * @throws SWO_WRONG_DATA_LENGTH if lc invalid
+ */
+static path_type_t parse_full_path(uint8_t lc,
+                                   uint8_t *cdata,
+                                   uint32_t *prf_key_path,
+                                   uint32_t *cred_counter) {
+    check_lc_any_path(lc);
 
-    //
-    for (size_t i = 0; i < (lc / 4) - 1; i++) {
+    size_t offset = 0;
+    uint8_t num_nodes = lc / 4;
+
+    for (size_t i = 0; i < num_nodes - 1; i++) {
         prf_key_path[i] = read_u32_be(cdata, &offset);
     }
     *cred_counter = read_u32_be(cdata, &offset);
+
+    return PATH_TYPE_FULL;
 }
 
 /**
@@ -164,48 +219,46 @@ static void parse_full_path_input(uint8_t lc,
  * @param p1        Path format: P1_LEGACY_PATH, P1_NEW_PATH, or P1_FULL_PATH
  * @param p2        Network selector (P2_MAINNET_DEFAULT or P2_TESTNET for P1_NEW_PATH)
  * @param lc        Length of cdata
- * @param prfKeyPath Output buffer for the parsed derivation path
+ * @param prf_key_path Output buffer for the parsed derivation path. Pats is not hardened
  *
  * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
  */
-static bool parse_key_path(uint8_t *cdata,
-                           uint8_t p1,
-                           uint8_t p2,
-                           uint8_t lc,
-                           uint32_t *prf_key_path_out,
-                           uint32_t *cred_counter_out) {
-    bool is_legacy_path = false;
-    bool valid = true;
+static path_type_t parse_key_path(uint8_t *cdata,
+                                  uint8_t p1,
+                                  uint8_t p2,
+                                  uint8_t lc,
+                                  uint32_t *prf_key_path,
+                                  uint32_t *cred_counter) {
+    path_type_t path_type = PATH_TYPE_INVALID;
+    bool p2_is_valid = true;
 
     switch (p1) {
         case P1_LEGACY_PATH:
-            is_legacy_path = true;
-            valid = (p2 == P2_MAINNET_DEFAULT);
-            if (valid) parse_legacy_path(lc, cdata, prf_key_path_out, cred_counter_out);
+            p2_is_valid = (p2 == P2_MAINNET_DEFAULT);
+            if (p2_is_valid) path_type = parse_legacy_path(lc, cdata, prf_key_path, cred_counter);
             break;
 
         case P1_NEW_PATH:
             if (p2 == P2_MAINNET_DEFAULT) {
-                parse_new_path(lc, cdata, MAINNET, prf_key_path_out, cred_counter_out);
+                path_type = parse_new_path(lc, cdata, MAINNET, prf_key_path, cred_counter);
             } else if (p2 == P2_TESTNET) {
-                parse_new_path(lc, cdata, TESTNET, prf_key_path_out, cred_counter_out);
+                path_type = parse_new_path(lc, cdata, TESTNET, prf_key_path, cred_counter);
             } else {
-                valid = false;
             }
             break;
 
         case P1_FULL_PATH:
-            valid = (p2 == P2_MAINNET_DEFAULT);
-            if (valid) parse_full_path_input(lc, cdata, prf_key_path_out, cred_counter_out);
+            p2_is_valid = (p2 == P2_MAINNET_DEFAULT);
+            if (p2_is_valid) path_type = parse_full_path(lc, cdata, prf_key_path, cred_counter);
             break;
 
         default:
-            valid = false;
+            p2_is_valid = false;
             break;
     }
 
-    if (!valid) THROW(SWO_WRONG_P1_P2);
-    return is_legacy_path;
+    if (!p2_is_valid) THROW(SWO_WRONG_P1_P2);
+    return path_type;
 }
 
 void handleVerifyAddress(uint8_t *cdata,
@@ -213,36 +266,57 @@ void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p2,
                          uint8_t lc,
                          volatile unsigned int *flags) {
-    uint32_t prf_key_path_out[MAX_DERIVATION_PATH_LENGTH] = {0};
-    uint32_t cred_counter_out = 0;
+    uint32_t prf_key_path[MAX_DERIVATION_PATH_LENGTH] = {0};
+    uint32_t cred_counter = 0;
 
-    bool is_legacy_path = parse_key_path(cdata, p1, p2, lc, prf_key_path_out, &cred_counter_out);
+    path_type_t path_type = parse_key_path(cdata, p1, p2, lc, prf_key_path, &cred_counter);
 
-    if (is_legacy_path) {
-        getIdentityAccountDisplay(ctx->display,
-                                  sizeof(ctx->display),
-                                  prf_key_path_out[4],
-                                  cred_counter_out);
-    } else {
-        getIdentityAccountDisplayNewPath(ctx->display,
-                                         sizeof(ctx->display),
-                                         prf_key_path_out[2],
-                                         prf_key_path_out[3],
-                                         cred_counter_out);
+    uint8_t prf_key_path_len = 0;
+
+    switch (path_type) {
+        case PATH_TYPE_NEW:
+            prf_key_path_len = 5;
+            getIdentityAccountDisplayNewPath(ctx->display,
+                                             sizeof(ctx->display),
+                                             prf_key_path[2],
+                                             prf_key_path[3],
+                                             cred_counter);
+            break;
+
+        case PATH_TYPE_LEGACY:
+            prf_key_path_len = 6;
+            getIdentityAccountDisplay(ctx->display,
+                                      sizeof(ctx->display),
+                                      prf_key_path[4],
+                                      cred_counter);
+            break;
+
+        case PATH_TYPE_FULL:
+            prf_key_path_len = lc / 4;
+            getIdentityAccountDisplayNewPath(ctx->display,
+                                             sizeof(ctx->display),
+                                             prf_key_path[2],
+                                             prf_key_path[3],
+                                             cred_counter);
+
+            break;
+
+        default:
+            break;
     }
-
-    uint8_t prf_key_path_len = is_legacy_path ? 6 : 5;
 
     uint8_t credId[BLS_G1_COORD_SIZE];
     uint8_t prf[KEY_LENGTH];
 
+    // Hardening path components here
     for (size_t i = 0; i < prf_key_path_len; i++) {
-        set_hardened(&prf_key_path_out[i]);
+        set_hardened(&prf_key_path[i]);
     }
+
     BEGIN_TRY {
         TRY {
-            getBlsPrivateKey(prf_key_path_out, prf_key_path_len, prf, sizeof(prf));
-            cx_err_t error = getCredId(prf, sizeof(prf), cred_counter_out, credId, sizeof(credId));
+            getBlsPrivateKey(prf_key_path, prf_key_path_len, prf, sizeof(prf));
+            cx_err_t error = getCredId(prf, sizeof(prf), cred_counter, credId, sizeof(credId));
 
             if (error != 0) {
                 THROW(ERROR_INVALID_STATE);
