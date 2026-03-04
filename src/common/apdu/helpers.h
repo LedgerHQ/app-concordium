@@ -12,7 +12,7 @@
  *
  * @param data   Buffer containing APDU data
  * @param offset Current read position; incremented by 1 on success
- * @param out    Pointer of an ouput value
+ * @param out    Pointer of an output value
  * @return       New offset
  */
 static inline size_t read_u8(uint8_t *data, size_t offset, uint8_t *out) {
@@ -25,7 +25,7 @@ static inline size_t read_u8(uint8_t *data, size_t offset, uint8_t *out) {
  *
  * @param data   Buffer containing APDU data
  * @param offset Current read position; incremented by 4 on success
- * @param out    Pointer of an ouput value
+ * @param out    Pointer of an output value
  * @return       New offset
  */
 static inline size_t read_u32_be(uint8_t *data, size_t offset, uint32_t *out) {
