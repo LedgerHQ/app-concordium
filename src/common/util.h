@@ -12,11 +12,6 @@
 
 #define ERROR_RESPONSE_LENGTH 2
 
-#define KEY_PATH_NODE_BYTES    4
-#define MIN_KEY_PATH_LENGTH    4
-#define MAX_KEY_PATH_LENGTH    8
-#define BYTES_PER_PATH_ELEMENT 4
-
 #define U64_RATIO_BYTES 16
 
 #define BLS_SALT_INITIAL_LENGTH 20
@@ -156,10 +151,10 @@ void updateHash(cx_hash_t *hash, const unsigned char *in, unsigned int len);
  * @param identityIndex
  * @param accountIndex
  */
-void getIdentityAccountDisplay(uint8_t *dst,
-                               size_t dstLength,
-                               uint32_t identityIndex,
-                               uint32_t accountIndex);
+void getIdentityAccountDisplayLegacyPath(uint8_t *dst,
+                                         size_t dstLength,
+                                         uint32_t identityIndex,
+                                         uint32_t accountIndex);
 
 /**
  * Builds a human-readable representation of the identityProvider/identity/account path for the new

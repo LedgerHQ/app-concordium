@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "util/derivation_path.h"
 
 static tx_state_t *tx_state = &global_tx_state;
 static keyDerivationPath_t *keyPath = &path;
@@ -166,10 +167,10 @@ void sendSuccessResultNoIdle(uint8_t tx) {
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, tx);
 }
 
-void getIdentityAccountDisplay(uint8_t *dst,
-                               size_t dstLength,
-                               uint32_t identityIndex,
-                               uint32_t accountIndex) {
+void getIdentityAccountDisplayLegacyPath(uint8_t *dst,
+                                         size_t dstLength,
+                                         uint32_t identityIndex,
+                                         uint32_t accountIndex) {
     int offset = numberToText(dst, dstLength, identityIndex);
     memmove(dst + offset, "/", 1);
     offset += 1;

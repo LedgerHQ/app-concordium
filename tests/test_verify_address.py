@@ -54,7 +54,7 @@ def test_verify_address_confirm_refused(
     except ExceptionRAPDU as e:
         response = e.status
 
-    assert response == 0x6985
+    assert response == StatusWords.SWO_CONDITIONS_NOT_SATISFIED
 
 
 @pytest.mark.active_test_scope
@@ -68,5 +68,5 @@ def test_verify_address_confirm_full_path_accepted(
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
-    assert response == 0x9000
+    assert response == StatusWords.SWO_SUCCESS
 

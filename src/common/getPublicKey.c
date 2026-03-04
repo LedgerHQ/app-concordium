@@ -1,9 +1,9 @@
 #include "globals.h"
+#include "util/derivation_path.h"
 
 static keyDerivationPath_t *keyPath = &path;
 static exportPublicKeyContext_t *ctx = &global.exportPublicKeyContext;
 static tx_state_t *tx_state = &global_tx_state;
-static const uint32_t HARDENED_OFFSET = 0x80000000;
 
 instructionContext global;
 
@@ -95,7 +95,7 @@ void handleGetPublicKey(uint8_t *cdata,
             }
         } else {
             if (keyPath->rawKeyDerivationPath[0] == NEW_PURPOSE ||
-                keyPath->rawKeyDerivationPath[0] == (NEW_PURPOSE | HARDENED_OFFSET)) {
+                keyPath->rawKeyDerivationPath[0] == (NEW_PURPOSE | HARDENED_BIT)) {
                 uint32_t identityProviderIndex =
                     keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_PROVIDER];
                 uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
@@ -108,10 +108,10 @@ void handleGetPublicKey(uint8_t *cdata,
             } else {
                 uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_LEGACY];
                 uint32_t accountIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_ACCOUNT_LEGACY];
-                getIdentityAccountDisplay(ctx->display,
-                                          sizeof(ctx->display),
-                                          identityIndex,
-                                          accountIndex);
+                getIdentityAccountDisplayLegacyPath(ctx->display,
+                                                    sizeof(ctx->display),
+                                                    identityIndex,
+                                                    accountIndex);
             }
         }
         uiGeneratePubkey(flags);

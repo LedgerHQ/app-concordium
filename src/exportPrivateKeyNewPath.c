@@ -2,12 +2,12 @@
 #include "format.h"
 #include "numberHelpers.h"
 #include "exportPrivateKey.h"
+#include "util/derivation_path.h"
 
 // This class allows for the export of a number of very specific private keys. These private keys
 // are made exportable as they are used in computations that are not feasible to carry out on the
 // Ledger device. The key derivation paths that are allowed are restricted so that it is not
 // possible to export keys that are used for signing.
-static const uint32_t HARDENED_OFFSET = 0x80000000;
 static exportPrivateKeyContext_t *ctx = &global.exportPrivateKeyContext;
 
 int editDerivationPathPerKeyType(uint32_t *derivationPath,
@@ -21,11 +21,11 @@ int editDerivationPathPerKeyType(uint32_t *derivationPath,
         case NEW_ID_CRED_SEC:
         case NEW_PRF_KEY:
         case NEW_SIGNATURE_BLINDING_RANDOMNESS:
-            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_OFFSET;
+            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_BIT;
             return derivationPathLength;
         case NEW_COMMITMENT_RANDOMNESS:
-            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_OFFSET;
-            derivationPath[derivationPathLength++] = account | HARDENED_OFFSET;
+            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_BIT;
+            derivationPath[derivationPathLength++] = account | HARDENED_BIT;
             return derivationPathLength;
         default:
             PRINTF("Invalid derivation path key type: %d\n", derivationPathKeyType);
@@ -49,23 +49,23 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
     uint8_t keysToExportLength = 0;
 
     // Set the derivation path
-    derivationPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
+    derivationPath[0] = NEW_PURPOSE | HARDENED_BIT;
 
     // choose the appropriate coin type based on the network selection in p2
     switch (networkDesignation) {
         case P2_MAINNET:
-            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
+            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_BIT;
             break;
         case P2_TESTNET:
-            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
+            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_BIT;
             break;
         default:
             PRINTF("Invalid network type: %d\n", networkDesignation);
             THROW(ERROR_INVALID_PARAM);
     }
 
-    derivationPath[2] = identityProvider | HARDENED_OFFSET;
-    derivationPath[3] = identity | HARDENED_OFFSET;
+    derivationPath[2] = identityProvider | HARDENED_BIT;
+    derivationPath[3] = identity | HARDENED_BIT;
 
     switch (purpose) {
         case P1_IDENTITY_CREDENTIAL_CREATION:

@@ -13,8 +13,6 @@
 #define MAINNET true
 #define TESTNET false
 
-typedef enum { PATH_TYPE_LEGACY, PATH_TYPE_NEW, PATH_TYPE_FULL, PATH_TYPE_INVALID } path_type_t;
-
 void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p1,
                          uint8_t p2,
