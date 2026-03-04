@@ -244,6 +244,7 @@ static path_type_t parse_key_path(uint8_t *cdata,
             } else if (p2 == P2_TESTNET) {
                 path_type = parse_new_path(lc, cdata, TESTNET, prf_key_path, cred_counter);
             } else {
+                p2_is_valid = false;
             }
             break;
 
