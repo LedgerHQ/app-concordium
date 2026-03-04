@@ -107,11 +107,11 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     identity = U4BE(dataBuffer, offset);
     uint32_t *keyDerivationPath;
     size_t pathLength;
-    keyDerivationPath = (uint32_t[5]) {LEGACY_PURPOSE | HARDENED_BIT,
-                                       LEGACY_COIN_TYPE | HARDENED_BIT,
-                                       ACCOUNT_SUBTREE | HARDENED_BIT,
-                                       NORMAL_ACCOUNTS | HARDENED_BIT,
-                                       identity | HARDENED_BIT};
+    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_BIT,
+                                      LEGACY_COIN_TYPE | HARDENED_BIT,
+                                      ACCOUNT_SUBTREE | HARDENED_BIT,
+                                      NORMAL_ACCOUNTS | HARDENED_BIT,
+                                      identity | HARDENED_BIT};
     pathLength = 5;
     memmove(ctx->path, keyDerivationPath, pathLength * sizeof(uint32_t));
     ctx->pathLength = pathLength * sizeof(uint32_t);
