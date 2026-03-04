@@ -68,7 +68,7 @@ def test_credential_deployment_new(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
         response = client.get_async_response()
-        assert response.status == 0x9000
+        assert response.status == Errors.SW_SUCCESS
 
     with client.credential_deployment_part_3(
         last_key=last_key,
@@ -101,7 +101,7 @@ def test_credential_deployment_new(
             )
 
     response = client.get_async_response()
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     assert response.data == bytes.fromhex(
         "48abae30c2676169aeb71bf0bfddb6783ec78743f3b32ed0ed1722bf6d4c1be86eda1074eebbfb05ca2ab1d3b1f0fc51c11c2caa6bf11fff28d04e7edaa2f502"
     )
@@ -164,7 +164,7 @@ def test_credential_deployment_existing(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
         response = client.get_async_response()
-        assert response.status == 0x9000
+        assert response.status == Errors.SW_SUCCESS
 
     with client.credential_deployment_part_3(
         last_key=last_key,
@@ -197,7 +197,7 @@ def test_credential_deployment_existing(
             )
 
     response = client.get_async_response()
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     assert response.data == bytes.fromhex(
         "52be7b8e8da49716e1f355236429b4505a046f75f3ed67bb17854b15fecfbf382b1e1870e3c6a9e075ab1555c72fabd6c5e3422c1003714fb6667104f6f85400"
     )

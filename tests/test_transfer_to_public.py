@@ -36,7 +36,7 @@ def test_transfer_to_public(backend, navigator, test_name, default_screenshot_pa
             backend, navigator, "Sign", default_screenshot_path, test_name
         )
     response = client.get_async_response()
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     assert response.data == bytes.fromhex(
         "64734c80935a11ee46f180a775844dac122bc4fee23bc0b7bc6615751ec7ef42f07bc7563bb050c284135c466bf1236280fd3a50aa840285cf6b142ef59a130f"
     )

@@ -28,7 +28,7 @@ def test_verify_address_confirm_legacy_path_accepted(
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
-    assert response == 0x9000
+    assert response == Errors.SW_SUCCESS
 
 
 # In this test we check that the VERIFY ADDRESS works in confirmation mode
@@ -41,7 +41,7 @@ def test_verify_address_confirm_new_path_accepted(
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
-    assert response == 0x9000
+    assert response == Errors.SW_SUCCESS
 
 
 # In this test we check that the VERIFY ADDRESS in confirmation mode replies an error if the user refuses

@@ -43,7 +43,7 @@ def test_register_data(
 
     response = client.get_async_response()
     print(response.data.hex())
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
 
     # Send the second part of the data
     with client.register_data_part_2(data):
@@ -68,7 +68,7 @@ def test_register_data(
             )
     response = client.get_async_response()
     print(response.data.hex())
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     assert response.data == bytes.fromhex(
         "a410e856c8942767e5af88c3992013a2e788584d9c69141271400222978b57f5b86c8d3a0127b9d521a00c8e8b68ca7c4937da0f1ace27860765d9b0de4ffe08"
     )

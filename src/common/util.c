@@ -150,8 +150,8 @@ void sendUserRejectionNoIdle(void) {
 }
 
 void sendSuccess(uint8_t tx) {
-    G_io_apdu_buffer[tx++] = SUCCESS >> 8;
-    G_io_apdu_buffer[tx++] = SUCCESS & 0xFF;
+    G_io_apdu_buffer[tx++] = SWO_SUCCESS >> 8;
+    G_io_apdu_buffer[tx++] = SWO_SUCCESS & 0xFF;
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, tx);
     ui_menu_main();
 }
@@ -161,8 +161,8 @@ void sendSuccessNoIdle(void) {
 }
 
 void sendSuccessResultNoIdle(uint8_t tx) {
-    G_io_apdu_buffer[tx++] = SUCCESS >> 8;
-    G_io_apdu_buffer[tx++] = SUCCESS & 0xFF;
+    G_io_apdu_buffer[tx++] = SWO_SUCCESS >> 8;
+    G_io_apdu_buffer[tx++] = SWO_SUCCESS & 0xFF;
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, tx);
 }
 

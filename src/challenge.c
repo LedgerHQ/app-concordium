@@ -14,5 +14,5 @@ void handleGetChallenge(void) {
 
     memcpy(challenge, buf, CHALLENGE_SIZE);        /* persist for later use */
     memcpy(G_io_apdu_buffer, buf, CHALLENGE_SIZE); /* big-endian output */
-    io_send_response_pointer(G_io_apdu_buffer, CHALLENGE_SIZE, SUCCESS);
+    io_send_response_pointer(G_io_apdu_buffer, CHALLENGE_SIZE, SWO_SUCCESS);
 }

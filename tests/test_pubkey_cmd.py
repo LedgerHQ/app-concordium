@@ -43,7 +43,7 @@ wallet_refuse_instructions = [
 def test_get_challenge(backend):
     client = CommandSender(backend)
     response = client.get_challenge()
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     assert len(response.data) == 8
 
 

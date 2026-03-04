@@ -277,7 +277,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
         num_pairs=len(pairs),
         memo_length=len(memo),
     )
-    assert response.status == 0x9000
+    assert response.status == Errors.SW_SUCCESS
     # Send the part with the memo
     for chunk in memo_chunks:
         with client.sign_tx_with_schedule_and_memo_part_2(memo_chunk=chunk):
