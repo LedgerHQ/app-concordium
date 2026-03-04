@@ -61,9 +61,17 @@ def test_verify_address_confirm_refused(
 def test_verify_address_confirm_full_path_accepted(
     backend, scenario_navigator, test_name, default_screenshot_path
 ):
+    HARDENED = 0x80000000
     """Verify address with P1_FULL_PATH (derivation-path format) succeeds when user approves."""
     client = CommandSender(backend)
-    path_nodes = [44, 919, 403, 404, 8]
+    # 44'/919'/404'/404'/8' (matches doc example)
+    path_nodes = [
+        HARDENED | 44,
+        HARDENED | 919,
+        HARDENED | 403,
+        HARDENED | 404,
+        HARDENED | 8,
+    ]
     with client.verify_address_full_path(path_nodes):
         scenario_navigator.address_review_approve()
 

@@ -8,16 +8,29 @@
 #include <os_print.h>
 
 /**
+ * Read a big-endian uint8 from APDU data and advance the offset.
+ *
+ * @param data   Buffer containing APDU data
+ * @param offset Current read position; incremented by 1 on success
+ * @param out    Pointer of an ouput value
+ * @return       New offset
+ */
+static inline size_t read_u8(uint8_t *data, size_t offset, uint8_t *out) {
+    *out = data[offset];
+    return offset + 1;
+}
+
+/**
  * Read a big-endian uint32 from APDU data and advance the offset.
  *
  * @param data   Buffer containing APDU data
- * @param offset Pointer to current read position; incremented by 4 on success
- * @return       The 32-bit value read in host byte order
+ * @param offset Current read position; incremented by 4 on success
+ * @param out    Pointer of an ouput value
+ * @return       New offset
  */
-static inline uint32_t read_u32_be(uint8_t *data, size_t *offset) {
-    uint32_t val = U4BE(data, *offset);
-    *offset += 4;
-    return val;
+static inline size_t read_u32_be(uint8_t *data, size_t offset, uint32_t *out) {
+    *out = U4BE(data, offset);
+    return offset + 4;
 }
 
 /**

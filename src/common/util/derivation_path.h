@@ -6,14 +6,11 @@
 #define UTIL_DERIVATION_PATH_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
-/** Bytes per path node (big-endian uint32) */
-#define KEY_PATH_NODE_BYTES 4
-/** Minimum path length (nodes) */
-#define MIN_KEY_PATH_LENGTH 4
 /** Maximum path length (nodes) */
-#define MAX_KEY_PATH_LENGTH 8
+#define DERIVATION_PATH_NODES_MAX 8
 /** New path format length (44'/coinType'/idp'/id'/3') */
 #define DERIVATION_PATH_NEW_LEN 5
 /** Legacy path format length (1105'/0'/0'/0'/identity'/1') */
@@ -50,8 +47,8 @@ typedef enum {
 
 /** Derivation path with variable-length nodes and variant */
 typedef struct derivation_path {
+    uint32_t nodes[DERIVATION_PATH_NODES_MAX];
     uint8_t len;
-    uint32_t nodes[MAX_KEY_PATH_LENGTH];
     derivation_path_variant_t variant;
 } derivation_path_t;
 
@@ -66,14 +63,14 @@ typedef enum {
     NEW_COMMITMENT_RANDOMNESS = 5,
 } derivation_path_key_idx_t;
 
-/** Initialize an empty derivation path with invalid variant */
-static inline derivation_path_t init_derivation_path() {
-    derivation_path_t derivation_path = {.len = 0,
-                                         .nodes = {0},
-                                         .variant = DERIVATION_PATH_VARIANT_INVALID};
-    return derivation_path;
+/** Initialize an empty derivation path with invalid variant by pointer*/
+static inline void init_derivation_path(derivation_path_t *derivation_path) {
+    derivation_path->len = 0;
+    for (size_t i = 0; i < DERIVATION_PATH_NODES_MAX; i++) {
+        derivation_path->nodes[i] = 0;
+    }
+    derivation_path->variant = DERIVATION_PATH_VARIANT_INVALID;
 }
-
 /** Get cred counter from path (last node, stored at nodes[len]) */
 static inline uint32_t cred_counter(derivation_path_t *derivation_path) {
     return derivation_path->nodes[derivation_path->len];
@@ -85,13 +82,14 @@ static inline void trim_last_node(derivation_path_t *derivation_path) {
 }
 
 /**
- * Parse full derivation-path format: n path nodes (4 bytes each), last node is cred counter.
+ * Parse full derivation-path format: <n> <node 1> ... <node n>.
  *
- * CDATA is n*4 bytes. PRF path = path[0..n-2] with last element replaced by NEW_PRF_KEY.
+ * Byte 0 is depth n, then n nodes (4 bytes each). Last node is cred counter.
+ * PRF path = path[0..n-2] with last element replaced by NEW_PRF_KEY.
  *
- * @param lc                   Length of cdata (multiple of 4, at most 24)
+ * @param lc                   Length of cdata (1 + n*4)
  * @param cdata                APDU command data
- * @param derivation_path_out  Output derivation path and cred counter
+ * @param derivation_path_out  Output derivation path (PRF path with NEW_PRF_KEY)
  *
  * @throws SWO_WRONG_DATA_LENGTH if lc invalid
  */
@@ -102,18 +100,18 @@ void parse_derivation_path_full(uint8_t lc, uint8_t *cdata, derivation_path_t *d
  *
  * Builds PRF path 44/coinType/identityProvider/identity/3.
  *
- * @param lc               Length of cdata (must be 12)
- * @param cdata            APDU command data
- * @param mainnet          true for mainnet (919), false for testnet (1)
- * @param path_out         Output buffer for the 5-element PRF derivation path, not hardened
- * @param cred_counter_out Output credential counter / account index
+ * @param lc                  Length of cdata (must be 12)
+ * @param cdata               APDU command data
+ * @param mainnet             true for mainnet (919), false for testnet (1)
+ * @param derivation_path_out Output buffer for the 5-element PRF derivation path, not hardened
+ * @param cred_counter_out    Output credential counter / account index
  *
  * @throws SWO_WRONG_DATA_LENGTH if lc != 12
  */
 void parse_derivation_path_new(uint8_t lc,
                                uint8_t *cdata,
                                bool mainnet,
-                               derivation_path_t *path_out,
+                               derivation_path_t *derivation_path_out,
                                uint32_t *cred_counter_out);
 
 /**
@@ -121,16 +119,16 @@ void parse_derivation_path_new(uint8_t lc,
  *
  * Builds PRF path 1105'/0'/0'/0'/identity'/1'.
  *
- * @param lc               Length of cdata (must be 8)
- * @param cdata            APDU command data
- * @param path_out         Output buffer for the 6-element PRF derivation path, not hardened
- * @param cred_counter_out Output credential counter / account index
+ * @param lc                  Length of cdata (must be 8)
+ * @param cdata               APDU command data
+ * @param derivation_path_out Output buffer for the 6-element PRF derivation path, not hardened
+ * @param cred_counter_out    Output credential counter / account index
  *
  * @throws SWO_WRONG_DATA_LENGTH if lc != 8
  */
 void parse_derivation_path_legacy(uint8_t lc,
                                   uint8_t *cdata,
-                                  derivation_path_t *path_out,
+                                  derivation_path_t *derivation_path_out,
                                   uint32_t *cred_counter_out);
 
 /**
@@ -140,6 +138,16 @@ void parse_derivation_path_legacy(uint8_t lc,
  *
  * @param path Derivation path to harden (modified in place)
  */
-void harden_derivation_path(derivation_path_t *path);
+static inline void harden_derivation_path(derivation_path_t *derivation_path) {
+    for (size_t i = 0; i < derivation_path->len; i++) {
+        derivation_path->nodes[i] |= HARDENED_BIT;
+    }
+}
+
+static inline void unharden_derivation_path(derivation_path_t *derivation_path) {
+    for (size_t i = 0; i < derivation_path->len; i++) {
+        derivation_path->nodes[i] &= ~HARDENED_BIT;
+    }
+}
 
 #endif  // UTIL_DERIVATION_PATH_H

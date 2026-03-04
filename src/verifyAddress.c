@@ -101,11 +101,12 @@ end:
 /**
  * Parse APDU CDATA into a PRF key derivation path based on P1/P2.
  *
- * @param cdata     APDU command data
- * @param p1        Path format: P1_LEGACY_PATH, P1_NEW_PATH, or P1_FULL_PATH
- * @param p2        Network selector (P2_MAINNET_DEFAULT or P2_TESTNET for P1_NEW_PATH)
- * @param lc        Length of cdata
- * @param prf_key_path Output buffer for the parsed derivation path. Pats is not hardened
+ * @param cdata           APDU command data
+ * @param p1              Path format: P1_LEGACY_PATH, P1_NEW_PATH, or P1_FULL_PATH
+ * @param p2              Network selector (P2_MAINNET_DEFAULT or P2_TESTNET for P1_NEW_PATH)
+ * @param lc              Length of cdata
+ * @param derivation_path Output buffer for the parsed derivation path. Pats is not hardened
+ * @param crec_counter    Output buffer to store cred counter for legacy key deriving.
  *
  * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
  */
@@ -151,33 +152,35 @@ void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p2,
                          uint8_t lc,
                          volatile unsigned int *flags) {
-    derivation_path_t derivation_path = {.len = 0, .nodes = {0}};
+    derivation_path_t *derivation_path = &ctx->derivation_path;
+    init_derivation_path(derivation_path);
     uint32_t cred_counter = 0;
-    parse_key_path(cdata, p1, p2, lc, &derivation_path, &cred_counter);
+    parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
 
     switch (derivation_path
-                .variant) {  // TODO: refactor getIdentityAccountDisplay* to a single function
+                ->variant) {  // TODO: refactor getIdentityAccountDisplay* to a single function
         case DERIVATION_PATH_VARIANT_NEW:
             getIdentityAccountDisplayNewPath(ctx->display,
                                              sizeof(ctx->display),
-                                             derivation_path.nodes[2],
-                                             derivation_path.nodes[3],
+                                             derivation_path->nodes[2],
+                                             derivation_path->nodes[3],
                                              cred_counter);
             break;
 
         case DERIVATION_PATH_VARIANT_LEGACY:
             getIdentityAccountDisplayLegacyPath(ctx->display,
                                                 sizeof(ctx->display),
-                                                derivation_path.nodes[4],
+                                                derivation_path->nodes[4],
                                                 cred_counter);
             break;
 
         case DERIVATION_PATH_VARIANT_FULL:
+            unharden_derivation_path(derivation_path);
             getIdentityAccountDisplayNewPath(ctx->display,
                                              sizeof(ctx->display),
-                                             derivation_path.nodes[2],
-                                             derivation_path.nodes[3],
-                                             derivation_path.nodes[4]);
+                                             derivation_path->nodes[2],
+                                             derivation_path->nodes[3],
+                                             derivation_path->nodes[4]);
 
             break;
 
@@ -189,14 +192,13 @@ void handleVerifyAddress(uint8_t *cdata,
     uint8_t prf[KEY_LENGTH];
 
     /* getBlsPrivateKey expects hardened path (0x80000000 | node); parsers output unhardened */
-    harden_derivation_path(&derivation_path);
-    trim_last_node(&derivation_path);
+    harden_derivation_path(derivation_path);
 
     BEGIN_TRY {
         TRY {
             getBlsPrivateKey(
-                derivation_path.nodes,
-                derivation_path.len,
+                derivation_path->nodes,
+                derivation_path->len,
                 prf,
                 sizeof(prf));  // TODO: refactor getBlsPrivateKey to accept *derivation_path_t
             cx_err_t error = getCredId(prf, sizeof(prf), cred_counter, credId, sizeof(credId));

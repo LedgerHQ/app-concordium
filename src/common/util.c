@@ -12,9 +12,9 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     }
     keyPath->pathLength = cdata[0];
 
-    // Concordium does not use key paths with a length greater than MAX_KEY_PATH_LENGTH,
+    // Concordium does not use key paths with a length greater than DERIVATION_PATH_NODES_MAX,
     // so if that was received, then throw an error.
-    if (keyPath->pathLength > MAX_KEY_PATH_LENGTH) {
+    if (keyPath->pathLength > DERIVATION_PATH_NODES_MAX) {
         THROW(ERROR_INVALID_PATH);
     }
 
