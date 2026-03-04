@@ -1,16 +1,12 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-    InsType,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
 from ledgered.devices import DeviceType
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID
 from utils import navigate_until_text_and_compare, instructions_builder, split_message
 
@@ -277,7 +273,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
         num_pairs=len(pairs),
         memo_length=len(memo),
     )
-    assert response.status == Errors.SW_SUCCESS
+    assert response.status == StatusWords.SWO_SUCCESS
     # Send the part with the memo
     for chunk in memo_chunks:
         with client.sign_tx_with_schedule_and_memo_part_2(memo_chunk=chunk):

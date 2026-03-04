@@ -1,14 +1,11 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 from utils import navigate_until_text_and_compare
 
@@ -36,7 +33,7 @@ def test_transfer_to_public(backend, navigator, test_name, default_screenshot_pa
             backend, navigator, "Sign", default_screenshot_path, test_name
         )
     response = client.get_async_response()
-    assert response.status == Errors.SW_SUCCESS
+    assert response.status == StatusWords.SWO_SUCCESS
     assert response.data == bytes.fromhex(
         "64734c80935a11ee46f180a775844dac122bc4fee23bc0b7bc6615751ec7ef42f07bc7563bb050c284135c466bf1236280fd3a50aa840285cf6b142ef59a130f"
     )

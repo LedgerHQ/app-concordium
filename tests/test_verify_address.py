@@ -3,15 +3,12 @@ from bip32 import BIP32, HARDENED_INDEX
 from bip_utils import Bip32Slip10Ed25519
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives import serialization
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns, NavigateWithScenario
 
 
@@ -28,7 +25,7 @@ def test_verify_address_confirm_legacy_path_accepted(
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
-    assert response == Errors.SW_SUCCESS
+    assert response == StatusWords.SWO_SUCCESS
 
 
 # In this test we check that the VERIFY ADDRESS works in confirmation mode
@@ -41,7 +38,7 @@ def test_verify_address_confirm_new_path_accepted(
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
-    assert response == Errors.SW_SUCCESS
+    assert response == StatusWords.SWO_SUCCESS
 
 
 # In this test we check that the VERIFY ADDRESS in confirmation mode replies an error if the user refuses

@@ -3,6 +3,7 @@ from pathlib import Path
 from Crypto.Hash import keccak  # type: ignore
 from typing import List
 import re
+from ragger.error import StatusWords
 
 from ecdsa.curves import SECP256k1  # type: ignore
 from ecdsa.keys import VerifyingKey  # type: ignore
@@ -147,7 +148,6 @@ def verify_version(version: str) -> None:
     Args:
         Version (str): Version to be checked
     """
-    from application_client.command_sender import Errors
 
     vers_dict = {}
     vers_str = ""
@@ -159,7 +159,7 @@ def verify_version(version: str) -> None:
             dinfo = info.groupdict()
             vers_dict[dinfo["part"]] = int(dinfo["val"])
     try:
-        expected_hex = f"[0x{Errors.SW_SUCCESS:04X}] {vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
+        expected_hex = f"[0x{StatusWords.SWO_SUCCESS:04X}] {vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
     except KeyError:
         pass
 
