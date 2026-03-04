@@ -1,9 +1,6 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )

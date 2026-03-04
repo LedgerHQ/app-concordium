@@ -66,6 +66,7 @@
 #include "deployModule.h"
 #include "initContract.h"
 #include "updateContract.h"
+#include "challenge.h"
 
 #define LEGACY_PURPOSE        1105
 #define LEGACY_COIN_TYPE      0
@@ -210,9 +211,6 @@ extern const internal_storage_t N_storage_real;
 #define N_storage (*(volatile internal_storage_t *) PIC(&N_storage_real))
 
 enum {
-    // Successful codes
-    SUCCESS = 0x9000,
-
     // Error codes
     ERROR_NO_APDU_RECEIVED = 0x6982,
     ERROR_REJECTED_BY_USER = 0x6985,

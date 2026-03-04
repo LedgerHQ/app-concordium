@@ -31,13 +31,12 @@
 #define INS_PUBLIC_INFO_FOR_IP 0x20
 
 #define INS_GET_APP_NAME           0x21
+#define INS_GET_CHALLENGE          0x23
 #define INS_SIGN_UPDATE_CREDENTIAL 0x31
 
 #define INS_SIGN_TRANSFER_WITH_MEMO              0x32
 #define INS_SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO 0x34
 #define INS_REGISTER_DATA                        0x35
-
-#define INS_GET_APP_NAME 0x21
 
 #define INS_EXPORT_PRIVATE_KEY_NEW 0x37
 
