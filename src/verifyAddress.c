@@ -188,6 +188,7 @@ void handleVerifyAddress(uint8_t *cdata,
     uint8_t credId[BLS_G1_COORD_SIZE];
     uint8_t prf[KEY_LENGTH];
 
+    /* getBlsPrivateKey expects hardened path (0x80000000 | node); parsers output unhardened */
     harden_derivation_path(&derivation_path);
     trim_last_node(&derivation_path);
 
