@@ -10,8 +10,6 @@ from ecdsa.util import sigdecode_der  # type: ignore
 
 from ragger.navigator import NavInsID
 
-from tests.application_client.command_sender import Errors
-
 
 def split_message(message: bytes, max_size: int) -> List[bytes]:
     """
@@ -149,6 +147,7 @@ def verify_version(version: str) -> None:
     Args:
         Version (str): Version to be checked
     """
+    from application_client.command_sender import Errors
 
     vers_dict = {}
     vers_str = ""
@@ -161,6 +160,7 @@ def verify_version(version: str) -> None:
             vers_dict[dinfo["part"]] = int(dinfo["val"])
     try:
         expected_hex = f"[0x{Errors.SW_SUCCESS:04X}] {vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
+    except KeyError:
         pass
 
     assert str(version).strip() == expected_hex.strip()
