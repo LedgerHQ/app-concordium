@@ -1,14 +1,11 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 from utils import navigate_until_text_and_compare, instructions_builder
 
@@ -34,7 +31,7 @@ def test_deploy_module(
 
     response = client.get_async_response()
     print(response.data.hex())
-    assert response.status == 0x9000
+    assert response.status == StatusWords.SWO_SUCCESS
     assert response.data == bytes.fromhex(
         "dbf31688385e1dcf05520acb4dada4a139dd18c17a77645a0ffee5b3d3a1c5ad581286c0e6c82584c245cc9f21281b7244994e9ea5a07e4ac8fe8957144c2e0a"
     )

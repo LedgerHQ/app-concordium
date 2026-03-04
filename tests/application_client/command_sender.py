@@ -3,7 +3,7 @@ from typing import Generator, List, Literal, Optional
 from contextlib import contextmanager
 
 from ragger.backend.interface import BackendInterface, RAPDU
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.bip import pack_derivation_path
 from utils import split_message
 
@@ -109,6 +109,7 @@ class InsType(IntEnum):
     CONFIGURE_BAKER = 0x18
     PUBLIC_INFO_FOR_IP = 0x20
     GET_APP_NAME = 0x21
+    GET_CHALLENGE = 0x23
     SIGN_UPDATE_CREDENTIAL = 0x31
     SIGN_TRANSFER_WITH_MEMO = 0x32
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
@@ -116,44 +117,6 @@ class InsType(IntEnum):
     EXPORT_PRIVATE_KEY_NEW = 0x37
     GET_APP_VERSION = 0x40
 
-
-class Errors(IntEnum):
-    # Success code
-    SW_SUCCESS = 0x9000
-
-    # APDU Protocol Errors
-    SW_NO_APDU_RECEIVED = 0x6982
-    SW_DENY = 0x6985
-    SW_WRONG_P1P2 = 0x6A86
-    SW_WRONG_DATA_LENGTH = 0x6A87
-    SW_INS_NOT_SUPPORTED = 0x6D00
-    SW_CLA_NOT_SUPPORTED = 0x6E00
-    SW_WRONG_RESPONSE_LENGTH = 0xB000
-    SW_DISPLAY_BIP32_PATH_FAIL = 0xB001
-    SW_DISPLAY_ADDRESS_FAIL = 0xB002
-    SW_DISPLAY_AMOUNT_FAIL = 0xB003
-    SW_WRONG_TX_LENGTH = 0xB004
-    SW_TX_PARSING_FAIL = 0xB005
-    SW_TX_HASH_FAIL = 0xB006
-    SW_BAD_STATE = 0xB007
-    SW_SIGNATURE_FAIL = 0xB008
-
-    # Transaction and Parameter Errors
-    SW_INVALID_STATE = 0x6B01
-    SW_INVALID_PATH = 0x6B02
-    SW_INVALID_PARAM = 0x6B03
-    SW_INVALID_TRANSACTION = 0x6B04
-    SW_UNSUPPORTED_CBOR = 0x6B05
-    SW_BUFFER_OVERFLOW = 0x6B06
-    SW_FAILED_CX_OPERATION = 0x6B07
-    SW_INVALID_SOURCE_LENGTH = 0x6B08
-    SW_INVALID_MODULE_REF = 0x6B09
-    SW_INVALID_NAME_LENGTH = 0x6B0A
-    SW_INVALID_PARAMS_LENGTH = 0x6B0B
-    SW_INVALID_COININFO = 0x6B0C
-
-    # Device State Errors
-    SW_DEVICE_LOCKED = 0x530C
 
 
 # pylint: disable=too-many-public-methods
@@ -171,6 +134,11 @@ class CommandSender:
     def get_app_version(self) -> RAPDU:
         return self.backend.exchange(
             cla=CLA, ins=InsType.GET_APP_VERSION, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
+        )
+
+    def get_challenge(self) -> RAPDU:
+        return self.backend.exchange(
+            cla=CLA, ins=InsType.GET_CHALLENGE, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
         )
 
     def get_public_key(self, path: str, signPublicKey: bool = False) -> RAPDU:
@@ -371,7 +339,7 @@ class CommandSender:
             data=temp_data,
         )
 
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send remaining amount [192] + transaction amount [8]
         #          + amount index [1] + proof size [1] (no display)
@@ -382,7 +350,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
 
         # send proof in chunks
@@ -396,7 +364,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=chunk,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         with self.backend.exchange_async(
             cla=CLA,
@@ -662,7 +630,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # handle credential deployment keys
         ## send number of keys
@@ -674,7 +642,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         return True
 
@@ -713,7 +681,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
 
         # send signature threshold
@@ -724,7 +692,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=signature_threshold,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send ar_identity
         temp_response = self.backend.exchange(
@@ -734,7 +702,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=ar_identity,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send credential dates
         temp_response = self.backend.exchange(
@@ -744,7 +712,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=credential_dates,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send attribute tag
         temp_response = self.backend.exchange(
@@ -754,7 +722,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=attribute_tag,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send attribute value
         temp_response = self.backend.exchange(
@@ -764,7 +732,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=attribute_value,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send length of proofs
         data = len(proofs).to_bytes(4, byteorder="big")
@@ -775,7 +743,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # send proofs in chunks
         proof_chunks = split_message(proofs, MAX_APDU_LEN)
@@ -787,7 +755,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=chunk,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         # send new or existing
 
@@ -1041,7 +1009,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
 
         source_chunks = split_message(source, MAX_APDU_LEN)
@@ -1054,7 +1022,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=chunk,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         with self.backend.exchange_async(
             cla=CLA,
@@ -1090,7 +1058,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # Send the name
         data = len(name).to_bytes(2, byteorder="big")
@@ -1107,7 +1075,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=data,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         # Send the params
         data = len(params).to_bytes(2, byteorder="big")
@@ -1125,7 +1093,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=data,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         if len(params_chunks) == 0:
             data = len(last_chunk).to_bytes(2, byteorder="big") + last_chunk
@@ -1166,7 +1134,7 @@ class CommandSender:
             p2=P2.P2_NONE,
             data=data,
         )
-        if temp_response.status != 0x9000:
+        if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
         # Send the name
         data = len(name).to_bytes(2, byteorder="big")
@@ -1183,7 +1151,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=data,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         # Send the params
         data = len(params).to_bytes(2, byteorder="big")
@@ -1201,7 +1169,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=data,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         if len(params_chunks) == 0:
             data = len(last_chunk).to_bytes(2, byteorder="big") + last_chunk
@@ -1250,7 +1218,7 @@ class CommandSender:
                 p2=P2.P2_NONE,
                 data=chunk,
             )
-            if temp_response.status != 0x9000:
+            if temp_response.status != StatusWords.SWO_SUCCESS:
                 raise ExceptionRAPDU(temp_response.status)
         with self.backend.exchange_async(
             cla=CLA,

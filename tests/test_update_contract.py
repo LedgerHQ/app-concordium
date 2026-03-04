@@ -1,14 +1,12 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
+
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 from utils import navigate_until_text_and_compare, instructions_builder
 
@@ -42,7 +40,7 @@ def test_update_contract(
         )
     response = client.get_async_response()
     print(response.data.hex())
-    assert response.status == 0x9000
+    assert response.status == StatusWords.SWO_SUCCESS
     assert response.data == bytes.fromhex(
         "3c3d5a49e157b35b64f78677622f8c0a6bbe1a1864668006c8d432471e3d9e5df73e478e005db93c3986d6805b7d498f52b400099cc9034041d799f237703402"
     )
@@ -82,7 +80,7 @@ def test_update_contract(
         )
     response = client.get_async_response()
     print(response.data.hex())
-    assert response.status == 0x9000
+    assert response.status == StatusWords.SWO_SUCCESS
     assert response.data == bytes.fromhex(
         "79fc02f2d8afcb292bbcc3516db304b7ac628fe9b16379d75a0287eed7dc6909602782f25b02d4be44165bb2ea00ab5f4473b10847469f04ec9867f4e421b00a"
     )

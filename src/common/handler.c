@@ -1,4 +1,5 @@
 #include "globals.h"
+#include "challenge.h"
 #include "getAppName.h"
 #include "get_app_version.h"
 #include <status_words.h>
@@ -77,6 +78,13 @@ int handler(uint8_t INS,
                 return io_send_sw(SWO_INCORRECT_P1_P2);
             }
             handleGetAppName();
+            break;
+        case INS_GET_CHALLENGE:
+            LEDGER_ASSERT(cdata == NULL, "GET_CHALLENGE expects no command data");
+            if (p1 != P1_DEFAULT || p2 != P2_DEFAULT) {
+                return io_send_sw(SWO_INCORRECT_P1_P2);
+            }
+            handleGetChallenge();
             break;
         case INS_DEPLOY_MODULE:
             LEDGER_ASSERT(cdata != NULL, "NULL cdata");

@@ -6,5 +6,5 @@
 int handleGetAppName() {
     _Static_assert(APPNAME_LEN < MAX_APPNAME_LEN, "APPNAME must be at most 64 characters!");
 
-    return io_send_response_pointer(PIC(APPNAME), APPNAME_LEN, SUCCESS);
+    return io_send_response_pointer(PIC(APPNAME), APPNAME_LEN, SWO_SUCCESS);
 }

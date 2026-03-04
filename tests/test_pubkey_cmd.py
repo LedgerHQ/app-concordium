@@ -1,14 +1,11 @@
 import pytest
 
-from application_client.command_sender import (
-    CommandSender,
-    Errors,
-)
+from application_client.command_sender import CommandSender
 from application_client.response_unpacker import (
     unpack_get_public_key_response,
 )
 from ragger.bip import calculate_public_key_and_chaincode, CurveChoice
-from ragger.error import ExceptionRAPDU
+from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 
 nano_accept_instructions = [
@@ -36,6 +33,15 @@ wallet_refuse_instructions = [
     NavInsID.USE_CASE_CHOICE_REJECT,
     NavInsID.WAIT_FOR_HOME_SCREEN,
 ]
+
+
+# In this test we check that the GET_CHALLENGE returns an 8-byte random challenge
+@pytest.mark.active_test_scope
+def test_get_challenge(backend):
+    client = CommandSender(backend)
+    response = client.get_challenge()
+    assert response.status == StatusWords.SWO_SUCCESS
+    assert len(response.data) == 8
 
 
 # In this test we check that the GET_PUBLIC_KEY works in confirmation mode
@@ -173,5 +179,5 @@ def test_get_public_key_confirm_refused(
             )
 
     # Assert that we have received a refusal
-    assert e.value.status == Errors.SW_DENY
+    assert e.value.status == StatusWords.SWO_CONDITIONS_NOT_SATISFIED
     assert len(e.value.data) == 0
