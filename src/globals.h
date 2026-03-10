@@ -68,6 +68,7 @@
 #include "updateContract.h"
 #include "challenge.h"
 
+#define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 
 #define ACCOUNT_TRANSACTION_HEADER_LENGTH 60

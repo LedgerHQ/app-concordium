@@ -16,7 +16,7 @@
 /** Legacy path format length (1105'/0'/0'/0'/identity'/1') */
 #define DERIVATION_PATH_LEGACY_LEN 6
 /** Bytes per path element in serialized form */
-#define BYTES_PER_PATH_ELEMENT 4
+#define BYTES_PER_PATH_ELEMENT U32_BYTES
 
 /** Legacy purpose (BIP-43) */
 #define LEGACY_PURPOSE 1105
