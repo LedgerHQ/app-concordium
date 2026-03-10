@@ -2,13 +2,13 @@
 #include "format.h"
 #include "numberHelpers.h"
 #include "exportPrivateKey.h"
+#include "util/derivation_path.h"
 
 // This class allows for the export of a number of very specific private keys.
 // These private keys are made exportable as they are used in computations that
 // are not feasible to carry out on the Ledger device. The key derivation paths
 // that are allowed are restricted so that it is not possible to export keys
 // that are used for signing.
-static const uint32_t HARDENED_OFFSET = 0x80000000;
 static exportPrivateKeyContext_t *ctx = &global.exportPrivateKeyContext;
 
 void exportPrivateKeySeed(void) {
@@ -17,7 +17,7 @@ void exportPrivateKeySeed(void) {
         TRY {
             uint8_t lastSubPath = LEGACY_PRF_KEY;
             uint8_t lastSubPathIndex = 5;
-            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
+            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
             getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
             uint8_t tx = 0;
             for (int i = 0; i < KEY_LENGTH; i++) {
@@ -26,7 +26,7 @@ void exportPrivateKeySeed(void) {
 
             if (ctx->exportBoth) {
                 lastSubPath = LEGACY_ID_CRED_SEC;
-                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
+                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
                 getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
                 for (int i = 0; i < KEY_LENGTH; i++) {
                     G_io_apdu_buffer[tx++] = privateKey.d[i];
@@ -49,7 +49,7 @@ void exportPrivateKeyBls(void) {
             uint8_t lastSubPath = LEGACY_PRF_KEY;
             uint8_t lastSubPathIndex = 5;
 
-            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
+            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
             getBlsPrivateKey(ctx->path, lastSubPathIndex + 1, privateKey, sizeof(privateKey));
             uint8_t tx = 0;
             if (sizeof(privateKey) > sizeof(G_io_apdu_buffer)) {
@@ -60,7 +60,7 @@ void exportPrivateKeyBls(void) {
 
             if (ctx->exportBoth) {
                 lastSubPath = LEGACY_ID_CRED_SEC;
-                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_OFFSET;
+                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
                 getBlsPrivateKey(ctx->path, lastSubPathIndex + 1, privateKey, sizeof(privateKey));
                 if (sizeof(privateKey) + tx > sizeof(G_io_apdu_buffer)) {
                     THROW(ERROR_BUFFER_OVERFLOW);
@@ -107,11 +107,11 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     identity = U4BE(dataBuffer, offset);
     uint32_t *keyDerivationPath;
     size_t pathLength;
-    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_OFFSET,
-                                      LEGACY_COIN_TYPE | HARDENED_OFFSET,
-                                      ACCOUNT_SUBTREE | HARDENED_OFFSET,
-                                      NORMAL_ACCOUNTS | HARDENED_OFFSET,
-                                      identity | HARDENED_OFFSET};
+    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_BIT,
+                                      LEGACY_COIN_TYPE | HARDENED_BIT,
+                                      ACCOUNT_SUBTREE | HARDENED_BIT,
+                                      NORMAL_ACCOUNTS | HARDENED_BIT,
+                                      identity | HARDENED_BIT};
     pathLength = 5;
     memmove(ctx->path, keyDerivationPath, pathLength * sizeof(uint32_t));
     ctx->pathLength = pathLength * sizeof(uint32_t);

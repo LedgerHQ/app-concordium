@@ -68,12 +68,7 @@
 #include "updateContract.h"
 #include "challenge.h"
 
-#define LEGACY_PURPOSE        1105
-#define LEGACY_COIN_TYPE      0
-#define NEW_PURPOSE           44
-#define NEW_MAINNET_COIN_TYPE 919
-#define NEW_TESTNET_COIN_TYPE 1
-
+#define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 
 #define ACCOUNT_TRANSACTION_HEADER_LENGTH 60
@@ -98,16 +93,6 @@
  * P2 value for more data
  */
 #define P2_MORE 0x80
-
-typedef enum {
-    LEGACY_ID_CRED_SEC = 0,
-    LEGACY_PRF_KEY = 1,
-    // New path
-    NEW_ID_CRED_SEC = 2,
-    NEW_PRF_KEY = 3,
-    NEW_SIGNATURE_BLINDING_RANDOMNESS = 4,
-    NEW_COMMITMENT_RANDOMNESS = 5,
-} derivation_path_keys_t;
 
 typedef enum {
     DEPLOY_MODULE = 0,
