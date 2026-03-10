@@ -17,7 +17,7 @@
  */
 static inline size_t read_u8(uint8_t *data, size_t offset, uint8_t *out) {
     *out = data[offset];
-    return offset + 1;
+    return offset + sizeof(data[0]);
 }
 
 /**
@@ -30,7 +30,7 @@ static inline size_t read_u8(uint8_t *data, size_t offset, uint8_t *out) {
  */
 static inline size_t read_u32_be(uint8_t *data, size_t offset, uint32_t *out) {
     *out = U4BE(data, offset);
-    return offset + 4;
+    return offset + sizeof(data[0]);
 }
 
 /**
