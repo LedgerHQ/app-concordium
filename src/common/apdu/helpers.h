@@ -6,6 +6,7 @@
 #include <os_utils.h>
 #include <exceptions.h>
 #include <os_print.h>
+#include "globals.h"
 
 /**
  * Read a big-endian uint8 from APDU data and advance the offset.
