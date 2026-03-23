@@ -198,7 +198,6 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     ////// Set up the display //////
     const bool need_account_suffix = (p1 == P1_ACCOUNT_CREATION || p1 == P1_CREATION_OF_ZK_PROOF);
 
-    offset = 0;
     memmove(ctx->display_credid, "IDP#", 4);
     offset = 4;
     offset = append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, identityProvider, true);
