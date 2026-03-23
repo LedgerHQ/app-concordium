@@ -46,3 +46,6 @@ diff
 
 # clangd (language server index; may appear under fuzzing/ or repo root)
 .cache/
+
+# folder to store local helper scripts
+scripts_local/
