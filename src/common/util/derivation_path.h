@@ -15,7 +15,8 @@
 #define DERIVATION_PATH_NEW_LEN 5
 /** Legacy path format length (1105'/0'/0'/0'/identity'/1') */
 #define DERIVATION_PATH_LEGACY_LEN 6
-/** Last node of 6-segment legacy export path: PRF key vs ID cred sec (values in derivation_path_key_idx_t) */
+/** Last node of 6-segment legacy export path: PRF key vs ID cred sec (values in
+ * derivation_path_key_idx_t) */
 #define PATH_INDEX_LEGACY_EXPORT_KEY (DERIVATION_PATH_LEGACY_LEN - 1U)
 /** Bytes per path element in serialized form (uint32 big-endian) */
 #define BYTES_PER_PATH_ELEMENT 4
@@ -38,19 +39,19 @@
 
 /** Path indices for full serialized account paths (GET_PUBLIC_KEY / signing) */
 #define PATH_INDEX_IDENTITY_PROVIDER 2
-#define PATH_INDEX_IDENTITY            3
+#define PATH_INDEX_IDENTITY          3
 /** Last node of 5-segment new path: m/44'/coin'/idp'/identity'/account' */
-#define PATH_INDEX_ACCOUNT_NEW         4
+#define PATH_INDEX_ACCOUNT_NEW 4
 /** Index 4 in legacy 6-node path: identity (same numeric position as ACCOUNT_NEW in new path) */
-#define PATH_INDEX_IDENTITY_LEGACY     4
-#define PATH_INDEX_ACCOUNT_LEGACY      6
+#define PATH_INDEX_IDENTITY_LEGACY 4
+#define PATH_INDEX_ACCOUNT_LEGACY  6
 
 /** Governance subtree (legacy purpose, 5-node path) */
 #define GOVERNANCE_KEY_PATH_LENGTH 5
 #define GOVERNANCE_IDENTITY_INDEX  1
-#define GOVERNANCE_DISPLAY_MIN_LEN   13
-#define GOV_ROOT_LEN  10
-#define GOV_LEVEL_LEN 13
+#define GOVERNANCE_DISPLAY_MIN_LEN 13
+#define GOV_ROOT_LEN               10
+#define GOV_LEVEL_LEN              13
 
 /** Mask for the hardened bit (bit 31) */
 #define HARDENED_BIT 0x80000000U
@@ -101,15 +102,16 @@ static inline void trim_last_node(derivation_path_t *derivation_path) {
  * Does not require the buffer to end at the path (use when path is followed by more APDU data).
  *
  * @param max_len              Bytes available starting at cdata
- * @param derivation_path_out  Filled with unhardened nodes; variant set to DERIVATION_PATH_VARIANT_FULL.
- *                             Call detect_derivation_path_variant() after if you need legacy/new classification.
+ * @param derivation_path_out  Filled with unhardened nodes; variant set to
+ * DERIVATION_PATH_VARIANT_FULL. Call detect_derivation_path_variant() after if you need legacy/new
+ * classification.
  * @return                     Bytes consumed (1 + depth*4)
  *
  * @throws ERROR_INVALID_PATH if depth or length is invalid
  */
 size_t parse_derivation_path_from_buffer(uint8_t *cdata,
-                                        size_t max_len,
-                                        derivation_path_t *derivation_path_out);
+                                         size_t max_len,
+                                         derivation_path_t *derivation_path_out);
 
 /**
  * Parse full derivation-path format when CDATA is path-only (INS verify address P1_FULL_PATH).

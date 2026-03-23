@@ -42,9 +42,9 @@ typedef enum {
 // Derivation path constants
 #define DERIVATION_PATH_NODES_MAX 8
 #define NEW_PURPOSE               44
-#define NEW_MAINNET_COIN_TYPE 919
-#define NEW_TESTNET_COIN_TYPE 1
-#define HARDENED_OFFSET       0x80000000
+#define NEW_MAINNET_COIN_TYPE     919
+#define NEW_TESTNET_COIN_TYPE     1
+#define HARDENED_OFFSET           0x80000000
 
 typedef struct {
     uint32_t nodes[DERIVATION_PATH_NODES_MAX];
@@ -125,12 +125,14 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_idx_t keyType,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
                                        size_t outputPrivateKeySize) {
-    printf("MOCK exportNewPathPrivateKeysForPurpose: keyType=%d, network=%d, idp=%u, id=%u, account=%u\n",
-           (int) keyType,
-           networkDesignation,
-           identityProvider,
-           identity,
-           account);
+    printf(
+        "MOCK exportNewPathPrivateKeysForPurpose: keyType=%d, network=%d, idp=%u, id=%u, "
+        "account=%u\n",
+        (int) keyType,
+        networkDesignation,
+        identityProvider,
+        identity,
+        account);
 
     derivation_path_t dp;
     memset(&dp, 0, sizeof(dp));
@@ -236,7 +238,7 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     // Generate the private keys
     uint8_t outputBuffer[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     int bytesWritten = exportNewPathPrivateKeysForPurpose(
-        (derivation_path_key_idx_t) (2 + (p1 % 4)),  /* map fuzz input into 2..5 range */
+        (derivation_path_key_idx_t) (2 + (p1 % 4)),    /* map fuzz input into 2..5 range */
         (p2 == P2_MAINNET) ? P2_MAINNET : P2_TESTNET,  // Ensure valid network
         identityProvider,
         identity,

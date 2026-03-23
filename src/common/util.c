@@ -10,7 +10,8 @@ size_t parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
      * which requires lc == path length for path-only CDATA — see VERIFY_ADDRESS). */
     size_t consumed = parse_derivation_path_from_buffer(cdata, dataLength, dp);
     detect_derivation_path_variant(dp);
-    /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first. */
+    /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first.
+     */
     harden_derivation_path(dp);
     return consumed;
 }
@@ -355,9 +356,7 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
 }
 
-void getBlsPrivateKey(const derivation_path_t *path,
-                      uint8_t *privateKey,
-                      size_t privateKeySize) {
+void getBlsPrivateKey(const derivation_path_t *path, uint8_t *privateKey, size_t privateKeySize) {
     cx_ecfp_private_key_t privateKeySeed;
     BEGIN_TRY {
         TRY {

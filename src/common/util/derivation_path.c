@@ -4,8 +4,8 @@
 #include <exceptions.h>
 
 size_t parse_derivation_path_from_buffer(uint8_t *cdata,
-                                        size_t max_len,
-                                        derivation_path_t *derivation_path_out) {
+                                         size_t max_len,
+                                         derivation_path_t *derivation_path_out) {
     if (max_len < 1) {
         THROW(ERROR_INVALID_PATH);
     }

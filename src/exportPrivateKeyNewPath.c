@@ -19,8 +19,11 @@ static size_t append_dec(uint8_t *buf, size_t cap, size_t off, uint64_t n, bool 
     return off + step - (more_follows ? 1U : 0U);
 }
 
-/** Append export key-type segment(s) to a 4-node base path (identity + idp filled). Unhardened; caller hardens. */
-static bool append_export_key_type(derivation_path_t *dp, uint8_t derivationPathKeyType, uint32_t account) {
+/** Append export key-type segment(s) to a 4-node base path (identity + idp filled). Unhardened;
+ * caller hardens. */
+static bool append_export_key_type(derivation_path_t *dp,
+                                   uint8_t derivationPathKeyType,
+                                   uint32_t account) {
     switch (derivationPathKeyType) {
         case NEW_ID_CRED_SEC:
         case NEW_PRF_KEY:
@@ -187,23 +190,32 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
         account = U4BE(dataBuffer, offset);
     }
 
-    ctx->privateKeysLength = (uint8_t) exportNewPathPrivateKeysForPurpose(p1,
-                                                                          p2,
-                                                                          identityProvider,
-                                                                          identity,
-                                                                          account,
-                                                                          ctx->outputPrivateKeys,
-                                                                          sizeof(ctx->outputPrivateKeys));
+    ctx->privateKeysLength =
+        (uint8_t) exportNewPathPrivateKeysForPurpose(p1,
+                                                     p2,
+                                                     identityProvider,
+                                                     identity,
+                                                     account,
+                                                     ctx->outputPrivateKeys,
+                                                     sizeof(ctx->outputPrivateKeys));
 
     ////// Set up the display //////
     const bool need_account_suffix = (p1 == P1_ACCOUNT_CREATION || p1 == P1_CREATION_OF_ZK_PROOF);
 
     memmove(ctx->display_credid, "IDP#", 4);
     offset = 4;
-    offset = append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, identityProvider, true);
+    offset = append_dec(ctx->display_credid,
+                        sizeof(ctx->display_credid),
+                        offset,
+                        identityProvider,
+                        true);
     memmove(ctx->display_credid + offset, " ID#", 4);
     offset += 4;
-    offset = append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, identity, need_account_suffix);
+    offset = append_dec(ctx->display_credid,
+                        sizeof(ctx->display_credid),
+                        offset,
+                        identity,
+                        need_account_suffix);
 
     memmove(ctx->display_review_operation,
             "Review operation",

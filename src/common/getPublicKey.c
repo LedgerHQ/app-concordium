@@ -65,7 +65,8 @@ void handleGetPublicKey(uint8_t *cdata,
         return;
     }
 
-    /* Display uses unhardened path indices; parseKeyDerivationPath leaves hardened nodes for crypto. */
+    /* Display uses unhardened path indices; parseKeyDerivationPath leaves hardened nodes for
+     * crypto. */
     unharden_derivation_path(dp);
 
     if (dp->len == GOVERNANCE_KEY_PATH_LENGTH && dp->nodes[0] == LEGACY_PURPOSE &&
@@ -73,9 +74,9 @@ void handleGetPublicKey(uint8_t *cdata,
         THROW(ERROR_INVALID_PATH);
     }
 
-    const bool governance = (dp->len == GOVERNANCE_KEY_PATH_LENGTH &&
-                             dp->nodes[0] == LEGACY_PURPOSE &&
-                             dp->nodes[PATH_INDEX_IDENTITY_PROVIDER] == GOVERNANCE_IDENTITY_INDEX);
+    const bool governance =
+        (dp->len == GOVERNANCE_KEY_PATH_LENGTH && dp->nodes[0] == LEGACY_PURPOSE &&
+         dp->nodes[PATH_INDEX_IDENTITY_PROVIDER] == GOVERNANCE_IDENTITY_INDEX);
 
     if (governance) {
         if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
