@@ -89,15 +89,13 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
         (p2 != P2_LEGACY_KEY && p2 != P2_LEGACY_SEED)) {
         THROW(ERROR_INVALID_PARAM);
     }
-    size_t offset = 0;
 
     ctx->isNewPath = false;
-    uint8_t remainingDataLength = lc - offset;
     uint32_t identity;
-    if (remainingDataLength < 4) {
+    if (lc < 4) {
         THROW(ERROR_INVALID_PATH);
     }
-    identity = U4BE(dataBuffer, offset);
+    identity = U4BE(dataBuffer, 0);
 
     derivation_path_t *dp = &ctx->derivation_path;
     init_derivation_path(dp);
@@ -112,9 +110,7 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     ctx->exportBoth = p1 == P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC;
     ctx->exportSeed = p2 == P2_LEGACY_SEED;
 
-    // Reset the offset to 0
-    offset = 0;
-
+    size_t offset = 0;
     memmove(ctx->display_credid + offset, "ID#", 3);
     offset += 3;
     bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, identity);

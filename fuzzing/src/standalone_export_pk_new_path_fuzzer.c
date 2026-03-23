@@ -25,7 +25,6 @@ typedef enum {
 #define SUCCESS             0x9000
 
 // Constants from exportPrivateKey.h
-#define MAX_DERIVATION_PATH_LENGTH  6
 #define MAX_KEYS_TO_EXPORT          3
 #define LENGTH_AND_PRIVATE_KEY_SIZE 33
 

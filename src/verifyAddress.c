@@ -105,8 +105,8 @@ end:
  * @param p1              Path format: P1_LEGACY_PATH, P1_NEW_PATH, or P1_FULL_PATH
  * @param p2              Network selector (P2_MAINNET_DEFAULT or P2_TESTNET for P1_NEW_PATH)
  * @param lc              Length of cdata
- * @param derivation_path Output buffer for the parsed derivation path. Pats is not hardened
- * @param crec_counter    Output buffer to store cred counter for legacy key deriving.
+ * @param derivation_path Output buffer for the parsed derivation path. Path is not hardened.
+ * @param cred_counter    Output credential counter (legacy / new path).
  *
  * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
  */
@@ -157,8 +157,7 @@ void handleVerifyAddress(uint8_t *cdata,
     uint32_t cred_counter = 0;
     parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
 
-    switch (derivation_path
-                ->variant) {  // TODO: refactor getIdentityAccountDisplay* to a single function
+    switch (derivation_path->variant) {
         case DERIVATION_PATH_VARIANT_NEW:
             getIdentityAccountDisplayNewPath(ctx->display,
                                              sizeof(ctx->display),

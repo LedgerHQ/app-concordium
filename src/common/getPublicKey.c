@@ -3,8 +3,6 @@
 static exportPublicKeyContext_t *ctx = &global.exportPublicKeyContext;
 static tx_state_t *tx_state = &global_tx_state;
 
-instructionContext global;
-
 /**
  * Derive the public-key for the given path, and then write it to
  * the APDU buffer to be returned to the caller.

@@ -10,6 +10,7 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
      * which requires lc == path length for path-only CDATA — see VERIFY_ADDRESS). */
     size_t consumed = parse_derivation_path_from_buffer(cdata, dataLength, dp);
     detect_derivation_path_variant(dp);
+    /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first. */
     harden_derivation_path(dp);
     return (int) consumed;
 }

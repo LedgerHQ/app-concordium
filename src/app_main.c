@@ -20,6 +20,9 @@
 derivation_path_t global_derivation_path;
 tx_state_t global_tx_state;
 
+/** Single definition of the instruction union (see extern in globals.h). */
+instructionContext global;
+
 const internal_storage_t N_storage_real;
 
 // The Ledger uses APDU commands
@@ -88,6 +91,7 @@ void app_main() {
 
         if (cmd.cla != CLA) {
             io_send_sw(ERROR_INVALID_CLA);
+            continue;
         }
 
         // Dispatch structured APDU command to handler

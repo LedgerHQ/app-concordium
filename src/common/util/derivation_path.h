@@ -88,11 +88,6 @@ static inline void init_derivation_path(derivation_path_t *derivation_path) {
     }
     derivation_path->variant = DERIVATION_PATH_VARIANT_INVALID;
 }
-/** Get cred counter from path (last node, stored at nodes[len]) */
-static inline uint32_t cred_counter(derivation_path_t *derivation_path) {
-    return derivation_path->nodes[derivation_path->len];
-}
-
 /** Remove the last node from the path */
 static inline void trim_last_node(derivation_path_t *derivation_path) {
     derivation_path->len -= 1;
@@ -105,7 +100,8 @@ static inline void trim_last_node(derivation_path_t *derivation_path) {
  * Does not require the buffer to end at the path (use when path is followed by more APDU data).
  *
  * @param max_len              Bytes available starting at cdata
- * @param derivation_path_out  Filled with unhardened nodes; variant set to DERIVATION_PATH_VARIANT_FULL
+ * @param derivation_path_out  Filled with unhardened nodes; variant set to DERIVATION_PATH_VARIANT_FULL.
+ *                             Call detect_derivation_path_variant() after if you need legacy/new classification.
  * @return                     Bytes consumed (1 + depth*4)
  *
  * @throws ERROR_INVALID_PATH if depth or length is invalid

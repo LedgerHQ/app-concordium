@@ -10,6 +10,15 @@
 // possible to export keys that are used for signing.
 static exportPrivateKeyContext_t *ctx = &global.exportPrivateKeyContext;
 
+/**
+ * Append decimal representation via bin2dec (digits + trailing NUL). If more text follows, the NUL
+ * is dropped from the cursor so the buffer can be concatenated safely.
+ */
+static size_t append_dec(uint8_t *buf, size_t cap, size_t off, uint64_t n, bool more_follows) {
+    size_t step = bin2dec(buf + off, cap - off, n);
+    return off + step - (more_follows ? 1U : 0U);
+}
+
 /** Append export key-type segment(s) to a 4-node base path (identity + idp filled). Unhardened; caller hardens. */
 static bool append_export_key_type(derivation_path_t *dp, uint8_t derivationPathKeyType, uint32_t account) {
     switch (derivationPathKeyType) {
@@ -178,31 +187,24 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
         account = U4BE(dataBuffer, offset);
     }
 
-    ctx->privateKeysLength = exportNewPathPrivateKeysForPurpose(p1,
-                                                                p2,
-                                                                identityProvider,
-                                                                identity,
-                                                                account,
-                                                                ctx->outputPrivateKeys,
-                                                                sizeof(ctx->outputPrivateKeys));
-    if (ctx->privateKeysLength == 0) {
-        THROW(ERROR_INVALID_PARAM);
-    }
+    ctx->privateKeysLength = (uint8_t) exportNewPathPrivateKeysForPurpose(p1,
+                                                                          p2,
+                                                                          identityProvider,
+                                                                          identity,
+                                                                          account,
+                                                                          ctx->outputPrivateKeys,
+                                                                          sizeof(ctx->outputPrivateKeys));
 
     ////// Set up the display //////
+    const bool need_account_suffix = (p1 == P1_ACCOUNT_CREATION || p1 == P1_CREATION_OF_ZK_PROOF);
+
     offset = 0;
-    /// Add the identity provider to the display
     memmove(ctx->display_credid, "IDP#", 4);
-    offset += 4;
-    offset += bin2dec(ctx->display_credid + offset,
-                      sizeof(ctx->display_credid) - offset,
-                      identityProvider);
-    /// Add the identity to the display
-    // Remove the null terminator from the display to add the identity
-    offset -= 1;
+    offset = 4;
+    offset = append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, identityProvider, true);
     memmove(ctx->display_credid + offset, " ID#", 4);
     offset += 4;
-    offset += bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, identity);
+    offset = append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, identity, need_account_suffix);
 
     memmove(ctx->display_review_operation,
             "Review operation",
@@ -218,14 +220,8 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                 EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
         memmove(ctx->display_sign_verb, "to create credentials?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_ACCOUNT_CREATION) {
-        /// Set the display header
         memmove(ctx->display_review_verb, "to create account", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
         memmove(ctx->display_sign_verb, "to create account?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
-        /// Add the account to the display
-        offset -= 1;
-        memmove(ctx->display_credid + offset, " ACCOUNT#", 9);
-        offset += 9;
-        bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, account);
     } else if (p1 == P1_ID_RECOVERY) {
         memmove(ctx->display_review_verb,
                 "to recover credentials",
@@ -234,7 +230,6 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                 "to recover credentials?",
                 EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_ACCOUNT_CREDENTIAL_DISCOVERY) {
-        /// Set the display header
         memmove(ctx->display_review_verb,
                 "to discover credentials",
                 EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
@@ -242,14 +237,17 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
                 "to discover credentials?",
                 EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
     } else if (p1 == P1_CREATION_OF_ZK_PROOF) {
-        /// Set the display header
         memmove(ctx->display_review_verb, "to create ZK proof", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
         memmove(ctx->display_sign_verb, "to create ZK proof?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
-        /// Add the account to the display
-        offset -= 1;
+    }
+
+    if (need_account_suffix) {
+        if (offset + 9 > sizeof(ctx->display_credid)) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
         memmove(ctx->display_credid + offset, " ACCOUNT#", 9);
         offset += 9;
-        bin2dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, account);
+        (void) append_dec(ctx->display_credid, sizeof(ctx->display_credid), offset, account, false);
     }
 
     uiExportPrivateKeysNewPath(flags);
