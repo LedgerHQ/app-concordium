@@ -15,19 +15,17 @@ void exportPrivateKeySeed(void) {
     cx_ecfp_private_key_t privateKey;
     BEGIN_TRY {
         TRY {
-            uint8_t lastSubPath = LEGACY_PRF_KEY;
-            uint8_t lastSubPathIndex = 5;
-            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
-            getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
+            derivation_path_t *dp = &ctx->derivation_path;
+            const uint8_t lastSubPathIndex = PATH_INDEX_LEGACY_EXPORT_KEY;
+            const uint8_t key_count = ctx->exportBoth ? 2U : 1U;
             uint8_t tx = 0;
-            for (int i = 0; i < KEY_LENGTH; i++) {
-                G_io_apdu_buffer[tx++] = privateKey.d[i];
-            }
 
-            if (ctx->exportBoth) {
-                lastSubPath = LEGACY_ID_CRED_SEC;
-                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
-                getPrivateKey(ctx->path, lastSubPathIndex + 1, &privateKey);
+            for (uint8_t k = 0; k < key_count; k++) {
+                uint8_t lastSubPath = (k == 0) ? LEGACY_PRF_KEY : LEGACY_ID_CRED_SEC;
+                dp->nodes[lastSubPathIndex] = lastSubPath;
+                dp->len = (uint8_t) (lastSubPathIndex + 1);
+                harden_derivation_path(dp);
+                getPrivateKey(dp, &privateKey);
                 for (int i = 0; i < KEY_LENGTH; i++) {
                     G_io_apdu_buffer[tx++] = privateKey.d[i];
                 }
@@ -46,23 +44,18 @@ void exportPrivateKeyBls(void) {
     uint8_t privateKey[KEY_LENGTH];
     BEGIN_TRY {
         TRY {
-            uint8_t lastSubPath = LEGACY_PRF_KEY;
-            uint8_t lastSubPathIndex = 5;
-
-            ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
-            getBlsPrivateKey(ctx->path, lastSubPathIndex + 1, privateKey, sizeof(privateKey));
+            derivation_path_t *dp = &ctx->derivation_path;
+            const uint8_t lastSubPathIndex = PATH_INDEX_LEGACY_EXPORT_KEY;
+            const uint8_t key_count = ctx->exportBoth ? 2U : 1U;
             uint8_t tx = 0;
-            if (sizeof(privateKey) > sizeof(G_io_apdu_buffer)) {
-                THROW(ERROR_BUFFER_OVERFLOW);
-            }
-            memmove(G_io_apdu_buffer, privateKey, sizeof(privateKey));
-            tx += sizeof(privateKey);
 
-            if (ctx->exportBoth) {
-                lastSubPath = LEGACY_ID_CRED_SEC;
-                ctx->path[lastSubPathIndex] = lastSubPath | HARDENED_BIT;
-                getBlsPrivateKey(ctx->path, lastSubPathIndex + 1, privateKey, sizeof(privateKey));
-                if (sizeof(privateKey) + tx > sizeof(G_io_apdu_buffer)) {
+            for (uint8_t k = 0; k < key_count; k++) {
+                uint8_t lastSubPath = (k == 0) ? LEGACY_PRF_KEY : LEGACY_ID_CRED_SEC;
+                dp->nodes[lastSubPathIndex] = lastSubPath;
+                dp->len = (uint8_t) (lastSubPathIndex + 1);
+                harden_derivation_path(dp);
+                getBlsPrivateKey(dp, privateKey, sizeof(privateKey));
+                if (tx + sizeof(privateKey) > sizeof(G_io_apdu_buffer)) {
                     THROW(ERROR_BUFFER_OVERFLOW);
                 }
                 memmove(G_io_apdu_buffer + tx, privateKey, sizeof(privateKey));
@@ -105,16 +98,16 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
         THROW(ERROR_INVALID_PATH);
     }
     identity = U4BE(dataBuffer, offset);
-    uint32_t *keyDerivationPath;
-    size_t pathLength;
-    keyDerivationPath = (uint32_t[5]){LEGACY_PURPOSE | HARDENED_BIT,
-                                      LEGACY_COIN_TYPE | HARDENED_BIT,
-                                      ACCOUNT_SUBTREE | HARDENED_BIT,
-                                      NORMAL_ACCOUNTS | HARDENED_BIT,
-                                      identity | HARDENED_BIT};
-    pathLength = 5;
-    memmove(ctx->path, keyDerivationPath, pathLength * sizeof(uint32_t));
-    ctx->pathLength = pathLength * sizeof(uint32_t);
+
+    derivation_path_t *dp = &ctx->derivation_path;
+    init_derivation_path(dp);
+    dp->len = 5;
+    dp->nodes[0] = LEGACY_PURPOSE;
+    dp->nodes[1] = LEGACY_COIN_TYPE;
+    dp->nodes[2] = ACCOUNT_SUBTREE;
+    dp->nodes[3] = NORMAL_ACCOUNTS;
+    dp->nodes[4] = identity;
+    harden_derivation_path(dp);
 
     ctx->exportBoth = p1 == P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC;
     ctx->exportSeed = p2 == P2_LEGACY_SEED;

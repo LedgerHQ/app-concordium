@@ -46,6 +46,7 @@
 #include "display.h"
 #include "handler.h"
 #include "menu.h"
+
 #include "util.h"
 #include "sign.h"
 #include "numberHelpers.h"
@@ -109,19 +110,6 @@ typedef enum {
     CONFIGURE_BAKER = 25,
     CONFIGURE_DELEGATION = 26,
 } transactionKind_e;
-
-typedef struct {
-    uint8_t identity;
-    uint8_t accountIndex;
-
-    // Max length of path is 8. Currently we expect to receive the root, i.e. purpose and cointype
-    // as well. This could be refactored into having those values hardcoded if we determine they
-    // will be static.
-    uint8_t pathLength;
-    uint32_t keyDerivationPath[8];
-    uint32_t rawKeyDerivationPath[8];
-} keyDerivationPath_t;
-extern keyDerivationPath_t path;
 
 // Helper object used when computing the hash of a transaction,
 // and to keep track of the state of a multi command APDU flow.

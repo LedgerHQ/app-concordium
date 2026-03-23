@@ -3,20 +3,6 @@
 #define P1_SKIP_DISPLAY    0x01
 #define P2_SIGN_PUBLIC_KEY 0x01
 
-#define GOVERNANCE_KEY_PATH_LENGTH 5
-#define GOVERNANCE_IDENTITY_INDEX  1
-#define GOVERNANCE_DISPLAY_MIN_LEN 13
-
-#define PATH_INDEX_IDENTITY_PROVIDER 2
-#define PATH_INDEX_IDENTITY          3  // Index 3 in new path format
-#define PATH_INDEX_ACCOUNT_NEW       5
-
-#define PATH_INDEX_IDENTITY_LEGACY 4
-#define PATH_INDEX_ACCOUNT_LEGACY  6
-
-#define GOV_ROOT_LEN  10
-#define GOV_LEVEL_LEN 13
-
 /**
  * Handles the derivation and export of account and governance public keys.
  * @param cdata please see /doc/ins_public_key.md for details

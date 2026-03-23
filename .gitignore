@@ -17,6 +17,7 @@ unit-tests/coverage.info
 fuzzing/build/
 fuzzing/corpus/
 fuzzing/out/
+fuzzing/.cache/
 
 # Python
 *.pyc[cod]
@@ -42,3 +43,6 @@ diff
 
 # Vscode
 .vscode/
+
+# clangd (language server index; may appear under fuzzing/ or repo root)
+.cache/

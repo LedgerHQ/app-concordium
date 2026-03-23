@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "util/derivation_path.h"
+
 #define MAX_DERIVATION_PATH_LENGTH 6
 #define MAX_KEYS_TO_EXPORT         3
 
@@ -83,8 +85,7 @@ typedef struct {
     uint8_t display_sign[EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN];
     bool exportBoth;
     bool exportSeed;
-    uint32_t path[MAX_DERIVATION_PATH_LENGTH + 1];
-    uint8_t pathLength;
+    derivation_path_t derivation_path;
     bool isNewPath;
     uint8_t outputPrivateKeys[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     uint8_t privateKeysLength;

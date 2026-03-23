@@ -1,7 +1,5 @@
 #include "globals.h"
-#include "util/derivation_path.h"
 
-static keyDerivationPath_t *keyPath = &path;
 static exportPublicKeyContext_t *ctx = &global.exportPublicKeyContext;
 static tx_state_t *tx_state = &global_tx_state;
 
@@ -55,6 +53,7 @@ void handleGetPublicKey(uint8_t *cdata,
                         uint8_t lc,
                         volatile unsigned int *flags) {
     parseKeyDerivationPath(cdata, lc);
+    derivation_path_t *dp = &global_derivation_path;
 
     // If P2 == P2_SIGN_PUBLIC_KEY, then the public-key is signed by its corresponding private key,
     // and appended to the returned public-key. This is used when it is needed to provide
@@ -65,55 +64,58 @@ void handleGetPublicKey(uint8_t *cdata,
     // it is not important for the user to validate the key.
     if (p1 == P1_SKIP_DISPLAY) {
         sendPublicKey(false);
-    } else {
-        // If the key path is of length GOVERNANCE_KEY_PATH_LENGTH, then it is a request for a
-        // governance key. Also it has to be in the governance subtree, which starts with 1.
-        if (keyPath->pathLength == GOVERNANCE_KEY_PATH_LENGTH &&
-            keyPath->rawKeyDerivationPath[0] == LEGACY_PURPOSE) {
-            if (keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_PROVIDER] !=
-                GOVERNANCE_IDENTITY_INDEX) {
-                THROW(ERROR_INVALID_PATH);
-            }
-
-            uint32_t purpose = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
-            if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
-                THROW(ERROR_BUFFER_OVERFLOW);
-            }
-
-            switch (purpose) {
-                case 0:
-                    memmove(ctx->display, "Gov. root", GOV_ROOT_LEN);
-                    break;
-                case 1:
-                    memmove(ctx->display, "Gov. level 1", GOV_LEVEL_LEN);
-                    break;
-                case 2:
-                    memmove(ctx->display, "Gov. level 2", GOV_LEVEL_LEN);
-                    break;
-                default:
-                    THROW(ERROR_INVALID_PATH);
-            }
-        } else {
-            if (keyPath->rawKeyDerivationPath[0] == NEW_PURPOSE ||
-                keyPath->rawKeyDerivationPath[0] == (NEW_PURPOSE | HARDENED_BIT)) {
-                uint32_t identityProviderIndex =
-                    keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_PROVIDER];
-                uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY];
-                uint32_t accountIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_ACCOUNT_NEW];
-                getIdentityAccountDisplayNewPath(ctx->display,
-                                                 sizeof(ctx->display),
-                                                 identityProviderIndex,
-                                                 identityIndex,
-                                                 accountIndex);
-            } else {
-                uint32_t identityIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_IDENTITY_LEGACY];
-                uint32_t accountIndex = keyPath->rawKeyDerivationPath[PATH_INDEX_ACCOUNT_LEGACY];
-                getIdentityAccountDisplayLegacyPath(ctx->display,
-                                                    sizeof(ctx->display),
-                                                    identityIndex,
-                                                    accountIndex);
-            }
-        }
-        uiGeneratePubkey(flags);
+        return;
     }
+
+    /* Display uses unhardened path indices; parseKeyDerivationPath leaves hardened nodes for crypto. */
+    unharden_derivation_path(dp);
+
+    if (dp->len == GOVERNANCE_KEY_PATH_LENGTH && dp->nodes[0] == LEGACY_PURPOSE &&
+        dp->nodes[PATH_INDEX_IDENTITY_PROVIDER] != GOVERNANCE_IDENTITY_INDEX) {
+        THROW(ERROR_INVALID_PATH);
+    }
+
+    const bool governance = (dp->len == GOVERNANCE_KEY_PATH_LENGTH &&
+                             dp->nodes[0] == LEGACY_PURPOSE &&
+                             dp->nodes[PATH_INDEX_IDENTITY_PROVIDER] == GOVERNANCE_IDENTITY_INDEX);
+
+    if (governance) {
+        if (sizeof(ctx->display) < GOVERNANCE_DISPLAY_MIN_LEN) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
+        uint32_t level = dp->nodes[PATH_INDEX_IDENTITY];
+        switch (level) {
+            case 0:
+                memmove(ctx->display, "Gov. root", GOV_ROOT_LEN);
+                break;
+            case 1:
+                memmove(ctx->display, "Gov. level 1", GOV_LEVEL_LEN);
+                break;
+            case 2:
+                memmove(ctx->display, "Gov. level 2", GOV_LEVEL_LEN);
+                break;
+            default:
+                THROW(ERROR_INVALID_PATH);
+        }
+    } else if (dp->variant == DERIVATION_PATH_VARIANT_NEW) {
+        getIdentityAccountDisplayNewPath(ctx->display,
+                                         sizeof(ctx->display),
+                                         dp->nodes[PATH_INDEX_IDENTITY_PROVIDER],
+                                         dp->nodes[PATH_INDEX_IDENTITY],
+                                         dp->nodes[PATH_INDEX_ACCOUNT_NEW]);
+    } else if (dp->variant == DERIVATION_PATH_VARIANT_LEGACY) {
+        getIdentityAccountDisplayLegacyPath(ctx->display,
+                                            sizeof(ctx->display),
+                                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
+                                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
+    } else {
+        /* Non-standard purpose: same legacy-style display as before (indices 4 and 6). */
+        getIdentityAccountDisplayLegacyPath(ctx->display,
+                                            sizeof(ctx->display),
+                                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
+                                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
+    }
+
+    harden_derivation_path(dp);
+    uiGeneratePubkey(flags);
 }

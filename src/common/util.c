@@ -1,37 +1,17 @@
 #include "globals.h"
-#include "util/derivation_path.h"
 
 static tx_state_t *tx_state = &global_tx_state;
-static keyDerivationPath_t *keyPath = &path;
 static accountSender_t *accountSender = &global_account_sender;
-static const uint32_t HARDENED_OFFSET = 0x80000000;
 
 int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
-    if (dataLength < 1) {
-        THROW(ERROR_INVALID_PATH);
-    }
-    keyPath->pathLength = cdata[0];
-
-    // Concordium does not use key paths with a length greater than DERIVATION_PATH_NODES_MAX,
-    // so if that was received, then throw an error.
-    if (keyPath->pathLength > DERIVATION_PATH_NODES_MAX) {
-        THROW(ERROR_INVALID_PATH);
-    }
-
-    if (dataLength < 1 + (BYTES_PER_PATH_ELEMENT * keyPath->pathLength)) {
-        THROW(ERROR_INVALID_PATH);
-    }
-
-    // Each part of a key path is a uint32, parse through each part of the
-    // derivation path. All paths are hardened, but we save a non-hardened
-    // version that can be displayed if needed.
-    for (int i = 0; i < keyPath->pathLength; ++i) {
-        uint32_t node = U4BE(cdata, 1 + (i * BYTES_PER_PATH_ELEMENT));
-        keyPath->rawKeyDerivationPath[i] = node;
-        keyPath->keyDerivationPath[i] = node | HARDENED_OFFSET;
-    }
-
-    return 1 + (BYTES_PER_PATH_ELEMENT * keyPath->pathLength);
+    derivation_path_t *dp = &global_derivation_path;
+    init_derivation_path(dp);
+    /* Path is a prefix; use parse_derivation_path_from_buffer (not parse_derivation_path_full,
+     * which requires lc == path length for path-only CDATA — see VERIFY_ADDRESS). */
+    size_t consumed = parse_derivation_path_from_buffer(cdata, dataLength, dp);
+    detect_derivation_path_variant(dp);
+    harden_derivation_path(dp);
+    return (int) consumed;
 }
 
 /**
@@ -207,9 +187,7 @@ void ensureNoError(cx_err_t errorCode) {
     }
 }
 
-void getPrivateKey(uint32_t *keyPathInput,
-                   uint8_t keyPathLength,
-                   cx_ecfp_private_key_t *privateKey) {
+void getPrivateKey(const derivation_path_t *path, cx_ecfp_private_key_t *privateKey) {
     uint8_t privateKeyData[ED25519_SIGNATURE_LENGTH];
 
     // Invoke the device methods for generating a private key.
@@ -219,8 +197,8 @@ void getPrivateKey(uint32_t *keyPathInput,
         TRY {
             ensureNoError(os_derive_bip32_with_seed_no_throw(HDW_ED25519_SLIP10,
                                                              CX_CURVE_Ed25519,
-                                                             keyPathInput,
-                                                             keyPathLength,
+                                                             (uint32_t *) path->nodes,
+                                                             path->len,
                                                              privateKeyData,
                                                              NULL,
                                                              (unsigned char *) "ed25519 seed",
@@ -246,7 +224,7 @@ void getPublicKey(uint8_t *publicKeyArray) {
     // fails.
     BEGIN_TRY {
         TRY {
-            getPrivateKey(keyPath->keyDerivationPath, keyPath->pathLength, &privateKey);
+            getPrivateKey(&global_derivation_path, &privateKey);
             // Invoke the device method for generating a public-key pair.
             ensureNoError(
                 cx_ecfp_generate_pair_no_throw(CX_CURVE_Ed25519, &publicKey, &privateKey, 1));
@@ -267,14 +245,13 @@ void getPublicKey(uint8_t *publicKeyArray) {
     }
 }
 
-// Generic method that signs the input with the key given by the derivation path that
-// has been loaded into keyPath.
+// Generic method that signs the input with the key given by global_derivation_path.
 void sign(uint8_t *input, uint8_t *signatureOnInput) {
     cx_ecfp_private_key_t privateKey;
 
     BEGIN_TRY {
         TRY {
-            getPrivateKey(keyPath->keyDerivationPath, keyPath->pathLength, &privateKey);
+            getPrivateKey(&global_derivation_path, &privateKey);
             ensureNoError(cx_eddsa_sign_no_throw(&privateKey,
                                                  CX_SHA512,
                                                  input,
@@ -377,14 +354,13 @@ void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size_t dstL
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
 }
 
-void getBlsPrivateKey(uint32_t *keyPathInput,
-                      uint8_t keyPathLength,
+void getBlsPrivateKey(const derivation_path_t *path,
                       uint8_t *privateKey,
                       size_t privateKeySize) {
     cx_ecfp_private_key_t privateKeySeed;
     BEGIN_TRY {
         TRY {
-            getPrivateKey(keyPathInput, keyPathLength, &privateKeySeed);
+            getPrivateKey(path, &privateKeySeed);
             blsKeygen(privateKeySeed.d, sizeof(privateKeySeed.d), privateKey, privateKeySize);
         }
         FINALLY {

@@ -10,26 +10,27 @@
 // possible to export keys that are used for signing.
 static exportPrivateKeyContext_t *ctx = &global.exportPrivateKeyContext;
 
-int editDerivationPathPerKeyType(uint32_t *derivationPath,
-                                 uint8_t derivationPathLength,
-                                 uint8_t derivationPathKeyType,
-                                 uint32_t account) {
-    if (derivationPathLength > MAX_DERIVATION_PATH_LENGTH) {
-        return 0;
-    }
+/** Append export key-type segment(s) to a 4-node base path (identity + idp filled). Unhardened; caller hardens. */
+static bool append_export_key_type(derivation_path_t *dp, uint8_t derivationPathKeyType, uint32_t account) {
     switch (derivationPathKeyType) {
         case NEW_ID_CRED_SEC:
         case NEW_PRF_KEY:
         case NEW_SIGNATURE_BLINDING_RANDOMNESS:
-            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_BIT;
-            return derivationPathLength;
+            if (dp->len >= DERIVATION_PATH_NODES_MAX) {
+                return false;
+            }
+            dp->nodes[dp->len++] = derivationPathKeyType;
+            return true;
         case NEW_COMMITMENT_RANDOMNESS:
-            derivationPath[derivationPathLength++] = derivationPathKeyType | HARDENED_BIT;
-            derivationPath[derivationPathLength++] = account | HARDENED_BIT;
-            return derivationPathLength;
+            if (dp->len + 2 > DERIVATION_PATH_NODES_MAX) {
+                return false;
+            }
+            dp->nodes[dp->len++] = NEW_COMMITMENT_RANDOMNESS;
+            dp->nodes[dp->len++] = account;
+            return true;
         default:
             PRINTF("Invalid derivation path key type: %d\n", derivationPathKeyType);
-            return 0;
+            return false;
     }
 }
 
@@ -40,32 +41,24 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
                                        size_t outputPrivateKeySize) {
-    uint32_t derivationPath[MAX_DERIVATION_PATH_LENGTH];
-    uint8_t derivationPathLength = 4;
     cx_ecfp_private_key_t tempPrivateKeyEd25519;
     uint8_t tempPrivateKey[KEY_LENGTH];
 
     uint8_t keysToExport[MAX_KEYS_TO_EXPORT] = {0, 0, 0};
     uint8_t keysToExportLength = 0;
 
-    // Set the derivation path
-    derivationPath[0] = NEW_PURPOSE | HARDENED_BIT;
-
-    // choose the appropriate coin type based on the network selection in p2
+    uint32_t coin_type;
     switch (networkDesignation) {
         case P2_MAINNET:
-            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_BIT;
+            coin_type = NEW_MAINNET_COIN_TYPE;
             break;
         case P2_TESTNET:
-            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_BIT;
+            coin_type = NEW_TESTNET_COIN_TYPE;
             break;
         default:
             PRINTF("Invalid network type: %d\n", networkDesignation);
             THROW(ERROR_INVALID_PARAM);
     }
-
-    derivationPath[2] = identityProvider | HARDENED_BIT;
-    derivationPath[3] = identity | HARDENED_BIT;
 
     switch (purpose) {
         case P1_IDENTITY_CREDENTIAL_CREATION:
@@ -103,29 +96,31 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
     // iterate over the keys to export
     for (int keyIndex = 0; keyIndex < keysToExportLength; keyIndex++) {
-        // Edit the derivation path according to the key to export
-        uint8_t tempDerivationPathLength = editDerivationPathPerKeyType(derivationPath,
-                                                                        derivationPathLength,
-                                                                        keysToExport[keyIndex],
-                                                                        account);
-        if (tempDerivationPathLength == 0) {
+        derivation_path_t subpath;
+        init_derivation_path(&subpath);
+        subpath.len = 4;
+        subpath.nodes[0] = NEW_PURPOSE;
+        subpath.nodes[1] = coin_type;
+        subpath.nodes[2] = identityProvider;
+        subpath.nodes[3] = identity;
+
+        if (!append_export_key_type(&subpath, keysToExport[keyIndex], account)) {
             PRINTF("The derivation path length is too long\n");
             THROW(ERROR_BUFFER_OVERFLOW);
         }
 
+        harden_derivation_path(&subpath);
+
         outputPrivateKey[tx++] = KEY_LENGTH;
         if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
             // export raw key
-            getPrivateKey(derivationPath, tempDerivationPathLength, &tempPrivateKeyEd25519);
+            getPrivateKey(&subpath, &tempPrivateKeyEd25519);
             for (int i = 0; i < KEY_LENGTH; i++) {
                 tempPrivateKey[i] = tempPrivateKeyEd25519.d[i];
             }
         } else {
             // export bls key
-            getBlsPrivateKey(derivationPath,
-                             tempDerivationPathLength,
-                             tempPrivateKey,
-                             sizeof(tempPrivateKey));
+            getBlsPrivateKey(&subpath, tempPrivateKey, sizeof(tempPrivateKey));
         }
 
         for (int i = 0; i < KEY_LENGTH; i++) {

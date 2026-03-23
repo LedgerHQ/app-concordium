@@ -17,7 +17,7 @@
 
 #include "globals.h"
 
-keyDerivationPath_t path;
+derivation_path_t global_derivation_path;
 tx_state_t global_tx_state;
 
 const internal_storage_t N_storage_real;

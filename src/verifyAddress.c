@@ -196,11 +196,7 @@ void handleVerifyAddress(uint8_t *cdata,
 
     BEGIN_TRY {
         TRY {
-            getBlsPrivateKey(
-                derivation_path->nodes,
-                derivation_path->len,
-                prf,
-                sizeof(prf));  // TODO: refactor getBlsPrivateKey to accept *derivation_path_t
+            getBlsPrivateKey(derivation_path, prf, sizeof(prf));
             cx_err_t error = getCredId(prf, sizeof(prf), cred_counter, credId, sizeof(credId));
 
             if (error != 0) {
