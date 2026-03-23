@@ -41,6 +41,7 @@
 #define PATH_INDEX_IDENTITY            3
 /** Last node of 5-segment new path: m/44'/coin'/idp'/identity'/account' */
 #define PATH_INDEX_ACCOUNT_NEW         4
+/** Index 4 in legacy 6-node path: identity (same numeric position as ACCOUNT_NEW in new path) */
 #define PATH_INDEX_IDENTITY_LEGACY     4
 #define PATH_INDEX_ACCOUNT_LEGACY      6
 
@@ -183,7 +184,12 @@ static inline void unharden_derivation_path(derivation_path_t *derivation_path) 
 }
 
 /**
- * Current-command path buffer; defined in app_main.c.
+ * Current-command derivation path; defined in app_main.c.
+ *
+ * Overwritten on each APDU. The main loop processes one command at a time, so it is never shared
+ * across concurrent commands. For multi-step flows (e.g. signing), the path is parsed at flow start
+ * and must be re-parsed or re-established before use by subsequent APDUs.
+ *
  * Used by parseKeyDerivationPath (sign / get public key), export private key, and verify address
  * (not duplicated inside instruction union members).
  */

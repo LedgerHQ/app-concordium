@@ -3,7 +3,7 @@
 static tx_state_t *tx_state = &global_tx_state;
 static accountSender_t *accountSender = &global_account_sender;
 
-int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
+size_t parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     derivation_path_t *dp = &global_derivation_path;
     init_derivation_path(dp);
     /* Path is a prefix; use parse_derivation_path_from_buffer (not parse_derivation_path_full,
@@ -12,7 +12,7 @@ int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength) {
     detect_derivation_path_variant(dp);
     /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first. */
     harden_derivation_path(dp);
-    return (int) consumed;
+    return consumed;
 }
 
 /**
@@ -83,7 +83,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
                              size_t feesSize) {
     // Parse the key derivation path, which should always be the first thing received
     // in a command to the Ledger application.
-    int keyPathLength = parseKeyDerivationPath(cdata, dataLength);
+    size_t keyPathLength = parseKeyDerivationPath(cdata, dataLength);
     cdata += keyPathLength;
     uint8_t remainingDataLength = dataLength - keyPathLength;
 

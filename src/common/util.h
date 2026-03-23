@@ -107,7 +107,8 @@ void getPublicKey(uint8_t *publicKeyArray);
  * differ in length.
  * @return number of bytes received in the key derivation path
  */
-int parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength);
+/** Parse path from CDATA prefix; returns bytes consumed. Bounded by 1 + DERIVATION_PATH_NODES_MAX*4. */
+size_t parseKeyDerivationPath(uint8_t *cdata, uint8_t dataLength);
 
 /**
  * Signs the input with the private key for the loaded key derivation path.
@@ -220,11 +221,11 @@ int handleHeaderAndToAddress(uint8_t *cdata,
  *
  * @param path hardened derivation path (Ed25519 seed then BLS keygen)
  * @param privateKey [out] where to write the derived private key to
- * @param privateKeyLength length of privateKey
+ * @param privateKeySize size of privateKey buffer in bytes
  */
 void getBlsPrivateKey(const derivation_path_t *path,
                       uint8_t *privateKey,
-                      size_t privateKeyLength);
+                      size_t privateKeySize);
 
 /**
  * Loads a u64 ratio into the destination provided in a displayable format (numerator /
