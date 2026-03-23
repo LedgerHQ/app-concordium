@@ -152,7 +152,7 @@ void handleVerifyAddress(uint8_t *cdata,
                          uint8_t p2,
                          uint8_t lc,
                          volatile unsigned int *flags) {
-    derivation_path_t *derivation_path = &ctx->derivation_path;
+    derivation_path_t *derivation_path = &global_derivation_path;
     init_derivation_path(derivation_path);
     uint32_t cred_counter = 0;
     parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);

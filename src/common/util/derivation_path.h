@@ -182,7 +182,11 @@ static inline void unharden_derivation_path(derivation_path_t *derivation_path) 
     }
 }
 
-/** Current-command path buffer; defined in app_main.c (parse / get public key / sign). */
+/**
+ * Current-command path buffer; defined in app_main.c.
+ * Used by parseKeyDerivationPath (sign / get public key), export private key, and verify address
+ * (not duplicated inside instruction union members).
+ */
 extern derivation_path_t global_derivation_path;
 
 #endif  // UTIL_DERIVATION_PATH_H

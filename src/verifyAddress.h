@@ -1,6 +1,5 @@
 #ifndef VERIFY_ADDRESS_H
 #define VERIFY_ADDRESS_H
-#include "util/derivation_path.h"
 
 /** P1 value for verify address: new path format (identityProvider/identity/account) */
 #define P1_LEGACY_PATH 0x00
@@ -16,7 +15,6 @@
 #define TESTNET false
 
 typedef struct {
-    derivation_path_t derivation_path;
     uint8_t display[21];
     unsigned char address[57];
 } verifyAddressContext_t;

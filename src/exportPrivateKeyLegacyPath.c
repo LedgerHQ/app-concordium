@@ -15,7 +15,7 @@ void exportPrivateKeySeed(void) {
     cx_ecfp_private_key_t privateKey;
     BEGIN_TRY {
         TRY {
-            derivation_path_t *dp = &ctx->derivation_path;
+            derivation_path_t *dp = &global_derivation_path;
             const uint8_t lastSubPathIndex = PATH_INDEX_LEGACY_EXPORT_KEY;
             const uint8_t key_count = ctx->exportBoth ? 2U : 1U;
             uint8_t tx = 0;
@@ -44,7 +44,7 @@ void exportPrivateKeyBls(void) {
     uint8_t privateKey[KEY_LENGTH];
     BEGIN_TRY {
         TRY {
-            derivation_path_t *dp = &ctx->derivation_path;
+            derivation_path_t *dp = &global_derivation_path;
             const uint8_t lastSubPathIndex = PATH_INDEX_LEGACY_EXPORT_KEY;
             const uint8_t key_count = ctx->exportBoth ? 2U : 1U;
             uint8_t tx = 0;
@@ -97,7 +97,7 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
     }
     identity = U4BE(dataBuffer, 0);
 
-    derivation_path_t *dp = &ctx->derivation_path;
+    derivation_path_t *dp = &global_derivation_path;
     init_derivation_path(dp);
     dp->len = 5;
     dp->nodes[0] = LEGACY_PURPOSE;
