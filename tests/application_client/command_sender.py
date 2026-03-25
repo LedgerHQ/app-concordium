@@ -186,8 +186,7 @@ class CommandSender:
     @contextmanager
     def verify_address_full_path(self, path_nodes: list[int]) -> Generator[None, None, None]:
         """Verify address using P1_FULL_PATH (derivation-path format).
-        path_nodes: list of path elements as uint32 (hardened = 0x80000000 | index).
-        Last element is account index (used as cred_counter, unhardened part)."""
+        path_nodes: list of path elements as uint32 (hardened = 0x80000000 | index)."""
         data = len(path_nodes).to_bytes(1, byteorder="big")
         for node in path_nodes:
             data += node.to_bytes(4, byteorder="big")

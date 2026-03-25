@@ -27,10 +27,12 @@ The address is the credId's sh256 hash, and is displayed in base58.
 | `<n>`    | 1 byte | Depth of the derivation path                     |
 | `<node>` | 4 bytes| Path node, big-endian `uint32` (hardened = `0x80000000 \| index`) |
 
+For `P1` full-path mode there is no separate credential counter field in CDATA; the app uses the parsed path as given and `cred_counter == 0` in the BLS address step. Use `P1_NEW_PATH` / `P1_LEGACY_PATH` when you need an explicit `credCounter` in the APDU.
+
 ### Example
 
-Account 8 derived at `44'/919'/404'/404'/8'`:
+Account 8 derived at `44'/919'/403'/404'/8'`:
 
 | Typed representation | Byte representation (hex) |
 | -------------------- | ------------------------ |
-| `0x05 0x8000002C 0x80000397 0x80000194 0x80000194 0x80000008` | `05 80 00 00 2C 80 00 03 97 80 00 01 94 80 00 01 94 80 00 00 08` |
+| `0x05 0x8000002C 0x80000397 0x80000193 0x80000194 0x80000008` | `05 80 00 00 2C 80 00 03 97 80 00 01 94 80 00 01 94 80 00 00 08` |
