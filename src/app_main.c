@@ -82,16 +82,16 @@ void app_main() {
                cmd.lc,
                cmd.data);
 
+        if (cmd.cla != CLA) {
+            io_send_sw(ERROR_INVALID_CLA);
+            continue;
+        }
+
         bool isInitialCall = false;
         if (global_tx_state.currentInstruction == INSTRUCTION_NONE) {
             explicit_bzero(&global, sizeof(global));
             global_tx_state.currentInstruction = cmd.ins;
             isInitialCall = true;
-        }
-
-        if (cmd.cla != CLA) {
-            io_send_sw(ERROR_INVALID_CLA);
-            continue;
         }
 
         // Dispatch structured APDU command to handler
