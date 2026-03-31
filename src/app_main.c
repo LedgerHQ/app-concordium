@@ -48,6 +48,10 @@ void app_main() {
     command_t cmd;
     io_init();
     explicit_bzero(&global_tx_state, sizeof(global_tx_state));
+    explicit_bzero(g_trusted_name, sizeof(g_trusted_name));
+    explicit_bzero(g_trusted_address, sizeof(g_trusted_address));
+    g_trusted_address_len = 0;
+    g_trusted_name_valid = false;
     ui_menu_main();
 
     // Initialize the NVM data if required

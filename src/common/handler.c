@@ -79,6 +79,9 @@ int handler(uint8_t INS,
             }
             handleGetAppName();
             break;
+        case INS_SET_TRUSTED_NAME:
+            handleSetTrustedName(cdata, p1, p2, lc);
+            break;
         case INS_GET_CHALLENGE:
             LEDGER_ASSERT(cdata == NULL, "GET_CHALLENGE expects no command data");
             if (p1 != P1_DEFAULT || p2 != P2_DEFAULT) {

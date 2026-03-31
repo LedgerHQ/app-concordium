@@ -1,6 +1,8 @@
 # Get Challenge
 
-Generates a cryptographically secure random challenge and keeps it in device memory. The challenge can be used only once. When the trusted name is loaded, the challenge must be erased.
+Generates a cryptographically secure random challenge and keeps it in device memory. The challenge is single-use: it is erased when [Set Trusted Name](ins_set_trusted_name.md) succeeds.
+
+The host embeds this challenge in the TLV descriptor (tag `0x12`) so the firmware can verify freshness.
 
 ## Protocol description
 
@@ -20,6 +22,7 @@ Generates a cryptographically secure random challenge and keeps it in device mem
 ## Behavior
 
 - Each call generates a new random challenge and overwrites the previous one
-- The challenge is stored in device memory until:
+- The challenge is stored in `global.trustedNamePki.stored_challenge` (instruction-context union; see `trustedNamePki.h`) until:
   - A new challenge is requested (overwritten), or
-  - `eraseChallenge()` is called (e.g. when the trusted name is loaded)
+  - `eraseChallenge()` is called when SET\_TRUSTED\_NAME succeeds
+- The challenge must be called **before** SET\_TRUSTED\_NAME; the firmware rejects descriptors with a mismatched or zero challenge

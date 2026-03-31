@@ -110,6 +110,7 @@ class InsType(IntEnum):
     CONFIGURE_BAKER = 0x18
     PUBLIC_INFO_FOR_IP = 0x20
     GET_APP_NAME = 0x21
+    SET_TRUSTED_NAME = 0x22
     GET_CHALLENGE = 0x23
     SIGN_UPDATE_CREDENTIAL = 0x31
     SIGN_TRANSFER_WITH_MEMO = 0x32
@@ -140,6 +141,19 @@ class CommandSender:
     def get_challenge(self) -> RAPDU:
         return self.backend.exchange(
             cla=CLA, ins=InsType.GET_CHALLENGE, p1=P1.P1_NONE, p2=P2.P2_NONE, data=b""
+        )
+
+    def set_trusted_name(self, data: bytes, p1: int = 0, p2: int = 0) -> RAPDU:
+        """INS 0x22: SET_TRUSTED_NAME.  CDATA is a raw TLV payload (signedDescriptor).
+        See doc/ins_set_trusted_name.md."""
+        return self.backend.exchange(
+            cla=CLA, ins=InsType.SET_TRUSTED_NAME, p1=p1, p2=p2, data=data
+        )
+
+    def load_pki_certificate(self, key_usage: int, cert_data: bytes) -> RAPDU:
+        """Load a PKI certificate via the OS default APDU (CLA 0xB0, INS 0x06)."""
+        return self.backend.exchange_raw(
+            bytes([0xB0, 0x06, key_usage, 0x00, len(cert_data)]) + cert_data
         )
 
     def get_public_key(self, path: str, signPublicKey: bool = False) -> RAPDU:

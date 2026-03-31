@@ -96,6 +96,13 @@ ENABLE_BLUETOOTH = 1
 #ENABLE_NFC = 1
 
 ########################################
+#    Nano PKI + TLV (lib_pki/lib_tlv)  #
+########################################
+# Required for trusted-name verification (TLV descriptor format + PKI signature).
+ENABLE_PKI_LIBRARY = 1
+ENABLE_TLV_LIBRARY = 1
+
+########################################
 #         NBGL custom features         #
 ########################################
 ENABLE_NBGL_QRCODE = 1
@@ -117,4 +124,15 @@ ENABLE_NBGL_QRCODE = 1
 #DISABLE_DEBUG_LEDGER_ASSERT = 1
 #DISABLE_DEBUG_THROW = 1
 
+
+# Accept test signer key ID (0x00) for trusted name TLV (Speculos / PKI tests).
+# - DEBUG=1: enabled for local dev (pytest skips PKI tests on release builds automatically).
+# - ENABLE_TRUSTED_NAME_TEST_KEY=1: optional (e.g. CI without DEBUG).
+# Production: plain `make` (no DEBUG, no ENABLE).
+ifeq ($(DEBUG),1)
+DEFINES += TRUSTED_NAME_TEST_KEY
+endif
+ifeq ($(ENABLE_TRUSTED_NAME_TEST_KEY),1)
+DEFINES += TRUSTED_NAME_TEST_KEY
+endif
 include $(BOLOS_SDK)/Makefile.standard_app

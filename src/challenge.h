@@ -20,3 +20,9 @@ void handleGetChallenge(void);
  * MUST be called when the trusted name is loaded.
  */
 void eraseChallenge(void);
+
+/**
+ * Returns the stored challenge value (big-endian uint64_t).
+ * Returns 0 if no challenge has been generated.
+ */
+uint64_t getStoredChallenge(void);

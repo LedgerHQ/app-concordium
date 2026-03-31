@@ -238,6 +238,18 @@ pip install -r tests/requirements.txt
 
 Then you can :
 
+Build the app for functional tests. **`DEBUG=1`** enables the Speculos **test** PKI signer key for trusted name (`TRUSTED_NAME_TEST_KEY`). PKI integration tests **skip** automatically if the firmware was built **without** that (release-style build).
+
+```shell
+make DEBUG=1 COIN=CCD
+```
+
+CI without `DEBUG` can pass **`ENABLE_TRUSTED_NAME_TEST_KEY=1`** instead (see `.github/workflows/build_and_functional_tests.yml`).
+
+A plain `make` is **production**: only the production trusted-name key id; trusted-name PKI tests are **skipped** when you run pytest.
+
+**Docker / Ledger extension:** use `DEBUG=1` or add `ENABLE_TRUSTED_NAME_TEST_KEY=1` on the **`make` command line** when you need PKI tests to run. **`export DEBUG=1` in the shell is not enough:** the SDK sets `DEBUG:=0` in `Makefile.target`, which overrides the environment; only `make DEBUG=1 …` (or `ENABLE_TRUSTED_NAME_TEST_KEY=1`) defines `TRUSTED_NAME_TEST_KEY`.
+
 Run the functional tests (here for nanos+ but available for any device once you have built the binaries) :
 
 ```shell
