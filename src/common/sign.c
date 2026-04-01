@@ -30,7 +30,7 @@ void buildAndSignTransactionHash(void) {
 void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
     uint8_t remainingDataLength = dataLength;
     if (remainingDataLength < 1) {
-        THROW(ERROR_BUFFER_OVERFLOW);
+        THROW(SWO_INCORRECT_DATA);
     }
     uint8_t header = cdata[0];
     cdata += 1;
@@ -54,25 +54,25 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
         length = shortCount;
     } else if (shortCount == CBOR_ONE_BYTE_LENGTH) {
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         length = cdata[0];
         sizeLength = 1;
     } else if (shortCount == CBOR_TWO_BYTE_LENGTH) {
         if (remainingDataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         length = U2BE(cdata, 0);
         sizeLength = 2;
     } else if (shortCount == CBOR_FOUR_BYTE_LENGTH) {
         if (remainingDataLength < 4) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         length = U4BE(cdata, 0);
         sizeLength = 4;
     } else if (shortCount == CBOR_EIGHT_BYTE_LENGTH) {
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         length = U8BE(cdata, 0);
         sizeLength = 8;

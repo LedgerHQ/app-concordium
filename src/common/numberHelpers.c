@@ -193,7 +193,9 @@ size_t amountToGtuDisplay(uint8_t *dst, size_t dstLength, uint64_t microGtuAmoun
 }
 
 void toPaginatedHex(uint8_t *byteArray, const uint64_t len, char *asHex, const size_t asHexSize) {
-    LEDGER_ASSERT(byteArray != NULL, "NULL byteArray");
+    if (byteArray == NULL) {
+        THROW(ERROR_INVALID_PARAM);
+    }
 
     static uint8_t const hex[] = "0123456789abcdef";
 

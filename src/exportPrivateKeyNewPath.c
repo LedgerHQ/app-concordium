@@ -145,11 +145,12 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
     return tx;
 }
 
-void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   volatile unsigned int *flags) {
+void handleExportPrivateKeyNewPath(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *dataBuffer = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     /////// validate p1 parameter //////
     if ((p1 != P1_IDENTITY_CREDENTIAL_CREATION && p1 != P1_ACCOUNT_CREATION &&
          p1 != P1_ID_RECOVERY && p1 != P1_ACCOUNT_CREDENTIAL_DISCOVERY &&

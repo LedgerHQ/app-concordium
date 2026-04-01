@@ -7,11 +7,13 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_REMAINING_AMOUNT 0x01
 #define P1_PROOF            0x02
 
-void handleSignTransferToPublic(uint8_t *cdata,
-                                uint8_t p1,
-                                uint8_t dataLength,
+void handleSignTransferToPublic(const command_t *cmd,
                                 volatile unsigned int *flags,
                                 bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t dataLength = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_TRANSFER_TO_PUBLIC_INITIAL;
     }
@@ -19,7 +21,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
     if (p1 == P1_INITIAL && ctx->state == TX_TRANSFER_TO_PUBLIC_INITIAL) {
         size_t offset = parseKeyDerivationPath(cdata, remainingDataLength);
         if (offset > dataLength) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
@@ -29,7 +31,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
         offset =
             hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, TRANSFER_TO_PUBLIC);
         if (offset > dataLength) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->state = TX_TRANSFER_TO_PUBLIC_REMAINING_AMOUNT;
         // Ask the caller for the next command.
@@ -37,7 +39,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
     } else if (p1 == P1_REMAINING_AMOUNT && ctx->state == TX_TRANSFER_TO_PUBLIC_REMAINING_AMOUNT) {
         // Hash remaining amount. Remaining amount is encrypted, and so we cannot display it.
         if (remainingDataLength < 192) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 192);
         cdata += 192;
@@ -45,7 +47,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
 
         // Parse transaction amount so it can be displayed.
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint64_t amountToPublic = U8BE(cdata, 0);
         amountToGtuDisplay(ctx->amount, sizeof(ctx->amount), amountToPublic);
@@ -55,11 +57,11 @@ void handleSignTransferToPublic(uint8_t *cdata,
 
         // Parse Recipient address
         if (remainingDataLength < 32) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         size_t recipientAddressSize = sizeof(ctx->recipientAddress);
         if (base58check_encode(cdata, 32, ctx->recipientAddress, &recipientAddressSize) == -1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->recipientAddress[55] = '\0';
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 32);
@@ -68,7 +70,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
 
         // Hash amount index
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         cdata += 8;
@@ -76,7 +78,7 @@ void handleSignTransferToPublic(uint8_t *cdata,
 
         // Parse size of incoming proofs.
         if (remainingDataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->proofSize = U2BE(cdata, 0);
 

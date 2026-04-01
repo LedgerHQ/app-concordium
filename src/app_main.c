@@ -73,7 +73,7 @@ void app_main() {
         // Parse APDU command from G_io_apdu_buffer
         if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
             PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
-            io_send_sw(SW_WRONG_DATA_LENGTH);
+            io_send_sw(SWO_WRONG_DATA_LENGTH);
             continue;
         }
 
@@ -87,7 +87,7 @@ void app_main() {
                cmd.data);
 
         if (cmd.cla != CLA) {
-            io_send_sw(ERROR_INVALID_CLA);
+            io_send_sw(SWO_INVALID_CLA);
             continue;
         }
 
@@ -99,7 +99,7 @@ void app_main() {
         }
 
         // Dispatch structured APDU command to handler
-        if (handler(cmd.ins, cmd.data, cmd.p1, cmd.p2, cmd.lc, &flags, isInitialCall) < 0) {
+        if (handler(&cmd, &flags, isInitialCall) < 0) {
             PRINTF("=> handler failure\n");
             return;
         }

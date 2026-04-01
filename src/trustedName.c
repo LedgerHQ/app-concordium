@@ -267,7 +267,12 @@ static void sendSetTrustedNameError(uint16_t sw) {
     io_send_sw(sw);
 }
 
-void handleSetTrustedName(uint8_t *cdata, uint8_t p1, uint8_t p2, uint8_t lc) {
+void handleSetTrustedName(const command_t *cmd) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     if (p1 != 0 || p2 != 0) {
         sendSetTrustedNameError(ERROR_INVALID_PARAM);
         return;

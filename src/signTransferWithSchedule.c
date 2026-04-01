@@ -6,7 +6,9 @@ static cborContext_t *memo_ctx = &global.withDataBlob.cborContext;
 static tx_state_t *tx_state = &global_tx_state;
 
 void processNextScheduledAmount(uint8_t *buffer) {
-    LEDGER_ASSERT(buffer != NULL, "NULL buffer");
+    if (buffer == NULL) {
+        THROW(ERROR_INVALID_PARAM);
+    }
     if (ctx->scheduledAmountsInCurrentPacket == 0) {
         // Current packet has been successfully read, but there are still more data to receive. Ask
         // the caller for more data.
@@ -73,7 +75,7 @@ void handleTransferPairs(uint8_t *cdata, uint8_t dataLength, volatile unsigned i
 
     if (ctx->scheduledAmountsInCurrentPacket * 16 > sizeof(ctx->buffer) ||
         dataLength < ctx->scheduledAmountsInCurrentPacket * 16) {
-        THROW(ERROR_BUFFER_OVERFLOW);
+        THROW(SWO_INCORRECT_DATA);
     }
     memmove(ctx->buffer, cdata, ctx->scheduledAmountsInCurrentPacket * 16);
     processNextScheduledAmount(ctx->buffer);
@@ -94,11 +96,13 @@ void finishMemoScheduled(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
-                                           uint8_t p1,
-                                           uint8_t dataLength,
+void handleSignTransferWithScheduleAndMemo(const command_t *cmd,
                                            volatile unsigned int *flags,
                                            bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t dataLength = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_TRANSFER_WITH_SCHEDULE_INITIAL;
     }
@@ -114,14 +118,14 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
 
         // Store the number of scheduled amounts we are going to receive next.
         if (dataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->remainingNumberOfScheduledAmounts = cdata[0];
         cdata += 1;
 
         // Hash memo length
         if (dataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         memo_ctx->cborLength = U2BE(cdata, 0);
         if (memo_ctx->cborLength > MAX_MEMO_CBOR_SIZE) {
@@ -166,11 +170,13 @@ void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
     }
 }
 
-void handleSignTransferWithSchedule(uint8_t *cdata,
-                                    uint8_t p1,
-                                    uint8_t lc,
+void handleSignTransferWithSchedule(const command_t *cmd,
                                     volatile unsigned int *flags,
                                     bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t lc = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_TRANSFER_WITH_SCHEDULE_INITIAL;
     }
@@ -186,7 +192,7 @@ void handleSignTransferWithSchedule(uint8_t *cdata,
 
         // Store the number of scheduled amounts we are going to receive next.
         if (lc < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->remainingNumberOfScheduledAmounts = cdata[0];
         // Hash schedule length

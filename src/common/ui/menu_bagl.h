@@ -1,6 +1,5 @@
+#pragma once
 
-#ifndef MENU_BAGL_H
-#define MENU_BAGL_H
 #include <ux_layouts.h>
 
 // Stub. APPVERSION is defined in makefile
@@ -15,5 +14,3 @@ extern const bagl_icon_details_t C_icon_dashboard_x;
 extern const bagl_icon_details_t C_icon_back;
 
 void ui_menu_main(void);
-
-#endif  // MENU_BAGL_H

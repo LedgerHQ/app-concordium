@@ -1,21 +1,18 @@
 #pragma once
 
+#include <parser.h>
+
 /**
  * Handles the signing flow for the transfer with schedule account transaction.
- * @param cdata please see /doc/ins_transfer_with_schedule.md for details
- * @param p1 0x00 for the initial packet containing key derivation path, account transaction header,
- * transaction kind, recipient address and the number of scheduled transfers to make, 0x01 when
- * sending pairs of scheduled amounts.
+ * Command data: see /doc/ins_transfer_with_schedule.md. P1: 0x00 for the initial packet containing
+ * key derivation path, account transaction header, transaction kind, recipient address and the
+ * number of scheduled transfers to make, 0x01 when sending pairs of scheduled amounts.
  */
-void handleSignTransferWithSchedule(uint8_t *cdata,
-                                    uint8_t p1,
-                                    uint8_t lc,
+void handleSignTransferWithSchedule(const command_t *cmd,
                                     volatile unsigned int *flags,
                                     bool isInitialCall);
 
-void handleSignTransferWithScheduleAndMemo(uint8_t *cdata,
-                                           uint8_t p1,
-                                           uint8_t dataLength,
+void handleSignTransferWithScheduleAndMemo(const command_t *cmd,
                                            volatile unsigned int *flags,
                                            bool isInitialCall);
 

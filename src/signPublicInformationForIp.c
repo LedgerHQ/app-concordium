@@ -8,11 +8,13 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_VERIFICATION_KEY 0x01
 #define P1_THRESHOLD        0x02
 
-void handleSignPublicInformationForIp(uint8_t *cdata,
-                                      uint8_t p1,
-                                      uint8_t lc,
+void handleSignPublicInformationForIp(const command_t *cmd,
                                       volatile unsigned int *flags,
                                       bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t lc = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_PUBLIC_INFO_FOR_IP_INITIAL;
     }
@@ -27,10 +29,10 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         }
         // Parse IdCredPub
         if (remainingDataLength < 48) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         if (format_hex(cdata, 48, ctx->idCredPub, sizeof(ctx->idCredPub)) == -1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->idCredPub[48 * 2] = '\0';
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 48);
@@ -39,10 +41,10 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
 
         // Parse CredId
         if (remainingDataLength < 48) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         if (format_hex(cdata, 48, ctx->credId, sizeof(ctx->credId)) == -1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->credId[48 * 2] = '\0';
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 48);
@@ -51,7 +53,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
 
         // Parse number of public-keys that will be received next.
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->publicKeysLength = cdata[0];
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -65,10 +67,10 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         }
         // Parse key type
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         if (format_hex(cdata, 1, ctx->keyType, sizeof(ctx->keyType)) == -1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->keyType[2] = '\0';
         // Hash key type
@@ -77,7 +79,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         remainingDataLength -= 1;
         // Hash key index
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
 
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -85,7 +87,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
         remainingDataLength -= 1;
         uint8_t publicKey[32];
         if (remainingDataLength < 32) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         memmove(publicKey, cdata, 32);
         updateHash((cx_hash_t *) &tx_state->hash, publicKey, 32);
@@ -109,7 +111,7 @@ void handleSignPublicInformationForIp(uint8_t *cdata,
     } else if (p1 == P1_THRESHOLD && ctx->state == TX_PUBLIC_INFO_FOR_IP_THRESHOLD) {
         // Read the threshold byte and parse it to display it.
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         bin2dec(ctx->threshold, sizeof(ctx->threshold), cdata[0]);

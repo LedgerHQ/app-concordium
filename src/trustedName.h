@@ -1,5 +1,6 @@
 #pragma once
 
+#include <parser.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -23,4 +24,4 @@ extern bool g_trusted_name_valid;
  * On success the trusted name string (tag 0x20) and address (tag 0x22) are
  * stored in globals and the challenge is erased.
  */
-void handleSetTrustedName(uint8_t *cdata, uint8_t p1, uint8_t p2, uint8_t lc);
+void handleSetTrustedName(const command_t *cmd);

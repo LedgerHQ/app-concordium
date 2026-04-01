@@ -1,5 +1,4 @@
-#ifndef GET_APP_VERSION_H
-#define GET_APP_VERSION_H
+#pragma once
 
 /**
  * Maximum length of MAJOR_VERSION || MINOR_VERSION || PATCH_VERSION.
@@ -28,5 +27,3 @@
  *
  */
 int handler_get_version(void);
-
-#endif  // GET_APP_VERSION_H

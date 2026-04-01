@@ -147,11 +147,12 @@ static void parse_key_path(uint8_t *cdata,
     if (!p2_is_valid) THROW(SWO_WRONG_P1_P2);
 }
 
-void handleVerifyAddress(uint8_t *cdata,
-                         uint8_t p1,
-                         uint8_t p2,
-                         uint8_t lc,
-                         volatile unsigned int *flags) {
+void handleVerifyAddress(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     derivation_path_t *derivation_path = &global_derivation_path;
     init_derivation_path(derivation_path);
     uint32_t cred_counter = 0;

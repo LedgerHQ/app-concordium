@@ -6,27 +6,31 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_INITIAL 0x00
 #define P1_SOURCE  0x01
 
-void handleDeployModule(uint8_t *cdata, uint8_t p1, uint8_t lc) {
+void handleDeployModule(const command_t *cmd) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t lc = cmd->lc;
+
     if (p1 == P1_INITIAL) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
         size_t offset = parseKeyDerivationPath(cdata, lc);
         if (offset > lc) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         uint8_t remainingDataLength = lc - offset;
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, DEPLOY_MODULE);
         if (offset > lc) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
         // hash the version and source length
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
         ctx_deploy_module->version = U4BE(cdata, 0);

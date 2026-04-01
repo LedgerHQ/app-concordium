@@ -15,11 +15,13 @@ void handleData() {
 #define P1_INITIAL 0x00
 #define P1_DATA    0x01
 
-void handleSignRegisterData(uint8_t *cdata,
-                            uint8_t p1,
-                            uint8_t dataLength,
+void handleSignRegisterData(const command_t *cmd,
                             volatile unsigned int *flags,
                             bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t dataLength = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_REGISTER_DATA_INITIAL;
     }
@@ -27,7 +29,7 @@ void handleSignRegisterData(uint8_t *cdata,
     if (p1 == P1_INITIAL && ctx->state == TX_REGISTER_DATA_INITIAL) {
         size_t offset = parseKeyDerivationPath(cdata, remainingDataLength);
         if (offset > dataLength) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
@@ -37,13 +39,13 @@ void handleSignRegisterData(uint8_t *cdata,
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, REGISTER_DATA);
         if (offset > dataLength) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
         // hash the data length
         if (remainingDataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx->dataLength = U2BE(cdata, 0);
         if (ctx->dataLength > MAX_DATA_SIZE) {

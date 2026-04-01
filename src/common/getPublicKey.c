@@ -45,11 +45,12 @@ void sendPublicKey(bool compare) {
     }
 }
 
-void handleGetPublicKey(uint8_t *cdata,
-                        uint8_t p1,
-                        uint8_t p2,
-                        uint8_t lc,
-                        volatile unsigned int *flags) {
+void handleGetPublicKey(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     parseKeyDerivationPath(cdata, lc);
     derivation_path_t *dp = &global_derivation_path;
 

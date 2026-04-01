@@ -1,16 +1,14 @@
 #pragma once
 
-#import "buffer.h"
+#include <parser.h>
+#include "buffer.h"
 
 /**
  * Handles the signing flow, including updating the display, for the signing
  * of the public information for the identity provider.
- *
- * @param cdata please see /doc/ins_public_info_for_ip.md for details
+ * Command data: see /doc/ins_public_info_for_ip.md.
  */
-void handleSignPublicInformationForIp(uint8_t *cdata,
-                                      uint8_t p1,
-                                      uint8_t lc,
+void handleSignPublicInformationForIp(const command_t *cmd,
                                       volatile unsigned int *flags,
                                       bool isInitialCall);
 

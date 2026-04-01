@@ -1,5 +1,4 @@
-#ifndef VERIFY_ADDRESS_H
-#define VERIFY_ADDRESS_H
+#pragma once
 
 /** P1 value for verify address: new path format (identityProvider/identity/account) */
 #define P1_LEGACY_PATH 0x00
@@ -14,17 +13,13 @@
 #define MAINNET true
 #define TESTNET false
 
+#include <parser.h>
+
 typedef struct {
     uint8_t display[21];
     unsigned char address[57];
 } verifyAddressContext_t;
 
-void handleVerifyAddress(uint8_t *cdata,
-                         uint8_t p1,
-                         uint8_t p2,
-                         uint8_t lc,
-                         volatile unsigned int *flags);
+void handleVerifyAddress(const command_t *cmd, volatile unsigned int *flags);
 
 void uiVerifyAddress(volatile unsigned int *flags);
-
-#endif  // VERIFY_ADDRESS_H

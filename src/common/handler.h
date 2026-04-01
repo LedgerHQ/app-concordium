@@ -1,5 +1,7 @@
 #pragma once
 
+#include <parser.h>
+
 #define INS_VERIFY_ADDRESS 0x00
 
 // An INS instruction containing 0x01 means that we should start the public-key flow.
@@ -46,10 +48,4 @@
 #define P1_DEFAULT 0
 #define P2_DEFAULT 0
 
-int handler(uint8_t INS,
-            uint8_t *cdata,
-            uint8_t p1,
-            uint8_t p2,
-            uint8_t lc,
-            volatile unsigned int *flags,
-            bool isInitialCall);
+int handler(const command_t *cmd, volatile unsigned int *flags, bool isInitialCall);

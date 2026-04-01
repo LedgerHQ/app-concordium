@@ -79,11 +79,12 @@ void exportPrivateKey(void) {
     }
 }
 
-void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
-                                      uint8_t p1,
-                                      uint8_t p2,
-                                      uint8_t lc,
-                                      volatile unsigned int *flags) {
+void handleExportPrivateKeyLegacyPath(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *dataBuffer = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     if ((p1 != P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC && p1 != P1_LEGACY_PRF_KEY &&
          p1 != P1_LEGACY_PRF_KEY_RECOVERY) ||
         (p2 != P2_LEGACY_KEY && p2 != P2_LEGACY_SEED)) {

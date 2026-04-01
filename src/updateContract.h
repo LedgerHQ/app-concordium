@@ -1,5 +1,7 @@
 #pragma once
 
+#include <parser.h>
+
 typedef enum {
     UPDATE_CONTRACT_INITIAL = 60,
     UPDATE_CONTRACT_NAME_FIRST = 61,
@@ -14,7 +16,7 @@ typedef enum {
  *
  *
  */
-void handleUpdateContract(uint8_t *cdata, uint8_t p1, uint8_t lc);
+void handleUpdateContract(const command_t *cmd);
 
 typedef struct {
     uint64_t amount;

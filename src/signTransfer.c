@@ -9,7 +9,10 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_MEMO              0x02
 #define P1_AMOUNT            0x03
 
-void handleSignTransfer(uint8_t *cdata, uint8_t lc, volatile unsigned int *flags) {
+void handleSignTransfer(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *cdata = cmd->data;
+    uint8_t lc = cmd->lc;
+
     uint8_t offset = handleHeaderAndToAddress(cdata,
                                               lc,
                                               TRANSFER,
@@ -22,7 +25,7 @@ void handleSignTransfer(uint8_t *cdata, uint8_t lc, volatile unsigned int *flags
 
     // Build display value of the amount to transfer, and also add the bytes to the hash.
     if (remainingDataLength < 8) {
-        THROW(ERROR_BUFFER_OVERFLOW);
+        THROW(SWO_INCORRECT_DATA);
     }
     uint64_t amount = U8BE(cdata, 0);
     amountToGtuDisplay(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
@@ -40,11 +43,13 @@ void finishMemo() {
     sendSuccessNoIdle();
 }
 
-void handleSignTransferWithMemo(uint8_t *cdata,
-                                uint8_t p1,
-                                uint8_t dataLength,
+void handleSignTransferWithMemo(const command_t *cmd,
                                 volatile unsigned int *flags,
                                 bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t dataLength = cmd->lc;
+
     if (isInitialCall) {
         ctx->state = TX_TRANSFER_INITIAL;
     }
@@ -61,7 +66,7 @@ void handleSignTransferWithMemo(uint8_t *cdata,
         remainingDataLength -= offset;
         // hash the memo length
         if (remainingDataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         memo_ctx->cborLength = U2BE(cdata, 0);
         if (memo_ctx->cborLength > MAX_MEMO_CBOR_SIZE) {
@@ -96,7 +101,7 @@ void handleSignTransferWithMemo(uint8_t *cdata,
     } else if (p1 == P1_AMOUNT && ctx->state == TX_TRANSFER_AMOUNT) {
         // Build display value of the amount to transfer, and also add the bytes to the hash.
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint64_t amount = U8BE(cdata, 0);
         amountToGtuDisplay(ctx->displayAmount, sizeof(ctx->displayAmount), amount);

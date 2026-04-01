@@ -48,19 +48,19 @@ from trusted_name_helper import (
 
 SW_INVALID_PARAM = 0x6B03
 
-# None = not probed yet; True = firmware accepts test PKI; False = release build, skip PKI tests
+# None = not probed yet; True = app accepts test PKI; False = release build, skip PKI tests
 _trusted_name_test_key_ok: Optional[bool] = None
 
 
 def _ensure_trusted_name_test_key(backend, client: CommandSender) -> None:
-    """Skip PKI tests if firmware was built without TRUSTED_NAME_TEST_KEY (production signer only)."""
+    """Skip PKI tests if the app was built without TRUSTED_NAME_TEST_KEY (production signer only)."""
     global _trusted_name_test_key_ok
     _requires_speculos_pki(backend)
     if _trusted_name_test_key_ok is True:
         return
     if _trusted_name_test_key_ok is False:
         pytest.skip(
-            "Firmware built without TRUSTED_NAME_TEST_KEY (release). "
+            "App built without TRUSTED_NAME_TEST_KEY (release). "
             "Rebuild with DEBUG=1 or ENABLE_TRUSTED_NAME_TEST_KEY=1 to run PKI tests."
         )
 
@@ -87,7 +87,7 @@ def _ensure_trusted_name_test_key(backend, client: CommandSender) -> None:
     if status != StatusWords.SWO_SUCCESS:
         _trusted_name_test_key_ok = False
         pytest.skip(
-            "Firmware built without TRUSTED_NAME_TEST_KEY (release). "
+            "App built without TRUSTED_NAME_TEST_KEY (release). "
             "Rebuild with DEBUG=1 or ENABLE_TRUSTED_NAME_TEST_KEY=1 to run PKI tests."
         )
     _trusted_name_test_key_ok = True

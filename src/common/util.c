@@ -127,8 +127,8 @@ void sendUserRejection(void) {
 }
 
 void sendUserRejectionNoIdle(void) {
-    G_io_apdu_buffer[0] = ERROR_REJECTED_BY_USER >> 8;
-    G_io_apdu_buffer[1] = ERROR_REJECTED_BY_USER & 0xFF;
+    G_io_apdu_buffer[0] = SWO_CONDITIONS_NOT_SATISFIED >> 8;
+    G_io_apdu_buffer[1] = SWO_CONDITIONS_NOT_SATISFIED & 0xFF;
     io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, ERROR_RESPONSE_LENGTH);
 }
 

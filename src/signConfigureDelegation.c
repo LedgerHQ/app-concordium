@@ -3,12 +3,13 @@
 static signConfigureDelegationContext_t *ctx = &global.signConfigureDelegation;
 static tx_state_t *tx_state = &global_tx_state;
 
-void handleSignConfigureDelegation(uint8_t *cdata,
-                                   uint8_t dataLength,
-                                   volatile unsigned int *flags) {
+void handleSignConfigureDelegation(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *cdata = cmd->data;
+    uint8_t dataLength = cmd->lc;
+
     int keyDerivationPathLength = parseKeyDerivationPath(cdata, dataLength);
     if (keyDerivationPathLength > dataLength) {
-        THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+        THROW(SWO_INCORRECT_DATA);
     }
     cdata += keyDerivationPathLength;
 
@@ -18,14 +19,14 @@ void handleSignConfigureDelegation(uint8_t *cdata,
     int accountTransactionHeaderAndKindLength =
         hashAccountTransactionHeaderAndKind(cdata, dataLength, CONFIGURE_DELEGATION);
     if (accountTransactionHeaderAndKindLength > dataLength) {
-        THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+        THROW(SWO_INCORRECT_DATA);
     }
     cdata += accountTransactionHeaderAndKindLength;
     uint8_t remainingDataLength = dataLength - accountTransactionHeaderAndKindLength;
 
     // The initial 2 bytes tells us the fields we are receiving.
     if (remainingDataLength < 2) {
-        THROW(ERROR_BUFFER_OVERFLOW);
+        THROW(SWO_INCORRECT_DATA);
     }
     updateHash((cx_hash_t *) &tx_state->hash, cdata, 2);
     uint16_t bitmap = U2BE(cdata, 0);
@@ -45,7 +46,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
 
     if (ctx->hasCapital) {
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint64_t capitalAmount = U8BE(cdata, 0);
         if (capitalAmount == 0) {
@@ -62,7 +63,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
 
     if (ctx->hasRestakeEarnings) {
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint8_t restake = cdata[0];
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -80,7 +81,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
 
     if (ctx->hasDelegationTarget) {
         if (remainingDataLength < 1) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint8_t delegationType = cdata[0];
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -91,7 +92,7 @@ void handleSignConfigureDelegation(uint8_t *cdata,
             memmove(ctx->displayDelegationTarget, "Passive Delegation", 19);
         } else if (delegationType == 1) {
             if (remainingDataLength < 8) {
-                THROW(ERROR_BUFFER_OVERFLOW);
+                THROW(SWO_INCORRECT_DATA);
             }
             uint64_t bakerId = U8BE(cdata, 0);
             expectedDataLength += 8;

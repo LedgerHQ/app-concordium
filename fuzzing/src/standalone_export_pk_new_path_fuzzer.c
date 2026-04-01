@@ -8,6 +8,15 @@
 #include <string.h>
 
 // ========== STEP 2: TYPES (keep in sync with firmware) ==========
+// Mirrors ledger-secure-sdk/lib_standard_app/parser.h
+typedef struct {
+    uint8_t cla;
+    uint8_t ins;
+    uint8_t p1;
+    uint8_t p2;
+    uint8_t lc;
+    uint8_t *data;
+} command_t;
 // Mirrors src/common/util/derivation_path.h — derivation_path_key_idx_t
 // Values are the last path segment index for each exportable key (BIP32 child index).
 typedef enum {
@@ -186,11 +195,12 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_idx_t keyType,
 // ========== STEP 5: THE MAIN TARGET FUNCTION ==========
 // Simplified version of handleExportPrivateKeyNewPath
 
-void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   volatile unsigned int *flags) {
+void handleExportPrivateKeyNewPath(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *dataBuffer = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     printf("=== handleExportPrivateKeyNewPath ===\n");
     printf("p1=%d, p2=%d, lc=%d\n", p1, p2, lc);
 
@@ -279,7 +289,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Call the target function
     volatile unsigned int flags = 0;
-    handleExportPrivateKeyNewPath((uint8_t *) command_data, p1, p2, lc, &flags);
+    command_t cmd = {.cla = 0,
+                     .ins = 0,
+                     .p1 = p1,
+                     .p2 = p2,
+                     .lc = lc,
+                     .data = lc > 0 ? (uint8_t *) command_data : NULL};
+    handleExportPrivateKeyNewPath(&cmd, &flags);
 
     printf("Fuzzer iteration completed successfully\n");
     return 0;

@@ -1,13 +1,12 @@
 #pragma once
 
+#include <parser.h>
+
 /**
  * Handles the signing flow, including updating the display, for the 'transfer to public'
- * account transaction.
- * @param cdata please see /doc/ins_transfer_to_public.md
+ * account transaction. Command data: see /doc/ins_transfer_to_public.md.
  */
-void handleSignTransferToPublic(uint8_t *cdata,
-                                uint8_t p1,
-                                uint8_t dataLength,
+void handleSignTransferToPublic(const command_t *cmd,
                                 volatile unsigned int *flags,
                                 bool isInitialCall);
 

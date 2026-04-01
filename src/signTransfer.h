@@ -1,20 +1,18 @@
 #pragma once
 
+#include <parser.h>
+
 /**
  * Handles the signing flow, including updating the display, for the 'simple transfer'
- * account transaction.
- * @param cdata please see /doc/ins_transfer.md for details
+ * account transaction. Command data: see /doc/ins_transfer.md.
  */
-void handleSignTransfer(uint8_t *cdata, uint8_t lc, volatile unsigned int *flags);
+void handleSignTransfer(const command_t *cmd, volatile unsigned int *flags);
 
 /**
  * Handles the signing flow, including updating the display, for the 'simple transfer with memo'
- * account transaction.
- * @param cdata please see /doc/ins_transfer.md for details
+ * account transaction. Command data: see /doc/ins_transfer.md.
  */
-void handleSignTransferWithMemo(uint8_t *cdata,
-                                uint8_t p1,
-                                uint8_t dataLength,
+void handleSignTransferWithMemo(const command_t *cmd,
                                 volatile unsigned int *flags,
                                 bool isInitialCall);
 

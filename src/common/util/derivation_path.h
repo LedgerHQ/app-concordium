@@ -1,9 +1,9 @@
+#pragma once
+
 /**
  * @file derivation_path.h
  * @brief BIP-32 style derivation path parsing and representation for Concordium.
  */
-#ifndef UTIL_DERIVATION_PATH_H
-#define UTIL_DERIVATION_PATH_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -196,5 +196,3 @@ static inline void unharden_derivation_path(derivation_path_t *derivation_path) 
  * (not duplicated inside instruction union members).
  */
 extern derivation_path_t global_derivation_path;
-
-#endif  // UTIL_DERIVATION_PATH_H

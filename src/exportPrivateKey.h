@@ -1,5 +1,6 @@
 #pragma once
 
+#include <parser.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -40,11 +41,7 @@
  * then the BLS keys are exported. 0x00 is not used to ensure that old clients fail when calling
  * this functionality.
  */
-void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
-                                      uint8_t p1,
-                                      uint8_t p2,
-                                      uint8_t lc,
-                                      volatile unsigned int *flags);
+void handleExportPrivateKeyLegacyPath(const command_t *cmd, volatile unsigned int *flags);
 
 /**
  * Handles the export of sets of id related private keys that are allowed to leave the device.
@@ -59,11 +56,7 @@ void handleExportPrivateKeyLegacyPath(uint8_t *dataBuffer,
  * If set to 0x00, then mainnet derivations (m/44'/919') are used.
  * If set to 0x01, then testnet derivations (m/44'/1') are used.
  */
-void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   volatile unsigned int *flags);
+void handleExportPrivateKeyNewPath(const command_t *cmd, volatile unsigned int *flags);
 
 #define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       40
 #define EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN 17

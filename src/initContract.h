@@ -1,5 +1,7 @@
 #pragma once
 #include "globals.h"
+#include <parser.h>
+
 typedef enum {
     INIT_CONTRACT_INITIAL = 60,
     INIT_CONTRACT_NAME_FIRST = 61,
@@ -14,7 +16,7 @@ typedef enum {
  *
  *
  */
-void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc);
+void handleInitContract(const command_t *cmd);
 
 typedef struct {
     uint64_t amount;

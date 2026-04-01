@@ -7,7 +7,11 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_NAME    0x01
 #define P1_PARAMS  0x02
 
-void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc) {
+void handleInitContract(const command_t *cmd) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t lc = cmd->lc;
+
     if (p1 == P1_INITIAL) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
@@ -15,19 +19,19 @@ void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc) {
 
         size_t offset = parseKeyDerivationPath(cdata, lc);
         if (offset > lc) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         uint8_t remainingDataLength = lc - offset;
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, INIT_CONTRACT);
         if (offset > lc) {
-            THROW(ERROR_BUFFER_OVERFLOW);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
         if (remainingDataLength < 8) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         // hash the amount
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 8);
@@ -40,7 +44,7 @@ void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc) {
         cdata += 8;
         remainingDataLength -= 8;
         if (remainingDataLength < 32) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         // hash the module ref
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 32);
@@ -60,7 +64,7 @@ void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc) {
         if (ctx_init_contract->state == INIT_CONTRACT_NAME_FIRST) {
             // extract the name length
             if (lc < 2) {
-                THROW(ERROR_BUFFER_OVERFLOW);
+                THROW(SWO_INCORRECT_DATA);
             }
             ctx_init_contract->nameLength = U2BE(cdata, 0);
             // calculate the remaining name length
@@ -86,7 +90,7 @@ void handleInitContract(uint8_t *cdata, uint8_t p1, uint8_t lc) {
         if (ctx_init_contract->state == INIT_CONTRACT_PARAMS_FIRST) {
             // extract the params length
             if (lc < 2) {
-                THROW(ERROR_BUFFER_OVERFLOW);
+                THROW(SWO_INCORRECT_DATA);
             }
             ctx_init_contract->paramsLength = U2BE(cdata, 0);
             // calculate the remaining params length

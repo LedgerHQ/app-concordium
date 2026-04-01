@@ -6,7 +6,9 @@
  *
  */
 #include "globals.h"
-void handleDeployModule(uint8_t *cdata, uint8_t p1, uint8_t p2);
+#include <parser.h>
+
+void handleDeployModule(const command_t *cmd);
 
 typedef struct {
     uint32_t version;

@@ -1,13 +1,13 @@
 #pragma once
 
+#include <parser.h>
+
 /**
  * Handles the signing flow for a 'Configure Baker' transaction. It validates
  * that the correct UpdateType is supplied and will fail otherwise.
- * @param cdata please see /doc/ins_configure_delegation.md for details
+ * Command data: see /doc/ins_configure_delegation.md.
  */
-void handleSignConfigureBaker(uint8_t *cdata,
-                              uint8_t p1,
-                              uint8_t dataLength,
+void handleSignConfigureBaker(const command_t *cmd,
                               volatile unsigned int *flags,
                               bool isInitialCall);
 

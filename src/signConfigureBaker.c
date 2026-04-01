@@ -20,7 +20,7 @@ bool hasCommissionRate() {
 void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
     if (ctx_conf_baker->hasTransactionFeeCommission) {
         if (dataLength < 4) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint32_t rate = U4BE(cdata, 0);
         fractionToPercentageDisplay(
@@ -34,7 +34,7 @@ void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
 
     if (ctx_conf_baker->hasBakingRewardCommission) {
         if (dataLength < 4) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint32_t rate = U4BE(cdata, 0);
         fractionToPercentageDisplay(
@@ -48,7 +48,7 @@ void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
 
     if (ctx_conf_baker->hasFinalizationRewardCommission) {
         if (dataLength < 4) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint32_t rate = U4BE(cdata, 0);
         fractionToPercentageDisplay(
@@ -63,7 +63,7 @@ void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
         ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
     } else {
         if (dataLength != 0) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx_conf_baker->state = CONFIGURE_BAKER_END;
     }
@@ -71,24 +71,26 @@ void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
     startConfigureBakerCommissionDisplay();
 }
 
-void handleSignConfigureBaker(uint8_t *cdata,
-                              uint8_t p1,
-                              uint8_t dataLength,
+void handleSignConfigureBaker(const command_t *cmd,
                               volatile unsigned int *flags,
                               bool isInitialCall) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t dataLength = cmd->lc;
+
     if (P1_INITIAL == p1 && isInitialCall) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
         size_t offset = parseKeyDerivationPath(cdata, dataLength);
         if (offset > dataLength) {
-            THROW(ERROR_INVALID_TRANSACTION);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         uint8_t remainingDataLength = dataLength - offset;
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, CONFIGURE_BAKER);
         if (offset > dataLength) {
-            THROW(ERROR_INVALID_TRANSACTION);  // Ensure safe access
+            THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
         remainingDataLength -= offset;
@@ -96,7 +98,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
 
         // The initial 2 bytes tells us the fields we are receiving.
         if (remainingDataLength < 2) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 2);
         uint16_t bitmap = U2BE(cdata, 0);
@@ -134,7 +136,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
 
         if (ctx_conf_baker->hasCapital) {
             if (lengthCheck < 8) {
-                THROW(ERROR_INVALID_TRANSACTION);
+                THROW(SWO_INCORRECT_DATA);
             }
             uint64_t capitalAmount = U8BE(cdata, 0);
             if (capitalAmount == 0) {
@@ -152,7 +154,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
 
         if (ctx_conf_baker->hasRestakeEarnings) {
             if (lengthCheck < 1) {
-                THROW(ERROR_INVALID_TRANSACTION);
+                THROW(SWO_INCORRECT_DATA);
             }
             uint8_t restake = cdata[0];
             updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -169,7 +171,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
 
         if (ctx_conf_baker->hasOpenForDelegation) {
             if (lengthCheck < 1) {
-                THROW(ERROR_INVALID_TRANSACTION);
+                THROW(SWO_INCORRECT_DATA);
             }
             uint8_t openForDelegation = cdata[0];
             updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
@@ -197,7 +199,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
             // We are expecting the signature and election verification keys (each 32 bytes) and
             // their proofs (each 64 bytes).
             if (lengthCheck != 192) {
-                THROW(ERROR_INVALID_TRANSACTION);
+                THROW(SWO_INCORRECT_DATA);
             }
 
             // We do not display the verification keys to the user, as they are difficult
@@ -223,7 +225,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
             sendSuccessNoIdle();
         } else {
             if (lengthCheck != 0) {
-                THROW(ERROR_INVALID_TRANSACTION);
+                THROW(SWO_INCORRECT_DATA);
             }
 
             if (ctx_conf_baker->hasMetadataUrl) {
@@ -242,7 +244,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
     } else if (P1_AGGREGATION_KEY == p1 &&
                ctx_conf_baker->state == CONFIGURE_BAKER_AGGREGATION_KEY) {
         if (!ctx_conf_baker->hasKeys || dataLength != 160) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
 
         // Aggregation verify key
@@ -269,7 +271,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
             THROW(ERROR_INVALID_TRANSACTION);
         }
         if (dataLength < 2) {
-            THROW(ERROR_BUFFER_OVERFLOW);
+            THROW(SWO_INCORRECT_DATA);
         }
         ctx_conf_baker->url.urlLength = U2BE(cdata, 0);
         if (ctx_conf_baker->url.urlLength > 2048) {
@@ -317,7 +319,7 @@ void handleSignConfigureBaker(uint8_t *cdata,
             startConfigureBakerUrlDisplay(true);
             *flags |= IO_ASYNCH_REPLY;
         } else {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
     } else if (P1_COMMISSION_RATES == p1 &&
                ctx_conf_baker->state == CONFIGURE_BAKER_COMMISSION_RATES) {
@@ -325,14 +327,14 @@ void handleSignConfigureBaker(uint8_t *cdata,
         *flags |= IO_ASYNCH_REPLY;
     } else if (P1_SUSPENDED == p1 && ctx_conf_baker->state == CONFIGURE_BAKER_SUSPENDED) {
         if (dataLength < 1) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
         uint8_t suspended = cdata[0];
         updateHash((cx_hash_t *) &tx_state->hash, cdata, 1);
         dataLength -= 1;
 
         if (dataLength != 0) {
-            THROW(ERROR_INVALID_TRANSACTION);
+            THROW(SWO_INCORRECT_DATA);
         }
 
         if (suspended == 0) {

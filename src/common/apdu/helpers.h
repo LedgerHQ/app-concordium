@@ -1,5 +1,4 @@
-#ifndef APDU_HELPERS_H
-#define APDU_HELPERS_H
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>
@@ -48,5 +47,3 @@ static inline void check_lc(uint8_t lc, uint8_t expected) {
         THROW(SWO_WRONG_DATA_LENGTH);
     }
 }
-
-#endif  // APDU_HELPERS_H
