@@ -1,0 +1,11 @@
+# udev rules for Ledger USB devices (vendor 0x2c97).
+# Install on Linux host (not inside Docker):
+#   sudo cp .vscode/20-ledger.ledgerblue.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# For the full product list maintained by Ledger, see the Developer Portal
+# (device connection / Linux) or your distribution’s ledger packages.
+
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", TAG+="uaccess", TAG+="udev-acl"
+
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2c97", TAG+="uaccess", TAG+="udev-acl"

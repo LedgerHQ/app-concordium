@@ -135,4 +135,19 @@ endif
 ifeq ($(ENABLE_TRUSTED_NAME_TEST_KEY),1)
 DEFINES += TRUSTED_NAME_TEST_KEY
 endif
+
+# HKDF API is implemented in the SDK but declared only under lib_cxng/src (not in the public cx.h umbrella).
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+
 include $(BOLOS_SDK)/Makefile.standard_app
+
+# Berkeley `size` (text / data / bss / dec / hex), not `size -A`.
+# Depend on all SDK `default` outputs so this runs last (after .apdu / .sha256 copies), not right after link.
+# For full per-section listing: arm-none-eabi-size -A $(BIN_DIR)/app.elf
+.PHONY: app-size-report
+app-size-report: $(BIN_TARGETS) $(DBG_TARGETS)
+	@echo ""
+	@echo "Finished Concordium Ledger app ($(TARGET_NAME)) → $(BIN_DIR)/app.elf"
+	$(L)$(GCCPATH)arm-none-eabi-size $(BIN_DIR)/app.elf
+
+default: app-size-report

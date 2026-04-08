@@ -253,7 +253,7 @@ A plain `make` is **production**: only the production trusted-name key id; trust
 Run the functional tests (here for nanos+ but available for any device once you have built the binaries) :
 
 ```shell
-pytest tests/ --tb=short -v --device nanosp
+pytest tests/standalone/ --tb=short -v --device nanosp
 ```
 
 Or run your app directly with Speculos
@@ -295,5 +295,5 @@ Clang-format locally
 ```docker exec app-concordium-container find /app/src -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} \;```
 
 Run a certain test, with full logs and generate new snapshots 
-```source .venv/bin/activate && pytest ./tests/test_verify_address.py --tb=short -v --device nanosp --golden_run -s```
+```source .venv/bin/activate && pytest ./tests/standalone/test_verify_address.py --tb=short -v --device nanosp --golden_run -s```
 

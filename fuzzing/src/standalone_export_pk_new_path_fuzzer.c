@@ -17,7 +17,7 @@ typedef struct {
     uint8_t lc;
     uint8_t *data;
 } command_t;
-// Mirrors src/common/util/derivation_path.h — derivation_path_key_idx_t
+// Mirrors src/helpers/derivation_path.h — derivation_path_key_idx_t
 // Values are the last path segment index for each exportable key (BIP32 child index).
 typedef enum {
     LEGACY_ID_CRED_SEC = 0,
@@ -33,11 +33,11 @@ typedef enum {
 #define ERROR_INVALID_PATH  0x6A80
 #define SUCCESS             0x9000
 
-// Constants from exportPrivateKey.h
+// Constants from src/handler/export_private_key.h / instruction_context.h
 #define MAX_KEYS_TO_EXPORT          3
 #define LENGTH_AND_PRIVATE_KEY_SIZE 33
 
-// Purpose constants (from exportPrivateKey.h)
+// Purpose constants (from instruction_context.h)
 #define P1_IDENTITY_CREDENTIAL_CREATION 0x00
 #define P1_ACCOUNT_CREATION             0x01
 #define P1_ID_RECOVERY                  0x02
@@ -82,18 +82,18 @@ void explicit_bzero(void *ptr, size_t size) {
     }
 }
 
-// Mock bin2dec - convert binary to decimal string
-size_t bin2dec(uint8_t *dst, size_t dst_size, uint32_t value) {
+// Mock bin_to_dec - convert binary to decimal string
+size_t bin_to_dec(uint8_t *dst, size_t dst_size, uint32_t value) {
     int ret = snprintf((char *) dst, dst_size, "%u", value);
     return (ret > 0 && ret < (int) dst_size) ? ret + 1 : 0;
 }
 
 // Mock number helpers - simplified versions
-void numberToText(uint8_t *dst, size_t dst_size, uint64_t number) {
+void number_to_text(uint8_t *dst, size_t dst_size, uint64_t number) {
     snprintf((char *) dst, dst_size, "%llu", number);
 }
 
-uint8_t lengthOfNumber(uint64_t number) {
+uint8_t length_of_number(uint64_t number) {
     if (number == 0) return 1;
     uint8_t length = 0;
     while (number > 0) {
@@ -104,16 +104,18 @@ uint8_t lengthOfNumber(uint64_t number) {
 }
 
 // Mock crypto functions - return fake but valid-looking keys
-void getPrivateKey(const derivation_path_t *path, uint8_t *privateKey) {
-    printf("MOCK getPrivateKey: path_length=%d\n", path->len);
+void get_private_key(const derivation_path_t *path, uint8_t *privateKey) {
+    printf("MOCK get_private_key: path_length=%d\n", path->len);
     if (privateKey) {
         memset(privateKey, 0xAB, 32);  // Fake private key
     }
 }
 
-void getBlsPrivateKey(const derivation_path_t *path, uint8_t *privateKey, size_t privateKeySize) {
+void get_bls_private_key(const derivation_path_t *path,
+                         uint8_t *privateKey,
+                         size_t privateKeySize) {
     (void) privateKeySize;
-    printf("MOCK getBlsPrivateKey: path_length=%d\n", path->len);
+    printf("MOCK get_bls_private_key: path_length=%d\n", path->len);
     if (privateKey) {
         memset(privateKey, 0xCD, 32);  // Fake BLS private key
     }
@@ -182,7 +184,7 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_idx_t keyType,
         return 0;
     }
 
-    getPrivateKey(&dp, fakeKey);
+    get_private_key(&dp, fakeKey);
 
     // Write length + key to output
     outputPrivateKey[tx++] = 32;  // Key length

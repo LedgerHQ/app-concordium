@@ -76,4 +76,4 @@ A new GET\_CHALLENGE must be called before each SET\_TRUSTED\_NAME.
 
 The Ledger test API ([Concordium section](https://nft.api.live.ledger-test.com/docs/#/concordium/getV2ConcordiumOwnerPubkeyAddress)) returns a `signedDescriptor` hex string. Convert it to binary and send as CDATA.
 
-For Speculos testing, pre-baked PKI certificates and the matching test private key are provided in `tests/trusted_name_helper.py`. See `tests/test_set_trusted_name.py` for the complete test flow.
+For Speculos testing, pre-baked PKI certificates and the matching test private key are provided in `tests/standalone/trusted_name_helper.py`. See `tests/standalone/test_set_trusted_name.py` for the complete test flow.

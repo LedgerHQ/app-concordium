@@ -1,3 +1,10 @@
+"""
+Pytest configuration for the whole ``tests/`` tree.
+
+Must live here (not only under ``standalone/``) so ``pytest tests/`` registers
+Ragger's ``--device`` (and other) options. The Ledger VS Code extension often
+invokes that path; without this file, ``--device`` is unrecognized.
+"""
 from ragger.conftest import configuration
 
 ###########################
