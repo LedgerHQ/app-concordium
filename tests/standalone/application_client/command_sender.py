@@ -180,20 +180,27 @@ class CommandSender:
 
     @contextmanager
     def verify_address(
-        self, identity_index: int, credential_counter: int, idp_index: int = -1
+        self,
+        identity_index: int,
+        credential_counter: int,
+        idp_index: int = -1,
+        *,
+        testnet: bool = False,
     ) -> Generator[None, None, None]:
         data = b""
         p1 = P1.P1_VERIFY_ADDRESS_LEGACY_PATH
+        p2 = P2.P2_NONE
 
         if idp_index != -1:
             data += idp_index.to_bytes(4, byteorder="big")
             p1 = P1.P1_VERIFY_ADDRESS_NEW_PATH
+            p2 = P2.P2_TESTNET if testnet else P2.P2_MAINNET
 
         data += identity_index.to_bytes(
             4, byteorder="big"
         ) + credential_counter.to_bytes(4, byteorder="big")
         with self.backend.exchange_async(
-            cla=CLA, ins=InsType.VERIFY_ADDRESS, p1=p1, p2=P2.P2_NONE, data=data
+            cla=CLA, ins=InsType.VERIFY_ADDRESS, p1=p1, p2=p2, data=data
         ) as response:
             yield response
 

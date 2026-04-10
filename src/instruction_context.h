@@ -196,7 +196,9 @@ typedef struct {
 
 typedef struct {
     uint8_t display[21];
-    unsigned char address[57];
+    /** Without trusted descriptor: path-derived base58. With PKI descriptor: tag 0x20 UTF-8 (cert).
+     */
+    char address[TRUSTED_NAME_MAX_LEN + 1];
 } verifyAddressContext_t;
 
 typedef enum {

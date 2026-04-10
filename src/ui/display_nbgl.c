@@ -1027,9 +1027,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
     }
-    pairs[index].item = "Max fees";
-    pairs[index].value = (char *) global.withDataBlob.signTransferContext.energy_amount_str;
-    index++;
+    // TODO: Re-enable "Max fees" display once fees are correctly transmitted.
 
     // Create the page content
     nbgl_contentTagValueList_t content;

@@ -812,7 +812,8 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     if (displayMemo) {
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
-    ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
+    // TODO:  re-enable once fees are correctly transmitted
+    // ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_sign;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_decline;
 

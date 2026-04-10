@@ -16,7 +16,7 @@ extern tx_state_t global_tx_state;
 #define INSTRUCTION_NONE -1
 
 /*
- * Concordium-specific status words (0x6B01–0x6B0B, 0x530C). ISO7816 reserves 6Bxx for
+ * Concordium-specific status words (0x6B01–0x6B0C, 0x530C). ISO7816 reserves 6Bxx for
  * proprietary use; Ledger's status_words.h only defines SWO_WRONG_P1_P2 (0x6B00) in that range.
  * These values are part of the public host↔app contract — they are not aliases of other SWO_*.
  */
@@ -31,5 +31,6 @@ extern tx_state_t global_tx_state;
 #define ERROR_INVALID_NAME_LENGTH   0x6B0A
 #define ERROR_INVALID_PARAMS_LENGTH 0x6B0B
 #define ERROR_INVALID_MODULE_REF    0x6B09
+#define ERROR_TRUSTED_NAME_MISMATCH 0x6B0C
 
 #define ERROR_DEVICE_LOCKED 0x530C

@@ -114,21 +114,21 @@ size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength) {
     return consumed;
 }
 
-void getIdentityAccountDisplayLegacyPath(uint8_t *dst,
-                                         size_t dstLength,
-                                         uint32_t identityIndex,
-                                         uint32_t accountIndex) {
+void path_display_legacy(uint8_t *dst,
+                         size_t dstLength,
+                         uint32_t identityIndex,
+                         uint32_t accountIndex) {
     int offset = number_to_text(dst, dstLength, identityIndex);
     memmove(dst + offset, "/", 1);
     offset += 1;
     bin_to_dec(dst + offset, dstLength - offset, accountIndex);
 }
 
-void getIdentityAccountDisplayNewPath(uint8_t *dst,
-                                      size_t dstLength,
-                                      uint32_t identityProviderIndex,
-                                      uint32_t identityIndex,
-                                      uint32_t accountIndex) {
+void path_display_new(uint8_t *dst,
+                      size_t dstLength,
+                      uint32_t identityProviderIndex,
+                      uint32_t identityIndex,
+                      uint32_t accountIndex) {
     int offset = number_to_text(dst, dstLength, identityProviderIndex);
     memmove(dst + offset, "/", 1);
     offset += 1;

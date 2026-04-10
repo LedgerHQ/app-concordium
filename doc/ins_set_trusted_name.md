@@ -72,6 +72,12 @@ All fields except the DER Signature (tag `0x15`) are included in the progressive
 
 A new GET\_CHALLENGE must be called before each SET\_TRUSTED\_NAME.
 
+## Single use and VERIFY\_ADDRESS
+
+The volatile binding is cleared after **VERIFY\_ADDRESS** (`INS 0x00`) has **used** it: once the Ed25519 key matches tag `0x22`, the trusted name is copied into the verify UI context, then the binding is wiped. A plain **VERIFY\_ADDRESS** (no prior successful **SET\_TRUSTED\_NAME**) uses the usual BLS/base58 path and does not touch this binding.
+
+To show the trusted name again, run **GET\_CHALLENGE** → **SET\_TRUSTED\_NAME** → **VERIFY\_ADDRESS** again. A new **SET\_TRUSTED\_NAME** attempt clears any previous binding at command start; if that command fails, the binding stays empty until a later success.
+
 ## Test / integration
 
 The Ledger test API ([Concordium section](https://nft.api.live.ledger-test.com/docs/#/concordium/getV2ConcordiumOwnerPubkeyAddress)) returns a `signedDescriptor` hex string. Convert it to binary and send as CDATA.

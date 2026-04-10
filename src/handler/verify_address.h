@@ -26,13 +26,6 @@ cx_err_t getCredId(uint8_t *prf,
                    uint8_t *credId,
                    size_t credIdSize);
 
-void verify_address_parse_key_path(uint8_t *cdata,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   derivation_path_t *derivation_path,
-                                   uint32_t *cred_counter);
-
 /** UI flow for address verification; implemented in `ui/display_*.c`. */
 void uiVerifyAddress(volatile unsigned int *flags);
 

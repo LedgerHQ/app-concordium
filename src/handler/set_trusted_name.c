@@ -238,6 +238,10 @@ static bool verify_fields(const trustedNameTlvExtracted_t *ctx) {
         PRINTF("Wrong signer key id %u (expected %u)\n", ctx->signer_key_id, valid_key_id);
         return false;
     }
+    if (ctx->address.size != KEY_LENGTH) {
+        PRINTF("Tag 0x22 must be %u bytes (Ed25519 public key)\n", KEY_LENGTH);
+        return false;
+    }
     return true;
 }
 
@@ -281,6 +285,13 @@ static bool verify_signature(const trustedNameTlvExtracted_t *ctx) {
 void trusted_name_send_set_error(uint16_t sw) {
     global_tx_state.currentInstruction = INSTRUCTION_NONE;
     io_send_sw(sw);
+}
+
+void clear_trusted_name_binding(void) {
+    explicit_bzero(g_trusted_name, sizeof(g_trusted_name));
+    explicit_bzero(g_trusted_address, sizeof(g_trusted_address));
+    g_trusted_address_len = 0;
+    g_trusted_name_valid = false;
 }
 
 void handle_set_trusted_name(const command_t *cmd) {

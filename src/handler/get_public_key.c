@@ -72,22 +72,22 @@ void handle_get_public_key(const command_t *cmd, volatile unsigned int *flags) {
                 THROW(ERROR_INVALID_PATH);
         }
     } else if (dp->variant == DERIVATION_PATH_VARIANT_NEW) {
-        getIdentityAccountDisplayNewPath(ctx->display,
-                                         sizeof(ctx->display),
-                                         dp->nodes[PATH_INDEX_IDENTITY_PROVIDER],
-                                         dp->nodes[PATH_INDEX_IDENTITY],
-                                         dp->nodes[PATH_INDEX_ACCOUNT_NEW]);
+        path_display_new(ctx->display,
+                         sizeof(ctx->display),
+                         dp->nodes[PATH_INDEX_IDENTITY_PROVIDER],
+                         dp->nodes[PATH_INDEX_IDENTITY],
+                         dp->nodes[PATH_INDEX_ACCOUNT_NEW]);
     } else if (dp->variant == DERIVATION_PATH_VARIANT_LEGACY) {
-        getIdentityAccountDisplayLegacyPath(ctx->display,
-                                            sizeof(ctx->display),
-                                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
-                                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
+        path_display_legacy(ctx->display,
+                            sizeof(ctx->display),
+                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
+                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
     } else {
         /* Non-standard purpose: same legacy-style display as before (indices 4 and 6). */
-        getIdentityAccountDisplayLegacyPath(ctx->display,
-                                            sizeof(ctx->display),
-                                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
-                                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
+        path_display_legacy(ctx->display,
+                            sizeof(ctx->display),
+                            dp->nodes[PATH_INDEX_IDENTITY_LEGACY],
+                            dp->nodes[PATH_INDEX_ACCOUNT_LEGACY]);
     }
 
     harden_derivation_path(dp);

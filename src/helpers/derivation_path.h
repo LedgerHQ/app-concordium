@@ -172,22 +172,18 @@ void detect_derivation_path_variant(derivation_path_t *derivation_path);
  */
 size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength);
 
-/**
- * Human-readable legacy identity/account path: "identity/account".
- */
-void getIdentityAccountDisplayLegacyPath(uint8_t *dst,
-                                         size_t dstLength,
-                                         uint32_t identityIndex,
-                                         uint32_t accountIndex);
+/** Human-readable legacy identity/account line: "identity/account". */
+void path_display_legacy(uint8_t *dst,
+                         size_t dstLength,
+                         uint32_t identityIndex,
+                         uint32_t accountIndex);
 
-/**
- * Human-readable new path: "idp/identity/account".
- */
-void getIdentityAccountDisplayNewPath(uint8_t *dst,
-                                      size_t dstLength,
-                                      uint32_t identityProviderIndex,
-                                      uint32_t identityIndex,
-                                      uint32_t accountIndex);
+/** Human-readable new-path line: "idp/identity/account". */
+void path_display_new(uint8_t *dst,
+                      size_t dstLength,
+                      uint32_t identityProviderIndex,
+                      uint32_t identityIndex,
+                      uint32_t accountIndex);
 
 /**
  * Apply HARDENED_BIT (0x80000000) to all nodes in the path.

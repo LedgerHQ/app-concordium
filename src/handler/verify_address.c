@@ -13,6 +13,7 @@
 #include "app_sizes.h"
 #include "base58check.h"
 #include "derivation_path.h"
+#include "set_trusted_name.h"
 
 #include "verify_address.h"
 
@@ -123,12 +124,12 @@ end:
  *
  * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
  */
-void verify_address_parse_key_path(uint8_t *cdata,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   derivation_path_t *derivation_path,
-                                   uint32_t *cred_counter) {
+static void parse_key_path(uint8_t *cdata,
+                           uint8_t p1,
+                           uint8_t p2,
+                           uint8_t lc,
+                           derivation_path_t *derivation_path,
+                           uint32_t *cred_counter) {
     bool p2_is_valid = true;
 
     switch (p1) {
@@ -160,52 +161,32 @@ void verify_address_parse_key_path(uint8_t *cdata,
     if (!p2_is_valid) THROW(SWO_WRONG_P1_P2);
 }
 
-void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
-    uint8_t *cdata = cmd->data;
-    uint8_t p1 = cmd->p1;
-    uint8_t p2 = cmd->p2;
-    uint8_t lc = cmd->lc;
-
-    derivation_path_t *derivation_path = &global_derivation_path;
-    init_derivation_path(derivation_path);
-    uint32_t cred_counter = 0;
-    verify_address_parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
-
-    switch (derivation_path->variant) {
-        case DERIVATION_PATH_VARIANT_NEW:
-            getIdentityAccountDisplayNewPath(ctx->display,
-                                             sizeof(ctx->display),
-                                             derivation_path->nodes[2],
-                                             derivation_path->nodes[3],
-                                             cred_counter);
-            break;
-
-        case DERIVATION_PATH_VARIANT_LEGACY:
-            getIdentityAccountDisplayLegacyPath(ctx->display,
-                                                sizeof(ctx->display),
-                                                derivation_path->nodes[4],
-                                                cred_counter);
-            break;
-
-        case DERIVATION_PATH_VARIANT_FULL:
-            unharden_derivation_path(derivation_path);
-            getIdentityAccountDisplayNewPath(ctx->display,
-                                             sizeof(ctx->display),
-                                             derivation_path->nodes[2],
-                                             derivation_path->nodes[3],
-                                             derivation_path->nodes[4]);
-
-            break;
-
-        default:
-            break;
+/**
+ * PKI lane: require tag 0x22 == derived Ed25519, copy tag 0x20 into ctx->address (no UI).
+ */
+static void pki_bind_descriptor(const uint8_t *derived_ed25519_pub) {
+    if (g_trusted_address_len != KEY_LENGTH) {
+        THROW(ERROR_TRUSTED_NAME_MISMATCH);
+    }
+    if (memcmp(derived_ed25519_pub, g_trusted_address, KEY_LENGTH) != 0) {
+        THROW(ERROR_TRUSTED_NAME_MISMATCH);
     }
 
+    /* g_trusted_name is always NUL-terminated by SET_TRUSTED_NAME (max TRUSTED_NAME_MAX_LEN). */
+    size_t cert_len = strlen(g_trusted_name);
+    if (cert_len >= sizeof(ctx->address)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    memmove(ctx->address, g_trusted_name, cert_len + 1);
+}
+
+/**
+ * PRF → credId → SHA256(credId) → base58-check into ctx->address (cryptography only).
+ */
+static void bls_compute_address(uint32_t cred_counter) {
+    derivation_path_t *derivation_path = &global_derivation_path;
     uint8_t credId[BLS_G1_COORD_SIZE];
     uint8_t prf[KEY_LENGTH];
-
-    /* getBlsPrivateKey expects hardened path (0x80000000 | node); parsers output unhardened */
-    harden_derivation_path(derivation_path);
 
     BEGIN_TRY {
         TRY {
@@ -229,9 +210,68 @@ void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     size_t addressLength = sizeof(ctx->address);
-
-    base58check_encode(accountAddress, sizeof(accountAddress), ctx->address, &addressLength);
+    base58check_encode(accountAddress,
+                       sizeof(accountAddress),
+                       (unsigned char *) ctx->address,
+                       &addressLength);
     ctx->address[BASE58_ADDRESS_LENGTH] = '\0';
+}
 
+void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *cdata = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
+    derivation_path_t *derivation_path = &global_derivation_path;
+    init_derivation_path(derivation_path);
+    uint32_t cred_counter = 0;
+
+    explicit_bzero(ctx->address, sizeof(ctx->address));
+
+    parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
+
+    switch (derivation_path->variant) {
+        case DERIVATION_PATH_VARIANT_NEW:
+            path_display_new(ctx->display,
+                             sizeof(ctx->display),
+                             derivation_path->nodes[2],
+                             derivation_path->nodes[3],
+                             cred_counter);
+            break;
+
+        case DERIVATION_PATH_VARIANT_LEGACY:
+            path_display_legacy(ctx->display,
+                                sizeof(ctx->display),
+                                derivation_path->nodes[4],
+                                cred_counter);
+            break;
+
+        case DERIVATION_PATH_VARIANT_FULL:
+            unharden_derivation_path(derivation_path);
+            path_display_new(ctx->display,
+                             sizeof(ctx->display),
+                             derivation_path->nodes[2],
+                             derivation_path->nodes[3],
+                             derivation_path->nodes[4]);
+
+            break;
+
+        default:
+            break;
+    }
+
+    /* get_bls_private_key / get_public_key expect hardened path; parsers output unhardened */
+    harden_derivation_path(derivation_path);
+
+    if (g_trusted_name_valid) {
+        uint8_t derived_ed25519_pub[KEY_LENGTH];
+        get_public_key(derived_ed25519_pub);
+        pki_bind_descriptor(derived_ed25519_pub);
+        /* Single-use: display copy is in ctx->address; drop binding until next SET_TRUSTED_NAME. */
+        clear_trusted_name_binding();
+    } else {
+        bls_compute_address(cred_counter);
+    }
     uiVerifyAddress(flags);
 }
