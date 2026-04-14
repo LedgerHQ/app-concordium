@@ -81,7 +81,7 @@ def test_export_prfkey_and_idcredsed_private_key_legacy_path(
 
 
 @pytest.mark.active_test_scope
-def test_export_identity_credential_creation_private_key_new_path(
+def test_export_identity_credential_creation_private_key_new_path_mainnet(
     backend, navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
@@ -99,10 +99,37 @@ def test_export_identity_credential_creation_private_key_new_path(
         )
     result = client.get_async_response()
     assert len(result.data) == 33 * 3
+    assert result.data == bytes.fromhex(
+        "2020348347485688f67ce7256353549ae2bd986b8b9306f8ed78732fb5426c5e89200dd6831a46dd093b21fe43bdd01b7ede216d5689ff12143d7d4ceb77d16041bb202e4dc8653f7fc57bc51778c0d16537507a1f6388a439ea95c146cb2f15022f99"
+    )
 
 
 @pytest.mark.active_test_scope
-def test_export_account_creation_private_key_new_path(
+def test_export_identity_credential_creation_private_key_new_path_testnet(
+    backend, navigator, test_name, default_screenshot_path
+):
+    client = CommandSender(backend)
+    with client.export_private_key_new_path(
+        "identity_credential_creation", "testnet", idp_index=0, identity_index=1
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Sign operation",
+            default_screenshot_path,
+            test_name,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=True,
+        )
+    result = client.get_async_response()
+    assert len(result.data) == 33 * 3
+    assert result.data == bytes.fromhex(
+        "2053db453318231b1a43497551677cf23652ff306fc1d2e1f1cb5cd42ff680b12620336bfcd76a6e0756ee5b0f4a6d3434092d68eb38921aac96c85e0a4d4b6d9b59206225bc94caf90bc2aff95144d21c5f445582f8214cd10d3488085a09d8731ca5"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_export_account_creation_private_key_new_path_mainnet(
     backend, navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
@@ -120,10 +147,37 @@ def test_export_account_creation_private_key_new_path(
         )
     result = client.get_async_response()
     assert len(result.data) == 33 * 3
+    assert result.data == bytes.fromhex(
+        "200dd6831a46dd093b21fe43bdd01b7ede216d5689ff12143d7d4ceb77d16041bb2020348347485688f67ce7256353549ae2bd986b8b9306f8ed78732fb5426c5e8920d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e00"
+    )
 
 
 @pytest.mark.active_test_scope
-def test_export_id_recovery_private_key_new_path(
+def test_export_account_creation_private_key_new_path_testnet(
+    backend, navigator, test_name, default_screenshot_path
+):
+    client = CommandSender(backend)
+    with client.export_private_key_new_path(
+        "account_creation", "testnet", idp_index=0, identity_index=1, account_index=2
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Sign operation",
+            default_screenshot_path,
+            test_name,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=True,
+        )
+    result = client.get_async_response()
+    assert len(result.data) == 33 * 3
+    assert result.data == bytes.fromhex(
+        "20336bfcd76a6e0756ee5b0f4a6d3434092d68eb38921aac96c85e0a4d4b6d9b592053db453318231b1a43497551677cf23652ff306fc1d2e1f1cb5cd42ff680b126206b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_export_id_recovery_private_key_new_path_mainnet(
     backend, navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
@@ -141,10 +195,37 @@ def test_export_id_recovery_private_key_new_path(
         )
     result = client.get_async_response()
     assert len(result.data) == 33 * 2
+    assert result.data == bytes.fromhex(
+        "2020348347485688f67ce7256353549ae2bd986b8b9306f8ed78732fb5426c5e89202e4dc8653f7fc57bc51778c0d16537507a1f6388a439ea95c146cb2f15022f99"
+    )
 
 
 @pytest.mark.active_test_scope
-def test_export_account_credential_discovery_private_key_new_path(
+def test_export_id_recovery_private_key_new_path_testnet(
+    backend, navigator, test_name, default_screenshot_path
+):
+    client = CommandSender(backend)
+    with client.export_private_key_new_path(
+        "id_recovery", "testnet", idp_index=0, identity_index=1
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Sign operation",
+            default_screenshot_path,
+            test_name,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=True,
+        )
+    result = client.get_async_response()
+    assert len(result.data) == 33 * 2
+    assert result.data == bytes.fromhex(
+        "2053db453318231b1a43497551677cf23652ff306fc1d2e1f1cb5cd42ff680b126206225bc94caf90bc2aff95144d21c5f445582f8214cd10d3488085a09d8731ca5"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_export_account_credential_discovery_private_key_new_path_mainnet(
     backend, navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
@@ -162,10 +243,37 @@ def test_export_account_credential_discovery_private_key_new_path(
         )
     result = client.get_async_response()
     assert len(result.data) == 33 * 1
+    assert result.data == bytes.fromhex(
+        "200dd6831a46dd093b21fe43bdd01b7ede216d5689ff12143d7d4ceb77d16041bb"
+    )
 
 
 @pytest.mark.active_test_scope
-def test_export_creation_of_zk_proof_private_key_new_path(
+def test_export_account_credential_discovery_private_key_new_path_testnet(
+    backend, navigator, test_name, default_screenshot_path
+):
+    client = CommandSender(backend)
+    with client.export_private_key_new_path(
+        "account_credential_discovery", "testnet", idp_index=0, identity_index=1
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Sign operation",
+            default_screenshot_path,
+            test_name,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=True,
+        )
+    result = client.get_async_response()
+    assert len(result.data) == 33 * 1
+    assert result.data == bytes.fromhex(
+        "20336bfcd76a6e0756ee5b0f4a6d3434092d68eb38921aac96c85e0a4d4b6d9b59"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_export_creation_of_zk_proof_private_key_new_path_mainnet(
     backend, navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
@@ -187,3 +295,34 @@ def test_export_creation_of_zk_proof_private_key_new_path(
         )
     result = client.get_async_response()
     assert len(result.data) == 33 * 1
+    assert result.data == bytes.fromhex(
+        "20d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e00"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_export_creation_of_zk_proof_private_key_new_path_testnet(
+    backend, navigator, test_name, default_screenshot_path
+):
+    client = CommandSender(backend)
+    with client.export_private_key_new_path(
+        "creation_of_zk_proof",
+        "testnet",
+        idp_index=0,
+        identity_index=1,
+        account_index=2,
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Sign operation",
+            default_screenshot_path,
+            test_name,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=True,
+        )
+    result = client.get_async_response()
+    assert len(result.data) == 33 * 1
+    assert result.data == bytes.fromhex(
+        "206b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce"
+    )

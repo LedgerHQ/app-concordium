@@ -71,7 +71,9 @@ def _get_ed25519_pubkey_32(client: CommandSender, path_cdata: bytes) -> bytes:
         p2=P2.P2_NO_SIGN,
         data=path_cdata,
     )
-    assert rapdu.status == StatusWords.SWO_SUCCESS, f"GET_PUBLIC_KEY SW=0x{rapdu.status:04X}"
+    assert rapdu.status == StatusWords.SWO_SUCCESS, (
+        f"GET_PUBLIC_KEY SW=0x{rapdu.status:04X}"
+    )
     assert len(rapdu.data) == 32, len(rapdu.data)
     return rapdu.data
 
@@ -83,7 +85,9 @@ def _load_pki_certificate_only(backend, client: CommandSender) -> None:
     if cert is None:
         pytest.skip(f"No PKI certificate for device {_get_device_name(backend)}")
     resp = client.load_pki_certificate(PKI_KEY_USAGE_TRUSTED_NAME, cert)
-    assert resp.status == StatusWords.SWO_SUCCESS, f"PKI cert load failed: 0x{resp.status:04X}"
+    assert resp.status == StatusWords.SWO_SUCCESS, (
+        f"PKI cert load failed: 0x{resp.status:04X}"
+    )
 
 
 # In this test we check that the VERIFY ADDRESS works in confirmation mode
@@ -95,7 +99,9 @@ def test_verify_address_confirm_legacy_path_accepted(
     default_screenshot_path: str,
 ):
     client = CommandSender(backend)
-    with client.verify_address(identity_index=0, credential_counter=0):
+    with client.verify_address(
+        network_indicator="mainnet", identity_index=0, credential_counter=0
+    ):
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
@@ -108,7 +114,9 @@ def test_verify_address_confirm_new_path_accepted(
     backend, scenario_navigator, test_name, default_screenshot_path
 ):
     client = CommandSender(backend)
-    with client.verify_address(identity_index=0, credential_counter=0, idp_index=0):
+    with client.verify_address(
+        network_indicator="mainnet", identity_index=0, credential_counter=0
+    ):
         scenario_navigator.address_review_approve()
 
     response = client.get_async_response().status
@@ -122,7 +130,9 @@ def test_verify_address_confirm_refused(
 ):
     client = CommandSender(backend)
     try:
-        with client.verify_address(identity_index=0, credential_counter=0, idp_index=0):
+        with client.verify_address(
+            network_indicator="testnet", identity_index=0, credential_counter=0
+        ):
             scenario_navigator.address_review_reject()
 
     except ExceptionRAPDU as e:
@@ -212,6 +222,7 @@ def test_verify_address_trusted_name_full_flow_accepted(
     assert rapdu.status == StatusWords.SWO_SUCCESS
 
     with client.verify_address(
+        network_indicator="mainnet",
         identity_index=identity_index,
         credential_counter=credential_counter,
         idp_index=idp_index,
@@ -219,4 +230,3 @@ def test_verify_address_trusted_name_full_flow_accepted(
         scenario_navigator.address_review_approve()
 
     assert client.get_async_response().status == StatusWords.SWO_SUCCESS
-
