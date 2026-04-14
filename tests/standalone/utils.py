@@ -159,7 +159,10 @@ def verify_version(version: str) -> None:
             dinfo = info.groupdict()
             vers_dict[dinfo["part"]] = int(dinfo["val"])
     try:
-        expected_hex = f"[0x{StatusWords.SWO_SUCCESS:04X}] {vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
+        expected_hex = (
+            f"[0x{StatusWords.SWO_SUCCESS:04X}] "
+            f"{vers_dict['M']:02d}{vers_dict['N']:02d}{vers_dict['P']:02d}"
+        )
     except KeyError:
         pass
 

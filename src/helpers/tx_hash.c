@@ -11,7 +11,6 @@
 #include "concordium_crypto.h"
 #include "apdu/apdu_response.h"
 #include "base58check.h"
-#include "numberHelpers.h"
 
 #include "tx_hash.h"
 
@@ -68,9 +67,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,
                              uint8_t kind,
                              uint8_t *recipientDst,
-                             size_t recipientSize,
-                             uint8_t *feesDst,
-                             size_t feesSize) {
+                             size_t recipientSize) {
     size_t keyPathLength = parse_derivation_path(cdata, dataLength);
     cdata += keyPathLength;
     uint8_t remainingDataLength = dataLength - keyPathLength;
@@ -79,10 +76,6 @@ int handleHeaderAndToAddress(uint8_t *cdata,
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     int headerLength = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, kind);
-
-    uint64_t energy_amount_u64 = U8BE(cdata, ENERGY_OFFSET_IN_HEADER);
-
-    amount_to_gtu_display((uint8_t *) feesDst, feesSize, energy_amount_u64);
 
     cdata += headerLength;
     remainingDataLength -= headerLength;

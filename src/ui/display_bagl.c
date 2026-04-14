@@ -38,7 +38,7 @@ UX_STEP_NOCB(ux_sign_flow_account_sender_view,
 UX_STEP_NOCB(ux_sign_flow_fees_view,
              bnnn_paging,
              {.title = "Max fees",
-              .text = (char *) global.withDataBlob.signTransferContext.energy_amount_str});
+              .text = (char *) global.withDataBlob.signTransferContext.fee_display_str});
 
 // UI definitions for comparison of public-key on the device
 // with the public-key that the caller received.
@@ -791,7 +791,7 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 }
 
 // Sign Transfer
-const ux_flow_step_t *ux_sign_amount_transfer[8];
+const ux_flow_step_t *ux_sign_amount_transfer[10];
 
 UX_STEP_NOCB(ux_sign_flow_1_step,
              bnnn_paging,
@@ -812,8 +812,9 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     if (displayMemo) {
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
-    // TODO:  re-enable once fees are correctly transmitted
-    // ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
+    if (global.withDataBlob.signTransferContext.has_fee_display) {
+        ux_sign_amount_transfer[index++] = &ux_sign_flow_fees_view;
+    }
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_sign;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_decline;
 
@@ -843,8 +844,14 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+UX_STEP_NOCB(
+    ux_scheduled_flow_max_fees_step,
+    bnnn_paging,
+    {.title = "Max fees",
+     .text = (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str});
+
 // Sign Transfer with Schedule
-const ux_flow_step_t *ux_sign_scheduled_amount_transfer[8];
+const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
@@ -893,6 +900,10 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
 
     if (displayMemo) {
         ux_sign_scheduled_amount_transfer[index++] = &ux_display_memo_step_nocb;
+    }
+
+    if (global.withDataBlob.signTransferWithScheduleContext.has_fee_display) {
+        ux_sign_scheduled_amount_transfer[index++] = &ux_scheduled_flow_max_fees_step;
     }
 
     ux_sign_scheduled_amount_transfer[index++] = &ux_scheduled_transfer_initial_flow_2_step;

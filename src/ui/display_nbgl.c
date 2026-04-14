@@ -1027,7 +1027,11 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
     }
-    // TODO: Re-enable "Max fees" display once fees are correctly transmitted.
+    if (global.withDataBlob.signTransferContext.has_fee_display) {
+        pairs[index].item = "Max fees";
+        pairs[index].value = (char *) global.withDataBlob.signTransferContext.fee_display_str;
+        index++;
+    }
 
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -1180,6 +1184,12 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
     if (displayMemo) {
         pairs[index].item = "Memo";
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
+        index++;
+    }
+    if (global.withDataBlob.signTransferWithScheduleContext.has_fee_display) {
+        pairs[index].item = "Max fees";
+        pairs[index].value =
+            (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str;
         index++;
     }
     // Create the page content

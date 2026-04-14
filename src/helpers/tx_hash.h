@@ -39,9 +39,7 @@ int handleHeaderAndToAddress(uint8_t *cdata,
                              uint8_t dataLength,
                              uint8_t kind,
                              uint8_t *recipientDst,
-                             size_t recipientSize,
-                             uint8_t *feesDst,
-                             size_t feesSize);
+                             size_t recipientSize);
 
 size_t hashAndLoadU64Ratio(uint8_t *cdata, uint8_t *dst, uint8_t sizeOfDst);
 
