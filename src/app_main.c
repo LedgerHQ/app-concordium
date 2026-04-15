@@ -17,22 +17,20 @@
 
 #include "globals.h"
 
-keyDerivationPath_t path;
-tx_state_t global_tx_state;
+#include <string.h>
 
-const internal_storage_t N_storage_real;
+#include <io.h>
+#include <os.h>
+#include <parser.h>
+#include <status_words.h>
 
-// The Ledger uses APDU commands
-// (https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit) for performing actions.
-// The INS byte contains the instruction code that determines which action to perform.
-#define OFFSET_CLA   0x00
-#define OFFSET_INS   0x01
-#define OFFSET_P1    0x02
-#define OFFSET_P2    0x03
-#define OFFSET_LC    0x04
-#define OFFSET_CDATA 0x05
+#include "apdu/dispatcher.h"
+#include "menu.h"
 
-void *global_state;
+/**
+ * Instruction class of the Concordium application.
+ */
+#define CLA 0xE0
 
 // Main entry of application that listens for APDU commands that will be received from the
 // computer. The APDU commands control what flow is activated, i.e. which control flow is initiated.
@@ -47,15 +45,6 @@ void app_main() {
     explicit_bzero(&global_tx_state, sizeof(global_tx_state));
     ui_menu_main();
 
-    // Initialize the NVM data if required
-    if (N_storage.initialized != STORAGE_INITIALIZED) {
-        internal_storage_t storage;
-        storage.dummy1_allowed = STORAGE_DEFAULT;
-        storage.dummy2_allowed = STORAGE_DEFAULT;
-        storage.initialized = STORAGE_INITIALIZED;
-        nvm_write((void *) &N_storage, &storage, sizeof(internal_storage_t));
-    }
-
     for (;;) {
         // Receive command bytes in G_io_apdu_buffer
         if ((input_len = io_recv_command()) < 0) {
@@ -66,7 +55,7 @@ void app_main() {
         // Parse APDU command from G_io_apdu_buffer
         if (!apdu_parser(&cmd, G_io_apdu_buffer, input_len)) {
             PRINTF("=> /!\\ BAD LENGTH: %.*H\n", input_len, G_io_apdu_buffer);
-            io_send_sw(SW_WRONG_DATA_LENGTH);
+            io_send_sw(SWO_WRONG_DATA_LENGTH);
             continue;
         }
 
@@ -79,6 +68,11 @@ void app_main() {
                cmd.lc,
                cmd.data);
 
+        if (cmd.cla != CLA) {
+            io_send_sw(SWO_INVALID_CLA);
+            continue;
+        }
+
         bool isInitialCall = false;
         if (global_tx_state.currentInstruction == INSTRUCTION_NONE) {
             explicit_bzero(&global, sizeof(global));
@@ -86,13 +80,9 @@ void app_main() {
             isInitialCall = true;
         }
 
-        if (cmd.cla != CLA) {
-            io_send_sw(ERROR_INVALID_CLA);
-        }
-
-        // Dispatch structured APDU command to handler
-        if (handler(cmd.ins, cmd.data, cmd.p1, cmd.p2, cmd.lc, &flags, isInitialCall) < 0) {
-            PRINTF("=> handler failure\n");
+        // Dispatch structured APDU command
+        if (apdu_dispatcher(&cmd, &flags, isInitialCall) < 0) {
+            PRINTF("=> apdu_dispatcher failure\n");
             return;
         }
     }

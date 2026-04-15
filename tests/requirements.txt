@@ -1,6 +1,2 @@
-pytest
-ragger[speculos,ledgerwallet]>=1.11.4
-ecdsa>=0.16.1,<0.17.0
-pycryptodome
-py_ecc>=7.0.1,<8.0.0
-bip32>=3.4.0,<4.0.0
+# Shim: keeps `pip install -r tests/requirements.txt` working; canonical deps are in standalone/
+-r standalone/requirements.txt

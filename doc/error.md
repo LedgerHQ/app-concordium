@@ -14,11 +14,11 @@ This document lists all error codes that can be returned by the Concordium Ledge
 
 | Code   | Name                    | Description |
 |--------|------------------------|-------------|
-| `0x6982` | `ERROR_NO_APDU_RECEIVED` | No APDU was received |
-| `0x6985` | `ERROR_REJECTED_BY_USER` | Operation was rejected by the user |
-| `0x6E00` | `ERROR_INVALID_CLA`      | Invalid CLA byte in APDU header |
-| `0x6D00` | `ERROR_INVALID_INSTRUCTION` | Invalid instruction byte in APDU header |
-| `0x6A87` | `SW_WRONG_DATA_LENGTH`   | Incorrect data length |
+| `0x6985` | `SWO_CONDITIONS_NOT_SATISFIED` | Conditions of use not satisfied (`status_words.h`). User declined signing / approval (e.g. `sendUserRejectionNoIdle`). |
+| `0x6E00` | `SWO_INVALID_CLA`        | Invalid CLA byte in APDU header (`status_words.h`) |
+| `0x6D00` | `SWO_INVALID_INS`        | Invalid instruction byte in APDU header (`status_words.h`) |
+| `0x6A87` | `SWO_WRONG_DATA_LENGTH`  | Incorrect data length (`status_words.h`) |
+| `0x6A80` | `SWO_INCORRECT_DATA`     | Wrong data in command data (`status_words.h`): truncated or malformed transaction payload |
 
 ### Transaction and Parameter Errors
 
@@ -64,10 +64,12 @@ This document lists all error codes that can be returned by the Concordium Ledge
    - Clear sensitive data from memory
    - Return to a safe state
 
-2. User rejection errors (`ERROR_REJECTED_BY_USER`) are normal operations and indicate the user chose not to approve an action.
+2. User rejection uses `SWO_CONDITIONS_NOT_SATISFIED` (`0x6985`) per Ledger SDK naming; it is a normal outcome when the user declines.
 
 3. Device state errors may require user intervention (e.g., unlocking the device).
 
-4. Buffer overflow errors indicate the client should break data into smaller chunks where applicable.
+4. Buffer overflow errors (`0x6B06`, `ERROR_BUFFER_OVERFLOW`) indicate an internal fixed buffer limit (e.g. display or response buffer). Malformed or truncated **command data** (transaction payload) uses **`SWO_INCORRECT_DATA` (`0x6A80`)** from `status_words.h`.
+
+5. Wrong APDU `Lc` at dispatch uses **`SWO_WRONG_DATA_LENGTH` (`0x6A87`)** from `status_words.h`.
 
 

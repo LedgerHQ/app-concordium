@@ -7,6 +7,7 @@ debug/
 
 # Temporary directory with snapshots taken during test runs
 tests/snapshots-tmp/
+tests/standalone/snapshots-tmp/
 
 # Unit tests and code coverage
 unit-tests/build/
@@ -17,6 +18,7 @@ unit-tests/coverage.info
 fuzzing/build/
 fuzzing/corpus/
 fuzzing/out/
+fuzzing/.cache/
 
 # Python
 *.pyc[cod]
@@ -40,5 +42,12 @@ ledger/
 # Helpers
 diff
 
-# Vscode
-.vscode/
+# Vscode — track udev rules (Ledger app-boilerplate style); ignore local settings
+.vscode/*
+!.vscode/20-ledger.ledgerblue.rules
+
+# clangd (language server index; may appear under fuzzing/ or repo root)
+.cache/
+
+# folder to store local helper scripts
+scripts_local/

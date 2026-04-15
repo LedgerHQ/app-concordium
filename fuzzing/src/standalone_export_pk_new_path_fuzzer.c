@@ -7,28 +7,37 @@
 #include <stdlib.h>
 #include <string.h>
 
-// ========== STEP 2: COPY NEEDED TYPES FROM GLOBALS.H ==========
-// Instead of including the whole globals.h, we copy just what we need
-
-// Derivation path key types (copied from globals.h)
+// ========== STEP 2: TYPES (keep in sync with firmware) ==========
+// Mirrors ledger-secure-sdk/lib_standard_app/parser.h
+typedef struct {
+    uint8_t cla;
+    uint8_t ins;
+    uint8_t p1;
+    uint8_t p2;
+    uint8_t lc;
+    uint8_t *data;
+} command_t;
+// Mirrors src/helpers/derivation_path.h — derivation_path_key_idx_t
+// Values are the last path segment index for each exportable key (BIP32 child index).
 typedef enum {
-    NEW_ID_CRED_SEC = 0,
-    NEW_PRF_KEY = 1,
-    NEW_SIGNATURE_BLINDING_RANDOMNESS = 2,
-    NEW_COMMITMENT_RANDOMNESS = 3
-} derivation_path_key_t;
+    LEGACY_ID_CRED_SEC = 0,
+    LEGACY_PRF_KEY = 1,
+    NEW_ID_CRED_SEC = 2,
+    NEW_PRF_KEY = 3,
+    NEW_SIGNATURE_BLINDING_RANDOMNESS = 4,
+    NEW_COMMITMENT_RANDOMNESS = 5,
+} derivation_path_key_idx_t;
 
 // APDU response codes (copied from globals.h)
 #define ERROR_INVALID_PARAM 0x6B00
 #define ERROR_INVALID_PATH  0x6A80
 #define SUCCESS             0x9000
 
-// Constants from exportPrivateKey.h
-#define MAX_DERIVATION_PATH_LENGTH  6
+// Constants from src/handler/export_private_key.h / instruction_context.h
 #define MAX_KEYS_TO_EXPORT          3
 #define LENGTH_AND_PRIVATE_KEY_SIZE 33
 
-// Purpose constants (from exportPrivateKey.h)
+// Purpose constants (from instruction_context.h)
 #define P1_IDENTITY_CREDENTIAL_CREATION 0x00
 #define P1_ACCOUNT_CREATION             0x01
 #define P1_ID_RECOVERY                  0x02
@@ -40,10 +49,16 @@ typedef enum {
 #define P2_TESTNET 0x01
 
 // Derivation path constants
-#define NEW_PURPOSE     44
-#define NEW_MAINNET_COIN_TYPE   919
-#define NEW_TESTNET_COIN_TYPE   1
-#define HARDENED_OFFSET 0x80000000
+#define DERIVATION_PATH_NODES_MAX 8
+#define NEW_PURPOSE               44
+#define NEW_MAINNET_COIN_TYPE     919
+#define NEW_TESTNET_COIN_TYPE     1
+#define HARDENED_OFFSET           0x80000000
+
+typedef struct {
+    uint32_t nodes[DERIVATION_PATH_NODES_MAX];
+    uint8_t len;
+} derivation_path_t;
 
 // ========== STEP 3: MOCK IMPLEMENTATIONS ==========
 
@@ -67,18 +82,18 @@ void explicit_bzero(void *ptr, size_t size) {
     }
 }
 
-// Mock bin2dec - convert binary to decimal string
-size_t bin2dec(uint8_t *dst, size_t dst_size, uint32_t value) {
+// Mock bin_to_dec - convert binary to decimal string
+size_t bin_to_dec(uint8_t *dst, size_t dst_size, uint32_t value) {
     int ret = snprintf((char *) dst, dst_size, "%u", value);
     return (ret > 0 && ret < (int) dst_size) ? ret + 1 : 0;
 }
 
 // Mock number helpers - simplified versions
-void numberToText(uint8_t *dst, size_t dst_size, uint64_t number) {
+void number_to_text(uint8_t *dst, size_t dst_size, uint64_t number) {
     snprintf((char *) dst, dst_size, "%llu", number);
 }
 
-uint8_t lengthOfNumber(uint64_t number) {
+uint8_t length_of_number(uint64_t number) {
     if (number == 0) return 1;
     uint8_t length = 0;
     while (number > 0) {
@@ -89,26 +104,21 @@ uint8_t lengthOfNumber(uint64_t number) {
 }
 
 // Mock crypto functions - return fake but valid-looking keys
-int getPrivateKey(uint32_t *derivationPath,
-                  uint8_t pathLength,
-                  uint8_t *privateKeyArray,
-                  uint8_t *privateKey) {
-    printf("MOCK getPrivateKey: path_length=%d\n", pathLength);
+void get_private_key(const derivation_path_t *path, uint8_t *privateKey) {
+    printf("MOCK get_private_key: path_length=%d\n", path->len);
     if (privateKey) {
         memset(privateKey, 0xAB, 32);  // Fake private key
     }
-    return 0;
 }
 
-int getBlsPrivateKey(uint32_t *derivationPath,
-                     uint8_t pathLength,
-                     uint8_t *privateKeyArray,
-                     uint8_t *privateKey) {
-    printf("MOCK getBlsPrivateKey: path_length=%d\n", pathLength);
+void get_bls_private_key(const derivation_path_t *path,
+                         uint8_t *privateKey,
+                         size_t privateKeySize) {
+    (void) privateKeySize;
+    printf("MOCK get_bls_private_key: path_length=%d\n", path->len);
     if (privateKey) {
         memset(privateKey, 0xCD, 32);  // Fake BLS private key
     }
-    return 0;
 }
 
 // Utility macro for reading big-endian 32-bit integers
@@ -119,56 +129,54 @@ int getBlsPrivateKey(uint32_t *derivationPath,
 // ========== STEP 4: MOCK exportNewPathPrivateKeysForPurpose ==========
 // Simplified version of the real function
 
-int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
+int exportNewPathPrivateKeysForPurpose(derivation_path_key_idx_t keyType,
                                        uint8_t networkDesignation,
                                        uint32_t identityProvider,
                                        uint32_t identity,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
                                        size_t outputPrivateKeySize) {
-    printf("MOCK exportNewPathPrivateKeysForPurpose: purpose=%d, network=%d, idp=%u, id=%u, account=%u\n",
-           purpose,
-           networkDesignation,
-           identityProvider,
-           identity,
-           account);
+    printf(
+        "MOCK exportNewPathPrivateKeysForPurpose: keyType=%d, network=%d, idp=%u, id=%u, "
+        "account=%u\n",
+        (int) keyType,
+        networkDesignation,
+        identityProvider,
+        identity,
+        account);
 
-    // Build derivation path
-    uint32_t derivationPath[MAX_DERIVATION_PATH_LENGTH];
-    uint8_t pathLength = 4;
+    derivation_path_t dp;
+    memset(&dp, 0, sizeof(dp));
+    dp.len = 4;
+    dp.nodes[0] = NEW_PURPOSE | HARDENED_OFFSET;
 
-    derivationPath[0] = NEW_PURPOSE | HARDENED_OFFSET;
-
-    // choose the appropriate coin type based on the network selection in p2
-    switch(networkDesignation) {
+    switch (networkDesignation) {
         case P2_MAINNET:
-            derivationPath[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
-        break;
+            dp.nodes[1] = NEW_MAINNET_COIN_TYPE | HARDENED_OFFSET;
+            break;
         case P2_TESTNET:
-            derivationPath[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
-        break;
+            dp.nodes[1] = NEW_TESTNET_COIN_TYPE | HARDENED_OFFSET;
+            break;
     }
 
-    derivationPath[2] = identityProvider | HARDENED_OFFSET;
-    derivationPath[3] = identity | HARDENED_OFFSET;
+    dp.nodes[2] = identityProvider | HARDENED_OFFSET;
+    dp.nodes[3] = identity | HARDENED_OFFSET;
 
-    // Extend path based on purpose
-    switch (purpose) {
+    switch (keyType) {
         case NEW_ID_CRED_SEC:
         case NEW_PRF_KEY:
         case NEW_SIGNATURE_BLINDING_RANDOMNESS:
-            derivationPath[pathLength++] = purpose | HARDENED_OFFSET;
+            dp.nodes[dp.len++] = keyType | HARDENED_OFFSET;
             break;
         case NEW_COMMITMENT_RANDOMNESS:
-            derivationPath[pathLength++] = purpose | HARDENED_OFFSET;
-            derivationPath[pathLength++] = account | HARDENED_OFFSET;
+            dp.nodes[dp.len++] = NEW_COMMITMENT_RANDOMNESS | HARDENED_OFFSET;
+            dp.nodes[dp.len++] = account | HARDENED_OFFSET;
             break;
         default:
-            printf("Invalid purpose: %d\n", purpose);
+            printf("Invalid keyType: %d\n", (int) keyType);
             return 0;
     }
 
-    // Generate fake private keys
     uint8_t fakeKey[32];
     uint8_t tx = 0;
 
@@ -176,8 +184,7 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
         return 0;
     }
 
-    // Call our mock crypto function
-    getPrivateKey(derivationPath, pathLength, NULL, fakeKey);
+    get_private_key(&dp, fakeKey);
 
     // Write length + key to output
     outputPrivateKey[tx++] = 32;  // Key length
@@ -190,11 +197,12 @@ int exportNewPathPrivateKeysForPurpose(derivation_path_key_t purpose,
 // ========== STEP 5: THE MAIN TARGET FUNCTION ==========
 // Simplified version of handleExportPrivateKeyNewPath
 
-void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
-                                   uint8_t p1,
-                                   uint8_t p2,
-                                   uint8_t lc,
-                                   volatile unsigned int *flags) {
+void handleExportPrivateKeyNewPath(const command_t *cmd, volatile unsigned int *flags) {
+    uint8_t *dataBuffer = cmd->data;
+    uint8_t p1 = cmd->p1;
+    uint8_t p2 = cmd->p2;
+    uint8_t lc = cmd->lc;
+
     printf("=== handleExportPrivateKeyNewPath ===\n");
     printf("p1=%d, p2=%d, lc=%d\n", p1, p2, lc);
 
@@ -242,7 +250,7 @@ void handleExportPrivateKeyNewPath(uint8_t *dataBuffer,
     // Generate the private keys
     uint8_t outputBuffer[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     int bytesWritten = exportNewPathPrivateKeysForPurpose(
-        (derivation_path_key_t) (p1 % 4),  // Convert p1 to valid purpose
+        (derivation_path_key_idx_t) (2 + (p1 % 4)),    /* map fuzz input into 2..5 range */
         (p2 == P2_MAINNET) ? P2_MAINNET : P2_TESTNET,  // Ensure valid network
         identityProvider,
         identity,
@@ -283,7 +291,13 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     // Call the target function
     volatile unsigned int flags = 0;
-    handleExportPrivateKeyNewPath((uint8_t *) command_data, p1, p2, lc, &flags);
+    command_t cmd = {.cla = 0,
+                     .ins = 0,
+                     .p1 = p1,
+                     .p2 = p2,
+                     .lc = lc,
+                     .data = lc > 0 ? (uint8_t *) command_data : NULL};
+    handleExportPrivateKeyNewPath(&cmd, &flags);
 
     printf("Fuzzer iteration completed successfully\n");
     return 0;
