@@ -342,9 +342,10 @@ def test_sign_tx_transfer_with_schedule_legacy_path_with_display_fee(
             NavInsID.USE_CASE_CHOICE_CONFIRM,
         )
 
-    screenshots_so_far = 3
+    screenshots_so_far = 4
     if backend.device.is_nano:
-        screenshots_so_far = 6
+        screenshots_so_far = 7
+
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -525,12 +526,10 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
 
-    screenshots_so_far = 3
+    screenshots_so_far = 4
     if backend.device.is_nano:
-        screenshots_so_far = 7
-    elif backend.device.type == DeviceType.APEX_P:
-        screenshots_so_far = 4
-
+        screenshots_so_far = 8
+        
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
         number_of_pairs_in_chunk = len(chunk) // 16
