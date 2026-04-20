@@ -3,30 +3,30 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define GTU_DISPLAY_LENGTH 5
-#define GTU_DECIMAL_PLACES 6
-#define GTU_RESOLUTION     1000000
+#define CCD_DISPLAY_LENGTH 5
+#define CCD_DECIMAL_PLACES 6
+#define CCD_RESOLUTION     1000000
 
 #define PERCENTAGE_RESOLUTION     1000
 #define PERCENTAGE_DECIMAL_PLACES 3
 #define MAX_PERCENTAGE_NUMERATOR  100000
 #define PERCENTAGE_SUFFIX_LEN     2  // "%" + '\0'
 
-#define GTU_LINE_BREAK_MIN_OFFSET 14
-#define GTU_LINE_BREAK_MAX_OFFSET 18
+#define CCD_LINE_BREAK_MIN_OFFSET 14
+#define CCD_LINE_BREAK_MAX_OFFSET 18
 #define HEX_PAGINATION_WIDTH      16
 #define NIBBLE_MASK               0x0F
 #define UNIT_SPACE_AND_NULL_LEN   2
 
 /**
- * Writes the input amount of µGTU to the supplied destination as its value in
- * GTU with thousand separators.
- * @param dst where to write the thousand separated representation of the µGTU
+ * Writes the input amount of µCCD to the supplied destination as its value in
+ * CCD with thousand separators.
+ * @param dst where to write the thousand separated representation of the µCCD
  * @param dstLength the number of bytes that may be written to 'dst'
- * @param number the integer µGTU amount to convert to a GTU display version
+ * @param number the integer µCCD amount to convert to a CCD display version
  * @return number of bytes written to 'dst'
  */
-size_t amount_to_gtu_display(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount);
+size_t amount_to_ccd_display(uint8_t *dst, size_t dstLength, uint64_t microCcdAmount);
 
 /**
  * Helper method that writes the input integer to a format that the device

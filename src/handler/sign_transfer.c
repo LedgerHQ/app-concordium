@@ -41,7 +41,7 @@ void handle_sign_transfer(const command_t *cmd, volatile unsigned int *flags) {
         THROW(SWO_INCORRECT_DATA);
     }
     uint64_t amount = U8BE(cdata, 0);
-    amount_to_gtu_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
+    amount_to_ccd_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
     update_hash((cx_hash_t *) &tx_state->hash, cdata, 8);
 
     if (fee_suffix != 0) {

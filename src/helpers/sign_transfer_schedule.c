@@ -51,7 +51,7 @@ void processNextScheduledAmount(uint8_t *buffer) {
         uint64_t amount = U8BE(ctx->buffer, ctx->pos);
         update_hash((cx_hash_t *) &tx_state->hash, buffer + ctx->pos, 8);
         ctx->pos += 8;
-        amount_to_gtu_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
+        amount_to_ccd_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
 
         // We read one more scheduled amount, so count down to keep track of remaining to process.
         ctx->scheduledAmountsInCurrentPacket -= 1;

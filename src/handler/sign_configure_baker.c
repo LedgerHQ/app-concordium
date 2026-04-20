@@ -160,7 +160,7 @@ void handle_sign_configure_baker(const command_t *cmd,
                 ctx_conf_baker->capitalRestakeDelegation.stopBaking = true;
             } else {
                 ctx_conf_baker->capitalRestakeDelegation.stopBaking = false;
-                amount_to_gtu_display(
+                amount_to_ccd_display(
                     ctx_conf_baker->capitalRestakeDelegation.displayCapital,
                     sizeof(ctx_conf_baker->capitalRestakeDelegation.displayCapital),
                     capitalAmount);

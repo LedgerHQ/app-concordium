@@ -17,6 +17,6 @@ void fee_display_apply_u64(uint8_t *dst_str,
     if (v == FEE_DISPLAY_VALUE_OMIT) {
         return;
     }
-    amount_to_gtu_display(dst_str, dst_str_len, v);
+    amount_to_ccd_display(dst_str, dst_str_len, v);
     *has_fee_display = true;
 }
