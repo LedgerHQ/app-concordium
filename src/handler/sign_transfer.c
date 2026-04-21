@@ -8,6 +8,7 @@
 
 #include "concordium_crypto.h"
 #include "display.h"
+#include "fee_display.h"
 #include "numberHelpers.h"
 #include "tx_hash.h"
 
@@ -21,26 +22,35 @@ static tx_state_t *tx_state = &global_tx_state;
 void handle_sign_transfer(const command_t *cmd, volatile unsigned int *flags) {
     uint8_t *cdata = cmd->data;
     uint8_t lc = cmd->lc;
+    uint8_t p2 = cmd->p2;
 
-    uint8_t offset = handleHeaderAndToAddress(cdata,
-                                              lc,
-                                              TRANSFER,
-                                              ctx->displayStr,
-                                              sizeof(ctx->displayStr),
-                                              ctx->energy_amount_str,
-                                              sizeof(ctx->energy_amount_str));
+    if (p2 > P2_SIGN_TX_FEE_DISPLAY) {
+        THROW(SWO_WRONG_P1_P2);
+    }
+    uint8_t fee_suffix = (p2 == P2_SIGN_TX_FEE_DISPLAY) ? FEE_DISPLAY_U64_SIZE : 0;
+
+    ctx->has_fee_display = false;
+    explicit_bzero(ctx->fee_display_str, sizeof(ctx->fee_display_str));
+
+    uint8_t offset =
+        handleHeaderAndToAddress(cdata, lc, TRANSFER, ctx->displayStr, sizeof(ctx->displayStr));
     cdata += offset;
     uint8_t remainingDataLength = lc - offset;
 
-    // Build display value of the amount to transfer, and also add the bytes to the hash.
-    if (remainingDataLength < 8) {
+    if (remainingDataLength != 8 + fee_suffix) {
         THROW(SWO_INCORRECT_DATA);
     }
     uint64_t amount = U8BE(cdata, 0);
-    amount_to_gtu_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
+    amount_to_ccd_display(ctx->displayAmount, sizeof(ctx->displayAmount), amount);
     update_hash((cx_hash_t *) &tx_state->hash, cdata, 8);
 
-    // Display the transaction information to the user (recipient address and amount to be sent).
+    if (fee_suffix != 0) {
+        fee_display_apply_u64(ctx->fee_display_str,
+                              sizeof(ctx->fee_display_str),
+                              &ctx->has_fee_display,
+                              cdata + 8);
+    }
+
     startTransferDisplay(false, flags);
 
     // Tell the main process to wait for a button press.

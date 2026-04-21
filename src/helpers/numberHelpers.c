@@ -84,22 +84,22 @@ size_t fraction_to_percentage_display(uint8_t *dst, size_t dstLength, uint32_t n
     return offset + PERCENTAGE_SUFFIX_LEN;
 }
 
-size_t amount_to_gtu_display(uint8_t *dst, size_t dstLength, uint64_t microGtuAmount) {
+size_t amount_to_ccd_display(uint8_t *dst, size_t dstLength, uint64_t microCcdAmount) {
     FPU64_TMP_ZERO_INIT;
-    if (!format_fpu64_trimmed(tmp, sizeof(tmp), microGtuAmount, GTU_DECIMAL_PLACES)) {
+    if (!format_fpu64_trimmed(tmp, sizeof(tmp), microCcdAmount, CCD_DECIMAL_PLACES)) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     size_t offset = strlen(tmp);
-    if (dstLength < offset + GTU_DISPLAY_LENGTH) {
+    if (dstLength < offset + CCD_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     memmove(dst, tmp, offset);
-    if ((offset >= GTU_LINE_BREAK_MIN_OFFSET) && (offset < GTU_LINE_BREAK_MAX_OFFSET)) {
-        memmove(dst + offset, "\nCCD\0", GTU_DISPLAY_LENGTH);
+    if ((offset >= CCD_LINE_BREAK_MIN_OFFSET) && (offset < CCD_LINE_BREAK_MAX_OFFSET)) {
+        memmove(dst + offset, "\nCCD\0", CCD_DISPLAY_LENGTH);
     } else {
-        memmove(dst + offset, " CCD\0", GTU_DISPLAY_LENGTH);
+        memmove(dst + offset, " CCD\0", CCD_DISPLAY_LENGTH);
     }
-    offset += GTU_DISPLAY_LENGTH - 1;  // Exclude null terminator from return
+    offset += CCD_DISPLAY_LENGTH - 1;  // Exclude null terminator from return
     return offset;
 }
 

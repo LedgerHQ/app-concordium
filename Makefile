@@ -29,8 +29,8 @@ APPNAME = "Concordium"
 
 # Application version
 APPVERSION_M = 5
-APPVERSION_N = 5
-APPVERSION_P = 1
+APPVERSION_N = 6
+APPVERSION_P = 0
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += APPVERSION=\"$(APPVERSION)\"
@@ -66,7 +66,7 @@ CURVE_APP_LOAD_PARAMS = ed25519
 # If your app needs it, you can specify multiple path by using:
 # `PATH_APP_LOAD_PARAMS = "44'/1'" "45'/1'"`
 # purpose=coin(44) / coin_type=Testnet(1)
-PATH_APP_LOAD_PARAMS = "44'/919'" "1105'/0'"
+PATH_APP_LOAD_PARAMS = "44'/919'" "44'/1'" "1105'/0'"
 
 # Setting to allow building variant applications
 # - <VARIANT_PARAM> is the name of the parameter which should be set

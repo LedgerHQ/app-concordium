@@ -13,6 +13,10 @@ from utils import navigate_until_text_and_compare, instructions_builder, split_m
 MAX_SCHEDULE_PAIRS_IN_ONE_APDU: int = (250 // 16) * 16
 MAX_APDU_LEN: int = 255
 
+# µCCD value appended when P2=0x01 (display-only; not hashed). Signature must match the
+# corresponding test without a fee for the same transaction payload.
+TEST_DISPLAY_FEE_MICROCCD = 123_456_798
+
 
 # In this test we send to the device a transaction to sign and validate it on screen
 # The transaction is short and will be sent in one chunk
@@ -48,6 +52,32 @@ def test_sign_tx_simple_transfer_legacy_path(
         == "d1617ee706805c0bc6a43260ece93a7ceba37aaefa303251cf19bdcbbe88c0a3d3878dcb965cdb88ff380fdb1aa4b321671f365d7258e878d18fa1b398a1a10f"
     )
     # assert check_signature_validity(public_key, der_sig, transaction)
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_simple_transfer_legacy_path_with_display_fee(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """P2=0x01 + trailing display fee (µCCD); fee is not hashed — same signature as without fee."""
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    transaction = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da70320a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7ffffffffffffffff"
+    transaction = bytes.fromhex(transaction)
+
+    with client.sign_simple_transfer(
+        path=path,
+        transaction=transaction,
+        display_fee_microccd=TEST_DISPLAY_FEE_MICROCCD,
+    ):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+
+    response = client.get_async_response().data
+    assert (
+        response.hex()
+        == "d1617ee706805c0bc6a43260ece93a7ceba37aaefa303251cf19bdcbbe88c0a3d3878dcb965cdb88ff380fdb1aa4b321671f365d7258e878d18fa1b398a1a10f"
+    )
 
 
 # In this test we send to the device a transaction to sign and validate it on screen
@@ -137,6 +167,46 @@ def test_sign_tx_simple_transfer_with_memo_legacy_path(
         == "6c0b0ada297d35d79a76df87b30c4ae3c9b29fdfe5647e56ea3f9c1334366bfb942716dc4d236395ffaee5a4671b90118c28295cc12094cb7188a8354e92f600"
     )
     # assert check_signature_validity(public_key, der_sig, transaction)
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_simple_transfer_with_memo_legacy_path_with_display_fee(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """P2=0x01 on first memo packet; display fee bytes are not hashed."""
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+
+    header_and_to_address = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    header_and_to_address = bytes.fromhex(header_and_to_address)
+
+    memo_payload = (
+        "The quick brown fox jumps over the lazy dog. Pack my box with five dozen "
+        "liquor jugs. Jackdaws love my big sphinx of quartz. Quick zephyrs blow, "
+        "vexing daft Jim. Sphinx of black quartz, judge my vow. How quickly daft "
+        "jumping zebras vex!"
+    )
+
+    payload_bytes = memo_payload.encode("utf-8")
+    memo = bytes([0x78, len(memo_payload)]) + payload_bytes
+    amount = bytes.fromhex("ffffffffffffffff")
+
+    with client.sign_simple_transfer_with_memo(
+        path=path,
+        header_and_to_address=header_and_to_address,
+        memo=memo,
+        amount=amount,
+        display_fee_microccd=TEST_DISPLAY_FEE_MICROCCD,
+    ):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+
+    response = client.get_async_response().data
+    assert (
+        response.hex()
+        == "6c0b0ada297d35d79a76df87b30c4ae3c9b29fdfe5647e56ea3f9c1334366bfb942716dc4d236395ffaee5a4671b90118c28295cc12094cb7188a8354e92f600"
+    )
 
 
 @pytest.mark.active_test_scope
@@ -231,6 +301,83 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
 
 
 @pytest.mark.active_test_scope
+def test_sign_tx_transfer_with_schedule_legacy_path_with_display_fee(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """P2=0x01 on schedule part 1; display fee not hashed."""
+    client = CommandSender(backend)
+    path = "m/1105/0/0/0/0/2/0/0"
+
+    header_and_to_address = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71320a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    header_and_to_address = bytes.fromhex(header_and_to_address)
+
+    pairs = [
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+    ]
+    joined_pairs = bytes.fromhex("".join(pairs))
+
+    if len(joined_pairs) % 16 != 0:
+        raise ValueError("Pairs must be a multiple of 16 bytes")
+
+    pairs_chunk = split_message(joined_pairs, MAX_SCHEDULE_PAIRS_IN_ONE_APDU)
+
+    with client.sign_tx_with_schedule_part_1(
+        path=path,
+        header_and_to_address=header_and_to_address,
+        num_pairs=len(pairs),
+        display_fee_microccd=TEST_DISPLAY_FEE_MICROCCD,
+    ):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Continue",
+            default_screenshot_path,
+            test_name,
+            True,
+            False,
+            NavInsID.USE_CASE_CHOICE_CONFIRM,
+        )
+
+    screenshots_so_far = 4
+    if backend.device.is_nano:
+        screenshots_so_far = 8
+
+
+    for chunk in pairs_chunk:
+        nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
+        number_of_pairs_in_chunk = len(chunk) // 16
+        instructions = []
+        for _ in range(number_of_pairs_in_chunk):
+            if _ == number_of_pairs_in_chunk - 1:
+                nbgl_confirm_instruction = NavInsID.USE_CASE_REVIEW_CONFIRM
+            instructions.extend(
+                instructions_builder(2, backend, nbgl_confirm_instruction)
+            )
+
+        with client.sign_tx_with_schedule_part_2(data=chunk):
+            navigator.navigate_and_compare(
+                default_screenshot_path,
+                test_name,
+                instructions,
+                10,
+                True,
+                True,
+                screenshots_so_far,
+            )
+        screenshots_so_far += number_of_pairs_in_chunk * 3
+
+    response = client.get_async_response().data
+    assert (
+        response.hex()
+        == "e22fa38f78a79db71e84376c4eec2382166cdc412994207e7631b0ba3828f069b17b6f30351a64c50e5efacec3fe25161e9f7131e0235cd740739b24e0b06308"
+    )
+
+
+@pytest.mark.active_test_scope
 def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     backend, navigator, default_screenshot_path, test_name
 ):
@@ -307,9 +454,7 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
                 instructions_builder(2, backend, nbgl_confirm_instruction)
             )
 
-        # Send the second part of the transaction signing request
-        with client.sign_tx_with_schedule_part_2(data=chunk):
-            # Navigate and compare screenshots for validation
+        with client.sign_tx_with_schedule_and_memo_part_3(data=chunk):
             navigator.navigate_and_compare(
                 default_screenshot_path,
                 test_name,
@@ -326,5 +471,90 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
     response_hex = response.hex()
     assert (
         response_hex
+        == "9056db36dfa7b0ba722660b2becb227ed490dcaff9e332a7fba4c6d534ff0ff3368b21da8e7ebb62891be561261abd7c0435dfb46e596b1116c9996269d2a70b"
+    )
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """P2=0x01 on schedule+memo part 1; display fee not hashed."""
+    client = CommandSender(backend)
+    path = "m/1105/0/0/0/0/2/0/0"
+
+    header_and_to_address = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71820a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    header_and_to_address = bytes.fromhex(header_and_to_address)
+
+    memo = bytes.fromhex("6474657374")
+
+    memo_chunks = split_message(memo, MAX_APDU_LEN)
+
+    pairs = [
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+        "0000017a396883d90000000005f5e100",
+    ]
+    joined_pairs = bytes.fromhex("".join(pairs))
+
+    if len(joined_pairs) % 16 != 0:
+        raise ValueError("Pairs must be a multiple of 16 bytes")
+
+    pairs_chunk = split_message(joined_pairs, MAX_SCHEDULE_PAIRS_IN_ONE_APDU)
+
+    response = client.sign_tx_with_schedule_and_memo_part_1(
+        path=path,
+        header_and_to_address=header_and_to_address,
+        num_pairs=len(pairs),
+        memo_length=len(memo),
+        display_fee_microccd=TEST_DISPLAY_FEE_MICROCCD,
+    )
+    assert response.status == StatusWords.SWO_SUCCESS
+
+    for chunk in memo_chunks:
+        with client.sign_tx_with_schedule_and_memo_part_2(memo_chunk=chunk):
+            navigate_until_text_and_compare(
+                backend,
+                navigator,
+                "Continue",
+                default_screenshot_path,
+                test_name,
+                True,
+                False,
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+            )
+
+    screenshots_so_far = 4
+    if backend.device.is_nano:
+        screenshots_so_far = 8
+
+    for chunk in pairs_chunk:
+        nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
+        number_of_pairs_in_chunk = len(chunk) // 16
+        instructions = []
+        for _ in range(number_of_pairs_in_chunk):
+            if _ == number_of_pairs_in_chunk - 1:
+                nbgl_confirm_instruction = NavInsID.USE_CASE_REVIEW_CONFIRM
+            instructions.extend(
+                instructions_builder(2, backend, nbgl_confirm_instruction)
+            )
+
+        with client.sign_tx_with_schedule_and_memo_part_3(data=chunk):
+            navigator.navigate_and_compare(
+                default_screenshot_path,
+                test_name,
+                instructions,
+                10,
+                True,
+                True,
+                screenshots_so_far,
+            )
+        screenshots_so_far += number_of_pairs_in_chunk * 3
+
+    response = client.get_async_response().data
+    assert (
+        response.hex()
         == "9056db36dfa7b0ba722660b2becb227ed490dcaff9e332a7fba4c6d534ff0ff3368b21da8e7ebb62891be561261abd7c0435dfb46e596b1116c9996269d2a70b"
     )

@@ -69,7 +69,7 @@ void handle_sign_configure_delegation(const command_t *cmd, volatile unsigned in
             ctx->stopDelegation = true;
         } else {
             ctx->stopDelegation = false;
-            amount_to_gtu_display(ctx->displayCapital, sizeof(ctx->displayCapital), capitalAmount);
+            amount_to_ccd_display(ctx->displayCapital, sizeof(ctx->displayCapital), capitalAmount);
         }
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 8);
         expectedDataLength += 8;

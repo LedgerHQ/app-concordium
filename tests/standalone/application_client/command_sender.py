@@ -80,6 +80,8 @@ class P2(IntEnum):
     P2_EXPORT_BLS_KEY = 0x02
     # Basic P2 for all instructions
     P2_NONE = 0x00
+    # P2 for sign-transfer INS: trailing uint64 display fee (µCCD), not hashed (see fee_display.h).
+    P2_TX_FEE_DISPLAY = 0x01
     # # Parameter 2 for last APDU to receive.
     P2_LAST = 0x00
     # # Parameter 2 for more APDU to receive.
@@ -222,24 +224,38 @@ class CommandSender:
 
     @contextmanager
     def sign_simple_transfer(
-        self, path: str, transaction: bytes
+        self,
+        path: str,
+        transaction: bytes,
+        *,
+        display_fee_microccd: Optional[int] = None,
     ) -> Generator[None, None, None]:
         data = pack_derivation_path(path)
         data += transaction
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
 
         index = P1.P1_NONE + 1
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER,
             p1=index,
-            p2=P2.P2_NONE,
+            p2=p2,
             data=data,
         ) as response:
             yield response
 
     @contextmanager
     def sign_simple_transfer_with_memo(
-        self, path: str, header_and_to_address: bytes, memo: bytes, amount: bytes
+        self,
+        path: str,
+        header_and_to_address: bytes,
+        memo: bytes,
+        amount: bytes,
+        *,
+        display_fee_microccd: Optional[int] = None,
     ) -> Generator[None, None, None]:
         data = pack_derivation_path(path)
         data += header_and_to_address
@@ -249,11 +265,15 @@ class CommandSender:
         # memo length has to take 2 bytes
         memo_length_bytes = memo_length.to_bytes(2, byteorder="big")
         data += memo_length_bytes
+        p2_initial = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2_initial = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
         self.backend.exchange(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER_WITH_MEMO,
             p1=index,
-            p2=P2.P2_NONE,
+            p2=p2_initial,
             data=data,
         )
         index += 1
@@ -278,17 +298,26 @@ class CommandSender:
 
     @contextmanager
     def sign_tx_with_schedule_part_1(
-        self, path: str, header_and_to_address: bytes, num_pairs: int
+        self,
+        path: str,
+        header_and_to_address: bytes,
+        num_pairs: int,
+        *,
+        display_fee_microccd: Optional[int] = None,
     ) -> Generator[None, None, None]:
         # Send the derivation path, the header, the to address and the number of pairs
         data = pack_derivation_path(path)
         data += header_and_to_address
         data += num_pairs.to_bytes(1, byteorder="big")
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE,
             p1=P1.P1_NONE,
-            p2=P2.P2_NONE,
+            p2=p2,
             data=data,
         ) as response:
             yield response
@@ -305,18 +334,28 @@ class CommandSender:
             yield response
 
     def sign_tx_with_schedule_and_memo_part_1(
-        self, path: str, header_and_to_address: bytes, num_pairs: int, memo_length: int
+        self,
+        path: str,
+        header_and_to_address: bytes,
+        num_pairs: int,
+        memo_length: int,
+        *,
+        display_fee_microccd: Optional[int] = None,
     ) -> RAPDU:
         data = pack_derivation_path(path)
         data += header_and_to_address
         data += num_pairs.to_bytes(1, byteorder="big")
         memo_length_bytes = memo_length.to_bytes(2, byteorder="big")
         data += memo_length_bytes
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
         return self.backend.exchange(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
             p1=P1.P1_INITIAL_SCHEDULED_TRANSFER_WITH_MEMO,
-            p2=P2.P2_NONE,
+            p2=p2,
             data=data,
         )
 

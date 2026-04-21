@@ -63,7 +63,8 @@ typedef enum {
 typedef struct {
     unsigned char displayStr[57];
     uint8_t displayAmount[30];
-    uint8_t energy_amount_str[30];
+    uint8_t fee_display_str[30];
+    bool has_fee_display;
     simpleTransferState_t state;
 } signTransferContext_t;
 
@@ -102,7 +103,8 @@ typedef struct {
     uint8_t scheduledAmountsInCurrentPacket;
 
     uint8_t displayAmount[30];
-    uint8_t energy_amount_str[30];
+    uint8_t fee_display_str[30];
+    bool has_fee_display;
     uint8_t displayTimestamp[25];
 
     tm time;

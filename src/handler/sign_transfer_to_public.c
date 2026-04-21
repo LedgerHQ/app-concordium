@@ -66,7 +66,7 @@ void handle_sign_transfer_to_public(const command_t *cmd,
             THROW(SWO_INCORRECT_DATA);
         }
         uint64_t amountToPublic = U8BE(cdata, 0);
-        amount_to_gtu_display(ctx->amount, sizeof(ctx->amount), amountToPublic);
+        amount_to_ccd_display(ctx->amount, sizeof(ctx->amount), amountToPublic);
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 8);
         cdata += 8;
         remainingDataLength -= 8;

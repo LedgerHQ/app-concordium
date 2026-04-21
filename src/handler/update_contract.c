@@ -52,7 +52,7 @@ void handle_update_contract(const command_t *cmd) {
         // extract the amount
         ctx_update_contract->amount = U8BE(cdata, 0);
         // Format the amount
-        amount_to_gtu_display((uint8_t *) ctx_update_contract->amountDisplay,
+        amount_to_ccd_display((uint8_t *) ctx_update_contract->amountDisplay,
                               sizeof(ctx_update_contract->amountDisplay),
                               ctx_update_contract->amount);
         cdata += 8;
