@@ -122,7 +122,6 @@ class InsType(IntEnum):
     GET_APP_VERSION = 0x40
 
 
-
 # pylint: disable=too-many-public-methods
 # pylint: disable=too-many-locals
 # pylint: disable=too-many-lines
@@ -187,7 +186,7 @@ class CommandSender:
         credential_counter: int,
         idp_index: int = -1,
         *,
-        testnet: bool = False,
+        network_indicator: str = "mainnet",
     ) -> Generator[None, None, None]:
         data = b""
         p1 = P1.P1_VERIFY_ADDRESS_LEGACY_PATH
@@ -196,7 +195,12 @@ class CommandSender:
         if idp_index != -1:
             data += idp_index.to_bytes(4, byteorder="big")
             p1 = P1.P1_VERIFY_ADDRESS_NEW_PATH
-            p2 = P2.P2_TESTNET if testnet else P2.P2_MAINNET
+            if network_indicator == "mainnet":
+                p2 = P2.P2_MAINNET
+            elif network_indicator == "testnet":
+                p2 = P2.P2_TESTNET
+            else:
+                raise ValueError(f"Invalid network indicator: {network_indicator}")
 
         data += identity_index.to_bytes(
             4, byteorder="big"
@@ -207,7 +211,9 @@ class CommandSender:
             yield response
 
     @contextmanager
-    def verify_address_full_path(self, path_nodes: list[int]) -> Generator[None, None, None]:
+    def verify_address_full_path(
+        self, path_nodes: list[int]
+    ) -> Generator[None, None, None]:
         """Verify address using P1_FULL_PATH (derivation-path format).
         path_nodes: list of path elements as uint32 (hardened = 0x80000000 | index)."""
         data = len(path_nodes).to_bytes(1, byteorder="big")
