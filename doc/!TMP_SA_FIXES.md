@@ -84,3 +84,16 @@ introduced by **Hjort** (`524137ab`, 2021-09-07, *"fixes to memo based on feedba
 the original `memo.c`. The code was carried forward without a fix through three
 refactors: rename to `displayCbor.c` (Hjort, 2021-12-15), port to `sign.c` (n4l5u0r,
 2024-12-03), and move to `cbor_data_blob.c` (dbaranov-hoodies, 2026-04-08).
+
+## QB-3 — Unguarded P1_INITIAL in deploy-module / init-contract / update-contract handlers
+
+Added `isInitialCall` parameter to `handle_deploy_module`, `handle_init_contract`, and
+`handle_update_contract`, threaded it through the dispatcher, and changed `if (p1 == P1_INITIAL)`
+to `if (p1 == P1_INITIAL && isInitialCall)` in each handler. A client could previously
+send `P1_INITIAL` again mid-flow, silently resetting the SHA-256 hash and all parsed state
+while the device remained in an active signing session.
+
+**Root cause:** All three handlers were written from scratch by **keiff3r** without an
+`isInitialCall` guard — `deploy_module` (`04c3d10`, 2024-12-10), `init_contract`
+(`8acba8c`, 2024-12-11), `update_contract` (`c7fc099`, 2024-12-11). The April 2026
+reorganisation (`93d496a`, **dbaranov-hoodies**) carried the omission forward unchanged.

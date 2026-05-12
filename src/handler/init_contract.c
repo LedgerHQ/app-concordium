@@ -23,12 +23,12 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_NAME    0x01
 #define P1_PARAMS  0x02
 
-void handle_init_contract(const command_t *cmd) {
+void handle_init_contract(const command_t *cmd, bool isInitialCall) {
     uint8_t *cdata = cmd->data;
     uint8_t p1 = cmd->p1;
     uint8_t lc = cmd->lc;
 
-    if (p1 == P1_INITIAL) {
+    if (p1 == P1_INITIAL && isInitialCall) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }

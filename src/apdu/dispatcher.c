@@ -203,19 +203,19 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_deploy_module(cmd);
+            handle_deploy_module(cmd, isInitialCall);
             break;
         case INS_INIT_CONTRACT:
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_init_contract(cmd);
+            handle_init_contract(cmd, isInitialCall);
             break;
         case INS_UPDATE_CONTRACT:
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_update_contract(cmd);
+            handle_update_contract(cmd, isInitialCall);
             break;
         case INS_APP_VERSION:
             if (cmd->data != NULL) {
