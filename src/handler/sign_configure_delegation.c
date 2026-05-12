@@ -19,7 +19,13 @@
 static signConfigureDelegationContext_t *ctx = &global.signConfigureDelegation;
 static tx_state_t *tx_state = &global_tx_state;
 
-void handle_sign_configure_delegation(const command_t *cmd, volatile unsigned int *flags) {
+void handle_sign_configure_delegation(const command_t *cmd,
+                                      bool isInitialCall,
+                                      volatile unsigned int *flags) {
+    if (!isInitialCall) {
+        THROW(ERROR_INVALID_STATE);
+    }
+
     uint8_t *cdata = cmd->data;
     uint8_t dataLength = cmd->lc;
 

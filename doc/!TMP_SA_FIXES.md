@@ -97,3 +97,18 @@ while the device remained in an active signing session.
 `isInitialCall` guard — `deploy_module` (`04c3d10`, 2024-12-10), `init_contract`
 (`8acba8c`, 2024-12-11), `update_contract` (`c7fc099`, 2024-12-11). The April 2026
 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the omission forward unchanged.
+
+## QB-4 — Unguarded initial call in configure-delegation handler
+
+Added `isInitialCall` parameter to `handle_sign_configure_delegation` and threaded it through
+the dispatcher. A guard at the top of the handler throws `ERROR_INVALID_STATE` on any
+non-initial call. Because the handler has no sub-command state machine, a host could previously
+replay the APDU while the device was waiting for user approval, swapping the displayed
+delegation parameters (e.g. target baker ID or capital amount) before the user pressed
+confirm.
+
+**Root cause:** `handle_sign_configure_delegation` was written from scratch by **Jakob Ørhøj**
+(`cfcbb47`, 2022-01-17, *"Add support for configure delegation transaction"*) without an
+`isInitialCall` parameter or any state guard. Unlike other transaction handlers added at the
+same time, the delegation handler was never updated to accept the parameter as the codebase
+evolved.

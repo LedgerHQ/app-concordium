@@ -170,7 +170,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_sign_configure_delegation(cmd, flags);
+            handle_sign_configure_delegation(cmd, isInitialCall, flags);
             break;
         case INS_SIGN_UPDATE_CREDENTIAL:
             if (!cmd->data) {
