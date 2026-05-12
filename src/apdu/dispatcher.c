@@ -27,6 +27,7 @@
 #include "sign_transfer_with_memo.h"
 #include "sign_transfer_with_schedule.h"
 #include "sign_transfer_with_schedule_and_memo.h"
+#include "sign_plt.h"
 #include "sign_update_credential.h"
 #include "update_contract.h"
 #include "verify_address.h"
@@ -218,6 +219,13 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
             handle_update_contract(cmd, isInitialCall);
+            break;
+        /* PLT (Protocol Level Token) blind-signing flow: INIT then one or more CONT chunks. */
+        case INS_SIGN_PLT:
+            if (!cmd->data) {
+                return io_send_sw(SWO_WRONG_DATA_LENGTH);
+            }
+            handle_sign_plt(cmd, flags, isInitialCall);
             break;
         case INS_APP_VERSION:
             if (cmd->data != NULL) {
