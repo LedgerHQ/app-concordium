@@ -35,7 +35,6 @@ void handle_sign_update_credential(const command_t *cmd,
 
     if (isInitialCall) {
         ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_INITIAL;
-        ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
     }
     uint8_t remainingDataLength = lc;
     if (p2 == P2_CREDENTIAL_INITIAL && ctx->updateCredentialState == TX_UPDATE_CREDENTIAL_INITIAL) {
@@ -73,6 +72,7 @@ void handle_sign_update_credential(const command_t *cmd,
         }
         update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, 1);
         ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL;
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
         send_success_no_idle();
     } else if (p2 == P2_CREDENTIAL_CREDENTIAL &&
                ctx->updateCredentialState == TX_UPDATE_CREDENTIAL_CREDENTIAL &&

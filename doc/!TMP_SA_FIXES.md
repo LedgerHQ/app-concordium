@@ -1,2 +1,37 @@
-QB-17 -- added a guard into a dispatcher.c
-QB-15 -- added a guard into readCborContent
+# Security Audit Fixes
+
+## QB-1 — Out-of-order command execution in update-credential flow
+
+Moved `ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH` from the
+`isInitialCall` block to the `P2_CREDENTIAL_CREDENTIAL_INDEX` branch in
+`sign_update_credential.c`. Previously the deployment sub-state was set at flow start,
+so a client could call the credential deployment handler directly without first going
+through credential-index processing.
+
+**Root cause:** The `P2_CREDENTIAL_CREDENTIAL_INDEX` → `TX_UPDATE_CREDENTIAL_CREDENTIAL`
+transition was introduced by **Jakob Ørhøj** (`5d7543f2`, 2021-03-16) without ever
+setting `ctx->state` at that point. The 2026 reorganization (`9477d6de`,
+**dbaranov-hoodies**) added the eager `ctx->state` init at `isInitialCall`, which
+widened the window to any point after flow start rather than after credential-index.
+
+## QB-17 — Instruction-switching guard in dispatcher.c
+
+Added a guard in `apdu_dispatcher()` rejecting any APDU whose `ins` differs from
+`global_tx_state.currentInstruction` while a multi-step flow is active.
+
+The guard was missing since `handler.c` was first created by **keiff3r** (`ae19e3395b`,
+2024-12-04) — `currentInstruction` was already in `globals.h` (added by **n4l5u0r** in
+the replatform `f1c5511`, 2024-12-03) but no check was ever wired into the dispatcher.
+The April 2026 reorganization (`93d496a`, **dbaranov-hoodies**) rewrote `handler.c` into
+`dispatcher.c` and carried the omission forward.
+
+## QB-15 — Buffer overflow guard in `readCborContent`
+
+Added a bounds check before `memmove` into `ctx->display` in `cbor_data_blob.c`.
+A multi-chunk CBOR string could otherwise overflow the 255-byte display buffer.
+
+**Root cause:** The `memoDisplayUsed` accumulator and the unbounded `memmove` were
+introduced by **Hjort** (`524137ab`, 2021-09-07, *"fixes to memo based on feedback"*) in
+the original `memo.c`. The code was carried forward without a fix through three
+refactors: rename to `displayCbor.c` (Hjort, 2021-12-15), port to `sign.c` (n4l5u0r,
+2024-12-03), and move to `cbor_data_blob.c` (dbaranov-hoodies, 2026-04-08).
