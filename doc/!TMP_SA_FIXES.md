@@ -14,6 +14,23 @@ setting `ctx->state` at that point. The 2026 reorganization (`9477d6de`,
 **dbaranov-hoodies**) added the eager `ctx->state` init at `isInitialCall`, which
 widened the window to any point after flow start rather than after credential-index.
 
+## QB-12 — Write out of bounds in `path_display_new` / `path_display_legacy`
+
+Added `offset >= dstLength` guards before each `"/"` separator write in both functions
+in `derivation_path.c`. Also changed `int offset` to `size_t` to match the return type
+of `number_to_text`.
+
+`number_to_text` validates that the digit string fits in the remaining buffer, but the
+subsequent `memmove(dst + offset, "/", 1)` had no such check. If `offset == dstLength`
+after the digit write the `"/"` lands out of bounds, and the following `dstLength - offset`
+subtraction underflows (both are `size_t`), passing a huge length to the next call.
+
+**Root cause:** `getIdentityAccountDisplayNewPath` was written from scratch by **keiff3r**
+(`13c8d745`, 2024-12-04, *"feat(pubkey): support new derivation path format"*) with
+`int offset` and no separator guard. Carried forward unchanged through the Apr 2026
+reorganization (`93d496a`, **dbaranov-hoodies**) and renamed to `path_display_new` /
+`path_display_legacy` (`43d78be`, **dbaranov-hodies**, 2026-04-09).
+
 ## QB-17 — Instruction-switching guard in dispatcher.c
 
 Added a guard in `apdu_dispatcher()` rejecting any APDU whose `ins` differs from

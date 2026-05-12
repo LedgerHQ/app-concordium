@@ -118,7 +118,10 @@ void path_display_legacy(uint8_t *dst,
                          size_t dstLength,
                          uint32_t identityIndex,
                          uint32_t accountIndex) {
-    int offset = number_to_text(dst, dstLength, identityIndex);
+    size_t offset = number_to_text(dst, dstLength, identityIndex);
+    if (offset >= dstLength) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
     memmove(dst + offset, "/", 1);
     offset += 1;
     bin_to_dec(dst + offset, dstLength - offset, accountIndex);
@@ -129,11 +132,17 @@ void path_display_new(uint8_t *dst,
                       uint32_t identityProviderIndex,
                       uint32_t identityIndex,
                       uint32_t accountIndex) {
-    int offset = number_to_text(dst, dstLength, identityProviderIndex);
+    size_t offset = number_to_text(dst, dstLength, identityProviderIndex);
+    if (offset >= dstLength) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
     memmove(dst + offset, "/", 1);
     offset += 1;
 
     offset += number_to_text(dst + offset, dstLength - offset, identityIndex);
+    if (offset >= dstLength) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
     memmove(dst + offset, "/", 1);
     offset += 1;
 
