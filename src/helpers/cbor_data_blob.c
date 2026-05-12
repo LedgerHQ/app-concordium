@@ -120,6 +120,9 @@ void readCborContent(uint8_t *cdata, uint8_t contentLength) {
     ctx->cborLength -= contentLength;
     switch (ctx->majorType) {
         case 3:
+            if (ctx->displayUsed + contentLength > sizeof(ctx->display)) {
+                THROW(ERROR_BUFFER_OVERFLOW);
+            }
             memmove(ctx->display + ctx->displayUsed, cdata, contentLength);
             ctx->displayUsed += contentLength;
             break;
