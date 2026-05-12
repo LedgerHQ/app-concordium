@@ -111,44 +111,52 @@ static int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
 }
 
 int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
-    int offset = 0;
+    // Reject negative or zero tm_year: a negative value silently wraps to a huge
+    // uint64_t when passed to number_to_text, producing an unbounded digit string.
+    if (time.tm_year <= 0) {
+        THROW(ERROR_INVALID_TRANSACTION);
+    }
 
-    // Check if we have enough space for full timestamp
     if (dstLength < TIMESTAMP_DISPLAY_LENGTH) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
-    offset += number_to_text(dst, dstLength, time.tm_year + 1900);
+    size_t offset = number_to_text(dst, dstLength, (uint64_t)(time.tm_year + 1900));
 
+    if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, "-", 1);
     offset += 1;
 
     offset += prefixWithZero(dst + offset, dstLength - offset, time.tm_mon + 1);
     offset += number_to_text(dst + offset, dstLength - offset, time.tm_mon + 1);
 
+    if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, "-", 1);
     offset += 1;
 
     offset += prefixWithZero(dst + offset, dstLength - offset, time.tm_mday);
     offset += number_to_text(dst + offset, dstLength - offset, time.tm_mday);
 
+    if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, " ", 1);
     offset += 1;
 
     offset += prefixWithZero(dst + offset, dstLength - offset, time.tm_hour);
     offset += number_to_text(dst + offset, dstLength - offset, time.tm_hour);
 
+    if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, ":", 1);
     offset += 1;
 
     offset += prefixWithZero(dst + offset, dstLength - offset, time.tm_min);
     offset += number_to_text(dst + offset, dstLength - offset, time.tm_min);
 
+    if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, ":", 1);
     offset += 1;
 
     offset += prefixWithZero(dst + offset, dstLength - offset, time.tm_sec);
     offset += bin_to_dec(dst + offset, dstLength - offset, time.tm_sec);
 
-    return offset;
+    return (int) offset;
 }

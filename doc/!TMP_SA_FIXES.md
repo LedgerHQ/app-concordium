@@ -31,6 +31,23 @@ subtraction underflows (both are `size_t`), passing a huge length to the next ca
 reorganization (`93d496a`, **dbaranov-hoodies**) and renamed to `path_display_new` /
 `path_display_legacy` (`43d78be`, **dbaranov-hodies**, 2026-04-09).
 
+## QB-16 — Buffer overflow in `timeToDisplayText`
+
+Added `time.tm_year <= 0` guard at function entry in `time.c`, `size_t offset` replacing
+`int offset`, and `offset >= dstLength` checks before each separator write.
+
+A negative `tm_year` (possible when `secondsToTm` receives a value near `INT_MAX *
+31622400LL`) is silently cast to a huge `uint64_t` by `number_to_text`, producing a
+20-digit string that overflows the 20-byte timestamp buffer before any separator is
+written. The same unchecked separator offset pattern as QB-12 then causes further
+underflow of `dstLength - offset`.
+
+**Root cause:** `timeToDisplayText` was written from scratch by **Jakob Ørhøj**
+(`f03824ba`, 2021-06-23, *"Refactor epoch to date conversion"*) with `int offset`, no
+`tm_year` sign check, and no separator bounds guards. Carried through the replatform
+(`f1c5511`, n4l5u0r, 2024-12-03) and reorganization (`93d496a`, dbaranov-hoodies,
+2026-04-08) unchanged.
+
 ## QB-17 — Instruction-switching guard in dispatcher.c
 
 Added a guard in `apdu_dispatcher()` rejecting any APDU whose `ins` differs from
