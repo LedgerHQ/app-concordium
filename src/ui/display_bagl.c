@@ -281,7 +281,7 @@ void startConfigureBakerDisplay(void) {
 
     // If there are additional steps, then show continue screen. If this is the last
     // step, then show signing screens.
-    if (ctx_conf_baker->hasMetadataUrl || hasCommissionRate()) {
+    if (ctx_conf_baker->hasMetadataUrl || hasCommissionRate() || ctx_conf_baker->hasSuspended) {
         ux_sign_configure_baker_first[index++] = &ux_sign_configure_baker_continue;
     } else {
         ux_sign_configure_baker_first[index++] = &ux_sign_flow_shared_sign;
@@ -325,7 +325,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
 
         // If there are additional steps show the continue screen, otherwise go
         // to signing screens.
-        if (hasCommissionRate()) {
+        if (hasCommissionRate() || ctx_conf_baker->hasSuspended) {
             ux_sign_configure_baker_url[index++] = &ux_sign_configure_baker_continue;
         } else {
             ux_sign_configure_baker_url[index++] = &ux_sign_flow_shared_sign;

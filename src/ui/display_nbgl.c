@@ -351,7 +351,7 @@ void startConfigureBakerDisplay(void) {
 
     // If there are additional steps, then show continue screen. If this is the
     // last step, then show signing screens.
-    if (ctx->hasMetadataUrl || hasCommissionRate()) {
+    if (ctx->hasMetadataUrl || hasCommissionRate() || ctx->hasSuspended) {
         // Create the page content
         nbgl_contentTagValueList_t content;
         content.nbPairs = pairIndex;
@@ -419,7 +419,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
 
     // If there are additional steps show the continue screen, otherwise go
     // to signing screens.
-    if (hasCommissionRate()) {
+    if (hasCommissionRate() || ctx->hasSuspended) {
         // Create the page content
         nbgl_contentTagValueList_t content;
         content.nbPairs = pairIndex;

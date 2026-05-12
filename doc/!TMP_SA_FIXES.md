@@ -1,5 +1,20 @@
 # Security Audit Fixes
 
+## QB-2 — Early signing trigger in configure-baker display flow
+
+Added `|| ctx->hasSuspended` to the "continue vs. sign" condition in
+`startConfigureBakerDisplay` and `startConfigureBakerUrlDisplay` in both
+`display_nbgl.c` and `display_bagl.c`.
+
+When none of the three commission flags is set but `hasSuspended` is true, both
+functions fell into the `else` branch and presented the sign screen directly,
+skipping the `BAKER_SUSPENDED` display step entirely.
+
+**Root cause:** `a6c8be40` (**GuilaneDen**, 2025-01-24,
+*"fix(LDG-677): added suspended boolean to the configureBaker method"*) correctly
+wired `CONFIGURE_BAKER_SUSPENDED` into the handler state machine but did not update
+the display functions, leaving their "is this the last step?" guard stale.
+
 ## QB-1 — Out-of-order command execution in update-credential flow
 
 Moved `ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH` from the

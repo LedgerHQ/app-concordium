@@ -270,6 +270,85 @@ def test_sign_configure_baker_suspended_only(
 
 
 @pytest.mark.active_test_scope
+def test_sign_configure_baker_capital_and_suspended_no_commission(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """QB-2 regression: capital set + hasSuspended, no commission flags.
+    startConfigureBakerDisplay() must show 'Continue' (not 'Sign') so that
+    the BAKER_SUSPENDED step is not skipped."""
+    client = CommandSender(backend)
+
+    # bit 0 (capital) | bit 8 (suspended) = 0x0101
+    bitmap = bytes.fromhex("0101")
+    # 8-byte capital amount, no restake/open/keys data
+    transaction = bytes.fromhex("0000FFFFFFFFFFFF")
+
+    with client.sign_configure_baker(transaction=transaction, bitmap=bitmap):
+        if backend.device.is_nano:
+            navigate_until_text_and_compare(
+                backend, navigator, "Continue",
+                default_screenshot_path, test_name + "_1",
+                False, False,
+            )
+        else:
+            navigate_until_text_and_compare(
+                backend, navigator, "Continue",
+                default_screenshot_path, test_name + "_1",
+                True, False,
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+            )
+
+    with client.sign_configure_baker_suspended(
+        bitmap=bitmap, suspended=True, is_called_first=False
+    ):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name + "_2"
+        )
+
+    response = client.get_async_response().data
+    assert len(response.hex()) == 128
+
+
+@pytest.mark.active_test_scope
+def test_sign_configure_baker_url_and_suspended_no_commission(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """QB-2 regression: metadataUrl set + hasSuspended, no commission flags.
+    startConfigureBakerUrlDisplay() must show 'Continue' (not 'Sign') so that
+    the BAKER_SUSPENDED step is not skipped."""
+    client = CommandSender(backend)
+
+    # bit 4 (metadataUrl) | bit 8 (suspended) = 0x0110
+    bitmap = bytes.fromhex("0110")
+    url_bytes = url.encode("utf-8")
+
+    with client.sign_configure_baker_url(url=url_bytes, bitmap=bitmap):
+        if backend.device.is_nano:
+            navigate_until_text_and_compare(
+                backend, navigator, "Continue",
+                default_screenshot_path, test_name + "_1",
+                False, False,
+            )
+        else:
+            navigate_until_text_and_compare(
+                backend, navigator, "Continue",
+                default_screenshot_path, test_name + "_1",
+                True, False,
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+            )
+
+    with client.sign_configure_baker_suspended(
+        bitmap=bitmap, suspended=True, is_called_first=False
+    ):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name + "_2"
+        )
+
+    response = client.get_async_response().data
+    assert len(response.hex()) == 128
+
+
+@pytest.mark.active_test_scope
 def test_sign_configure_baker_all_parameters(
     backend, navigator, default_screenshot_path, test_name
 ):
