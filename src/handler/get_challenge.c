@@ -20,5 +20,6 @@ void handle_get_challenge(void) {
     memcpy(&global.trustedNamePki.stored_challenge, buf, CHALLENGE_SIZE);
 
     memcpy(G_io_apdu_buffer, buf, CHALLENGE_SIZE); /* big-endian output */
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
     io_send_response_pointer(G_io_apdu_buffer, CHALLENGE_SIZE, SWO_SUCCESS);
 }

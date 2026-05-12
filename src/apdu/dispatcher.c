@@ -67,6 +67,14 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
      * the specialized handler. Handlers are responsible for detailed parsing and for
      * populating the response buffer / status words.
      */
+    /* Prevent instruction-switching attacks: once a multi-step flow is started the
+     * host must not change the instruction byte mid-transaction. */
+    if (global_tx_state.currentInstruction != INSTRUCTION_NONE &&
+        global_tx_state.currentInstruction != (int) cmd->ins) {
+        PRINTF("CMD GUARD TRIGGERED");
+        return io_send_sw(ERROR_INVALID_STATE);
+    }
+
     switch (cmd->ins) {
         /* Key and address-related queries: return public information, do not modify state. */
         case INS_GET_PUBLIC_KEY:
