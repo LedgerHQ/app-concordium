@@ -355,6 +355,22 @@ typedef struct {
     bool hasDelegationTarget;
 } signConfigureDelegationContext_t;
 
+/* ----- PLT (Protocol Level Token) signing context (INS 0x27) ----- */
+
+typedef enum {
+    TX_PLT_INITIAL = 80,
+    TX_PLT_CBOR = 81,
+} pltState_t;
+
+typedef struct {
+    pltState_t state;
+    uint32_t cborTotalLength;
+    uint32_t cborReceived;
+    uint8_t tokenId[PLT_TOKEN_ID_MAX];
+    uint8_t tokenIdLength;
+    uint8_t cborBuf[APP_PLT_CBOR_MAX];
+} signPltContext_t;
+
 typedef struct trustedNameMultiHashCtx_s {
     cx_sha256_t sha256;
     cx_sha3_t sha3_256;
@@ -402,6 +418,7 @@ typedef union {
     updateContract_t updateContract;
     transactionWithDataBlob_t withDataBlob;
     trustedNamePkiContext_t trustedNamePki;
+    signPltContext_t signPlt;
 } instructionContext;
 
 /** Instruction-scoped union; storage in `globals.c`. */
