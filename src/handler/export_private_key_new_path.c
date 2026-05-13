@@ -240,28 +240,30 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
     if (p1 == P1_IDENTITY_CREDENTIAL_CREATION) {
         memmove(ctx->display_review_verb,
                 "to create credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-        memmove(ctx->display_sign_verb, "to create credentials?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                sizeof("to create credentials"));
+        memmove(ctx->display_sign_verb,
+                "to create credentials?",
+                sizeof("to create credentials?"));
     } else if (p1 == P1_ACCOUNT_CREATION) {
-        memmove(ctx->display_review_verb, "to create account", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-        memmove(ctx->display_sign_verb, "to create account?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+        memmove(ctx->display_review_verb, "to create account", sizeof("to create account"));
+        memmove(ctx->display_sign_verb, "to create account?", sizeof("to create account?"));
     } else if (p1 == P1_ID_RECOVERY) {
         memmove(ctx->display_review_verb,
                 "to recover credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+                sizeof("to recover credentials"));
         memmove(ctx->display_sign_verb,
                 "to recover credentials?",
-                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                sizeof("to recover credentials?"));
     } else if (p1 == P1_ACCOUNT_CREDENTIAL_DISCOVERY) {
         memmove(ctx->display_review_verb,
                 "to discover credentials",
-                EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+                sizeof("to discover credentials"));
         memmove(ctx->display_sign_verb,
                 "to discover credentials?",
-                EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                sizeof("to discover credentials?"));
     } else if (p1 == P1_CREATION_OF_ZK_PROOF) {
-        memmove(ctx->display_review_verb, "to create ZK proof", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-        memmove(ctx->display_sign_verb, "to create ZK proof?", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+        memmove(ctx->display_review_verb, "to create ZK proof", sizeof("to create ZK proof"));
+        memmove(ctx->display_sign_verb, "to create ZK proof?", sizeof("to create ZK proof?"));
     }
 
     if (need_account_suffix) {

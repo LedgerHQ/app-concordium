@@ -66,26 +66,26 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
         case P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC:
             memmove(ctx->display_sign_verb,
                     "to create credentials?",
-                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                    sizeof("to create credentials?"));
             memmove(ctx->display_review_verb,
                     "to create credentials",
-                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+                    sizeof("to create credentials"));
             break;
         case P1_LEGACY_PRF_KEY_RECOVERY:
             memmove(ctx->display_sign_verb,
                     "to recover credentials?",
-                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                    sizeof("to recover credentials?"));
             memmove(ctx->display_review_verb,
                     "to recover credentials",
-                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+                    sizeof("to recover credentials"));
             break;
         case P1_LEGACY_PRF_KEY:
             memmove(ctx->display_sign_verb,
                     "to decrypt credentials?",
-                    EXPORT_PRIVATE_KEY_SIGN_VERB_LEN);
+                    sizeof("to decrypt credentials?"));
             memmove(ctx->display_review_verb,
                     "to decrypt credentials",
-                    EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
+                    sizeof("to decrypt credentials"));
             break;
         default:
             THROW(SWO_INCORRECT_P1_P2);

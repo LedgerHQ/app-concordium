@@ -1,5 +1,5 @@
 /*
- * Fuzzer for handle_export_private_key_new_path.
+ * Fuzzer for handle_sign_transfer_with_schedule_and_memo.
  * Input: [p1:1][p2:1][command data...]
  */
 #include <stdint.h>
@@ -7,7 +7,7 @@
 #include <setjmp.h>
 #include "../stubs/ledger/exceptions.h"
 #include "../stubs/ledger/parser.h"
-#include "handler/export_private_key_new_path.h"
+#include "handler/sign_transfer_with_schedule_and_memo.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (size < 2) return 0;
@@ -20,7 +20,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     cmd.lc   = (uint8_t)((size - 2) > 255 ? 255 : (size - 2));
     cmd.data = (uint8_t *)(data + 2);
 
-    handle_export_private_key_new_path(&cmd, &flags);
+    handle_sign_transfer_with_schedule_and_memo(&cmd, &flags, /*isInitialCall=*/true);
     return 0;
 }
 

@@ -21,6 +21,9 @@ This document tracks every finding addressed on branch `1360-sa-fixes`. For each
 | [QB-15](#qb-15) | <span style="color:orangered">High</span>      | Buffer overflow in `readCborContent`                                    | 2021-09-07 · Hjort · `524137ab`                    |
 | [QB-16](#qb-16) | <span style="color:darkorange">Medium</span>   | Buffer overflow in `timeToDisplayText`                                  | 2021-06-23 · Jakob Ørhøj · `f03824ba`              |
 | [QB-17](#qb-17) | <span style="color:crimson">Critical</span>    | Instruction-switching guard missing in `dispatcher.c`                   | 2024-12-04 · keiff3r · `ae19e339`                  |
+| [QB-18](#qb-18) | <span style="color:forestgreen">Low</span>     | Insufficient fuzzing coverage across APDU handlers                      | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
+| [QB-19](#qb-19) | <span style="color:forestgreen">Low</span>     | Global-buffer-overflow in export-private-key display (memmove overread) | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
+| [QB-20](#qb-20) | <span style="color:darkorange">Medium</span>   | Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength| 2022-01-17 · Jakob Ørhøj · `cfcbb47`               |
 
 ---
 
@@ -246,3 +249,84 @@ The guard was missing since `handler.c` was first created by **keiff3r** (`ae19e
 the replatform `f1c5511`, 2024-12-03) but no check was ever wired into the dispatcher.
 The April 2026 reorganization (`93d496a`, **dbaranov-hoodies**) rewrote `handler.c` into
 `dispatcher.c` and carried the omission forward.
+
+<a id="qb-18"></a>
+## QB-18 — Insufficient fuzzing coverage across APDU handlers
+
+Rewrote the fuzzing infrastructure so all 19 APDU handler fuzz targets compile the real
+handler source files rather than re-implementing simplified logic inline. Changes:
+
+- Rewrote `fuzzing/CMakeLists.txt` with a `SHARED_SOURCES` list (all helpers) and an
+  `add_fuzz_target()` function that links each target against its real handler `.c` file.
+- Created `fuzzing/stubs/` — a thin Ledger SDK stub layer (`cx_sha256_init`,
+  `os_perso_derive_node_bip32`, `get_private_key`, etc. as no-ops) so harnesses compile
+  without the full Ledger SDK toolchain.
+- Rewrote all 19 fuzzer `.c` files as thin harnesses: input bytes are unpacked into a
+  `command_t` and the real handler is called; `setjmp`/`longjmp` intercepts `THROW`
+  exceptions so the harness terminates cleanly instead of crashing the process.
+- Added `fuzzing/run_local.sh`: builds the suite, runs each target for a configurable
+  duration, accumulates corpus in `fuzzing/corpus/`, and reports any crashes.
+
+Running the harnesses for one minute each immediately found two previously unknown
+memory-safety bugs in production handler code (QB-19, QB-20) that the old stub-based
+fuzzers could not have detected.
+
+**Root cause:** The `fuzzing/` directory (last restructured `93d496a`, **dbaranov-hoodies**,
+2026-04-08) contained 19 targets, but each re-implemented a simplified copy of its handler's
+logic rather than calling the real handler. Any memory-safety violation in the actual source
+was invisible to the fuzzer.
+
+<a id="qb-19"></a>
+## QB-19 — Global-buffer-overflow in export-private-key display (memmove overread)
+
+Changed all `memmove(ctx->display_sign_verb, "...", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN)` and
+`memmove(ctx->display_review_verb, "...", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN)` calls in
+`export_private_key_legacy_path.c` (3 switch cases) and `export_private_key_new_path.c`
+(5 switch cases) to use `sizeof("literal")` as the copy length.
+
+`EXPORT_PRIVATE_KEY_SIGN_VERB_LEN` is defined as 25 — the buffer capacity of
+`display_sign_verb`, sized for the longest string `"to discover credentials?"` (24 bytes
++ NUL). When a shorter string such as `"to create credentials?"` (23 bytes) is copied with
+count 25, `memmove` reads one byte past the end of that string literal in the rodata
+section, triggering a global-buffer-overflow. The same applies to
+`EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN` (24) against shorter review-verb strings. On the
+device the overread byte is adjacent rodata (typically the NUL of the next literal) and
+the display field appears correct, hiding the defect entirely.
+
+**Root cause:** Both handler files were restructured by **dbaranov-hoodies** (`93d496a`,
+2026-04-08). The `EXPORT_PRIVATE_KEY_SIGN_VERB_LEN` / `EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN`
+constants were introduced as buffer-size annotations on the destination array, but were
+accidentally reused as the `memmove` byte-count argument for every string regardless of
+its actual length.
+
+<a id="qb-20"></a>
+## QB-20 — Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength
+
+Introduced `uint8_t remaining = dataLength - keyDerivationPathLength` immediately after
+advancing `cdata` past the derivation path in `handle_sign_configure_delegation`, and
+passed `remaining` (not the original `dataLength`) to `hashAccountTransactionHeaderAndKind`
+and its subsequent length checks.
+
+`hashAccountTransactionHeaderAndKind` calls `base58check_encode(cdata, ADDRESS_LENGTH, …)`
+which reads exactly 32 bytes. The function checks `if (dataLength < ADDRESS_LENGTH)` before
+that call (QB-13 fix), but `dataLength` had not been reduced by `keyDerivationPathLength`,
+so the guard passed even when only a few bytes of actual payload remained after the path,
+and `base58check_encode` read past the end of the heap-allocated input buffer:
+
+```
+ERROR: AddressSanitizer: heap-buffer-overflow … READ of size 32
+    #0 __asan_memmove … base58check.c:43
+    #1 hashAccountTransactionHeaderAndKind … tx_hash.c:53
+    #2 handle_sign_configure_delegation … sign_configure_delegation.c:42
+```
+
+Every other handler calling `hashAccountTransactionHeaderAndKind` (`sign_transfer.c`,
+`sign_configure_baker.c`, etc.) first subtracts the path length and passes the reduced
+value; only `sign_configure_delegation` passed the original `dataLength`.
+
+**Root cause:** `handle_sign_configure_delegation` was written from scratch by **Jakob Ørhøj**
+(`cfcbb47`, 2022-01-17, *"Add support for configure delegation transaction"*). The
+remaining-data pattern used in every other handler was simply not applied — `dataLength`
+was passed to `hashAccountTransactionHeaderAndKind` without accounting for the bytes
+already consumed by the derivation path. The omission was carried forward through the
+April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) unchanged.
