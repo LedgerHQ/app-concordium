@@ -1,5 +1,45 @@
 # Security Audit Fixes
 
+This document tracks every finding addressed on branch `1360-sa-fixes`. For each issue it records the fix applied, the commit that originally introduced the bug, and the author responsible. Severities follow the audit's §8.2 table (QB-N and severity-N share the same numbering).
+
+| QB# | Severity | Name | Introduced |
+|-----|----------|------|------------|
+| [QB-1](#qb-1)   | <span style="color:darkorange">Medium</span>   | Out-of-order command execution in update-credential flow                | 2021-03-16 · jo · `5d7543f2`                       |
+| [QB-2](#qb-2)   | <span style="color:forestgreen">Low</span>     | Early signing trigger in configure-baker display flow                   | 2025-01-24 · GuilaneDen · `a6c8be40`               |
+| [QB-3](#qb-3)   | <span style="color:forestgreen">Low</span>     | Unguarded P1_INITIAL in deploy-module / init-contract / update-contract | 2024-12-10/11 · keiff3r · `04c3d10` / `8acba8c` / `c7fc099` |
+| [QB-4](#qb-4)   | <span style="color:forestgreen">Low</span>     | Unguarded initial call in configure-delegation handler                  | 2022-01-17 · jo · `cfcbb47`                        |
+| [QB-5](#qb-5)   | <span style="color:forestgreen">Low</span>     | Missing bounds check in `NAME_FIRST` state of `handle_init_contract`    | 2024-12-11 · keiff3r · `8acba8c`                   |
+| [QB-6](#qb-5)   | <span style="color:forestgreen">Low</span>     | Missing bounds check in `PARAMS_FIRST` state of `handle_init_contract`  | 2024-12-11 · keiff3r · `8acba8c`                   |
+| [QB-7](#qb-7)   | <span style="color:forestgreen">Low</span>     | Unguarded P1_INITIAL in `handle_sign_configure_baker`                   | 2022-01-20 · jo · `024cd076`                       |
+| [QB-8](#qb-8)   | <span style="color:forestgreen">Low</span>     | Missing bounds check in `NAME_FIRST` state of `handle_update_contract`  | 2024-12-11 · keiff3r · `c7fc099`                   |
+| [QB-9](#qb-8)   | <span style="color:forestgreen">Low</span>     | Missing bounds check in `PARAMS_FIRST` state of `handle_update_contract`| 2024-12-11 · keiff3r · `c7fc099`                   |
+| [QB-10](#qb-10) | <span style="color:forestgreen">Low</span>     | Read out of bounds in `parse_derivation_path_legacy`                    | 2026-04-08 · dbaranov-hoodies · `93d496a`          |
+| [QB-11](#qb-10) | <span style="color:forestgreen">Low</span>     | Read out of bounds in `parse_derivation_path_new`                       | 2026-04-08 · dbaranov-hoodies · `93d496a`          |
+| [QB-12](#qb-12) | <span style="color:darkorange">Medium</span>   | Write out of bounds in `path_display_new` / `path_display_legacy`       | 2024-12-04 · keiff3r · `13c8d745`                  |
+| [QB-13](#qb-13) | <span style="color:forestgreen">Low</span>     | Read out of bounds in `hashAccountTransactionHeaderAndKind`             | 2021-05-28 · jo · `f1f8f0be`                       |
+| [QB-14](#qb-14) | <span style="color:forestgreen">Low</span>     | Integer underflow in `readCborInitial`                                  | 2021-09-07 · Hjort · `5b108ea6`                    |
+| [QB-15](#qb-15) | <span style="color:orangered">High</span>      | Buffer overflow in `readCborContent`                                    | 2021-09-07 · Hjort · `524137ab`                    |
+| [QB-16](#qb-16) | <span style="color:darkorange">Medium</span>   | Buffer overflow in `timeToDisplayText`                                  | 2021-06-23 · Jakob Ørhøj · `f03824ba`              |
+| [QB-17](#qb-17) | <span style="color:crimson">Critical</span>    | Instruction-switching guard missing in `dispatcher.c`                   | 2024-12-04 · keiff3r · `ae19e339`                  |
+
+---
+
+<a id="qb-1"></a>
+## QB-1 — Out-of-order command execution in update-credential flow
+
+Moved `ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH` from the
+`isInitialCall` block to the `P2_CREDENTIAL_CREDENTIAL_INDEX` branch in
+`sign_update_credential.c`. Previously the deployment sub-state was set at flow start,
+so a client could call the credential deployment handler directly without first going
+through credential-index processing.
+
+**Root cause:** The `P2_CREDENTIAL_CREDENTIAL_INDEX` → `TX_UPDATE_CREDENTIAL_CREDENTIAL`
+transition was introduced by **Jakob Ørhøj** (`5d7543f2`, 2021-03-16) without ever
+setting `ctx->state` at that point. The 2026 reorganization (`9477d6de`,
+**dbaranov-hoodies**) added the eager `ctx->state` init at `isInitialCall`, which
+widened the window to any point after flow start rather than after credential-index.
+
+<a id="qb-2"></a>
 ## QB-2 — Early signing trigger in configure-baker display flow
 
 Added `|| ctx->hasSuspended` to the "continue vs. sign" condition in
@@ -15,76 +55,7 @@ skipping the `BAKER_SUSPENDED` display step entirely.
 wired `CONFIGURE_BAKER_SUSPENDED` into the handler state machine but did not update
 the display functions, leaving their "is this the last step?" guard stale.
 
-## QB-1 — Out-of-order command execution in update-credential flow
-
-Moved `ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH` from the
-`isInitialCall` block to the `P2_CREDENTIAL_CREDENTIAL_INDEX` branch in
-`sign_update_credential.c`. Previously the deployment sub-state was set at flow start,
-so a client could call the credential deployment handler directly without first going
-through credential-index processing.
-
-**Root cause:** The `P2_CREDENTIAL_CREDENTIAL_INDEX` → `TX_UPDATE_CREDENTIAL_CREDENTIAL`
-transition was introduced by **Jakob Ørhøj** (`5d7543f2`, 2021-03-16) without ever
-setting `ctx->state` at that point. The 2026 reorganization (`9477d6de`,
-**dbaranov-hoodies**) added the eager `ctx->state` init at `isInitialCall`, which
-widened the window to any point after flow start rather than after credential-index.
-
-## QB-12 — Write out of bounds in `path_display_new` / `path_display_legacy`
-
-Added `offset >= dstLength` guards before each `"/"` separator write in both functions
-in `derivation_path.c`. Also changed `int offset` to `size_t` to match the return type
-of `number_to_text`.
-
-`number_to_text` validates that the digit string fits in the remaining buffer, but the
-subsequent `memmove(dst + offset, "/", 1)` had no such check. If `offset == dstLength`
-after the digit write the `"/"` lands out of bounds, and the following `dstLength - offset`
-subtraction underflows (both are `size_t`), passing a huge length to the next call.
-
-**Root cause:** `getIdentityAccountDisplayNewPath` was written from scratch by **keiff3r**
-(`13c8d745`, 2024-12-04, *"feat(pubkey): support new derivation path format"*) with
-`int offset` and no separator guard. Carried forward unchanged through the Apr 2026
-reorganization (`93d496a`, **dbaranov-hoodies**) and renamed to `path_display_new` /
-`path_display_legacy` (`43d78be`, **dbaranov-hodies**, 2026-04-09).
-
-## QB-16 — Buffer overflow in `timeToDisplayText`
-
-Added `time.tm_year <= 0` guard at function entry in `time.c`, `size_t offset` replacing
-`int offset`, and `offset >= dstLength` checks before each separator write.
-
-A negative `tm_year` (possible when `secondsToTm` receives a value near `INT_MAX *
-31622400LL`) is silently cast to a huge `uint64_t` by `number_to_text`, producing a
-20-digit string that overflows the 20-byte timestamp buffer before any separator is
-written. The same unchecked separator offset pattern as QB-12 then causes further
-underflow of `dstLength - offset`.
-
-**Root cause:** `timeToDisplayText` was written from scratch by **Jakob Ørhøj**
-(`f03824ba`, 2021-06-23, *"Refactor epoch to date conversion"*) with `int offset`, no
-`tm_year` sign check, and no separator bounds guards. Carried through the replatform
-(`f1c5511`, n4l5u0r, 2024-12-03) and reorganization (`93d496a`, dbaranov-hoodies,
-2026-04-08) unchanged.
-
-## QB-17 — Instruction-switching guard in dispatcher.c
-
-Added a guard in `apdu_dispatcher()` rejecting any APDU whose `ins` differs from
-`global_tx_state.currentInstruction` while a multi-step flow is active.
-
-The guard was missing since `handler.c` was first created by **keiff3r** (`ae19e3395b`,
-2024-12-04) — `currentInstruction` was already in `globals.h` (added by **n4l5u0r** in
-the replatform `f1c5511`, 2024-12-03) but no check was ever wired into the dispatcher.
-The April 2026 reorganization (`93d496a`, **dbaranov-hoodies**) rewrote `handler.c` into
-`dispatcher.c` and carried the omission forward.
-
-## QB-15 — Buffer overflow guard in `readCborContent`
-
-Added a bounds check before `memmove` into `ctx->display` in `cbor_data_blob.c`.
-A multi-chunk CBOR string could otherwise overflow the 255-byte display buffer.
-
-**Root cause:** The `memoDisplayUsed` accumulator and the unbounded `memmove` were
-introduced by **Hjort** (`524137ab`, 2021-09-07, *"fixes to memo based on feedback"*) in
-the original `memo.c`. The code was carried forward without a fix through three
-refactors: rename to `displayCbor.c` (Hjort, 2021-12-15), port to `sign.c` (n4l5u0r,
-2024-12-03), and move to `cbor_data_blob.c` (dbaranov-hoodies, 2026-04-08).
-
+<a id="qb-3"></a>
 ## QB-3 — Unguarded P1_INITIAL in deploy-module / init-contract / update-contract handlers
 
 Added `isInitialCall` parameter to `handle_deploy_module`, `handle_init_contract`, and
@@ -98,6 +69,7 @@ while the device remained in an active signing session.
 (`8acba8c`, 2024-12-11), `update_contract` (`c7fc099`, 2024-12-11). The April 2026
 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the omission forward unchanged.
 
+<a id="qb-4"></a>
 ## QB-4 — Unguarded initial call in configure-delegation handler
 
 Added `isInitialCall` parameter to `handle_sign_configure_delegation` and threaded it through
@@ -113,6 +85,7 @@ confirm.
 same time, the delegation handler was never updated to accept the parameter as the codebase
 evolved.
 
+<a id="qb-5"></a><a id="qb-6"></a>
 ## QB-5 / QB-6 — Missing bounds check in `*_FIRST` state of `handle_init_contract`
 
 Added `if (remainingNameLength < lc) THROW(ERROR_INVALID_NAME_LENGTH)` immediately after
@@ -127,6 +100,7 @@ declared length, causing an unsigned underflow on `remaining -= lc` with a corru
 first-chunk path was left unchecked. Carried forward by the April 2026 reorganisation
 (`93d496a`, **dbaranov-hoodies**).
 
+<a id="qb-7"></a>
 ## QB-7 — Unguarded P1_INITIAL in `handle_sign_configure_baker`
 
 Added `if (isInitialCall) { ctx_conf_baker->state = CONFIGURE_BAKER_INITIAL; }` before the
@@ -148,6 +122,69 @@ defined but never used as a state guard. The December 2024 replatform (`313463a`
 and the April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the incomplete guard
 forward unchanged.
 
+<a id="qb-8"></a><a id="qb-9"></a>
+## QB-8 / QB-9 — Same underflow in `handle_update_contract`
+
+Identical fix applied to `update_contract.c`: bounds checks added in both
+`UPDATE_CONTRACT_NAME_FIRST` and `UPDATE_CONTRACT_PARAMS_FIRST` branches.
+
+**Root cause:** `update_contract.c` was written from scratch by **keiff3r** (`c7fc099`,
+2024-12-11) with the same omission as `init_contract.c` above.
+
+<a id="qb-10"></a><a id="qb-11"></a>
+## QB-10 / QB-11 — Read out of bounds in `parse_derivation_path_legacy` / `parse_derivation_path_new`
+
+Added `if (lc < 8) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_legacy`
+and `if (lc < 12) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_new` in
+`derivation_path.c`. Both functions called `read_u32_be` (which performs no bounds check)
+before any length validation; `check_lc` at the end verified the exact length only after
+the out-of-bounds reads had already occurred.
+
+**Root cause:** Both functions were introduced in the April 2026 reorganisation (`93d496a`,
+**dbaranov-hoodies**) by extracting repeated derivation-path parsing from the individual
+handlers. The original `handleExportPrivateKeyNewPath` and `handleExportPrivateKeyLegacyPath`
+had explicit `if (remainingDataLength < 4) THROW(ERROR_INVALID_PATH)` guards before each
+`U4BE` read. The extracted helpers replaced those per-field guards with a single
+post-read `check_lc`, introducing the window.
+
+<a id="qb-12"></a>
+## QB-12 — Write out of bounds in `path_display_new` / `path_display_legacy`
+
+Added `offset >= dstLength` guards before each `"/"` separator write in both functions
+in `derivation_path.c`. Also changed `int offset` to `size_t` to match the return type
+of `number_to_text`.
+
+`number_to_text` validates that the digit string fits in the remaining buffer, but the
+subsequent `memmove(dst + offset, "/", 1)` had no such check. If `offset == dstLength`
+after the digit write the `"/"` lands out of bounds, and the following `dstLength - offset`
+subtraction underflows (both are `size_t`), passing a huge length to the next call.
+
+**Root cause:** `getIdentityAccountDisplayNewPath` was written from scratch by **keiff3r**
+(`13c8d745`, 2024-12-04, *"feat(pubkey): support new derivation path format"*) with
+`int offset` and no separator guard. Carried forward unchanged through the Apr 2026
+reorganization (`93d496a`, **dbaranov-hoodies**) and renamed to `path_display_new` /
+`path_display_legacy` (`43d78be`, **dbaranov-hodies**, 2026-04-09).
+
+<a id="qb-13"></a>
+## QB-13 — Read out of bounds in `hashAccountTransactionHeaderAndKind`
+
+Added `if (dataLength < ADDRESS_LENGTH) THROW(ERROR_INVALID_TRANSACTION)` at the top of
+`hashAccountTransactionHeaderAndKind` in `tx_hash.c`, before the `base58check_encode` call.
+`base58check_encode` reads exactly `ADDRESS_LENGTH` (32) bytes from `cdata`, but `dataLength`
+was never checked first. `handleHeaderAndToAddress` correctly computes `remainingDataLength`
+after stripping the derivation path and passes it in, but that value was ignored.
+`hashHeaderAndType` (called afterward) does check `dataLength < ACCOUNT_TRANSACTION_HEADER_LENGTH + 1`,
+but that check arrives too late — the 32-byte read has already happened.
+
+**Root cause:** `f1f8f0be` (**jo**, 2021-05-28, *"Show sender address for all account
+transactions"*) added `base58check_encode(cdata, 32, ...)` to a function that had no
+`dataLength` parameter at all at the time — so a bounds check was not possible. The
+`dataLength` parameter was added later as part of the `hashHeaderAndType` refactor but
+no one added a guard for the preceding `base58check_encode` call. The omission was carried
+through the December 2024 replatform (`f1c5511`, **n4l5u0r**) and the April 2026
+reorganisation (`93d496a`, **dbaranov-hoodies**) unchanged.
+
+<a id="qb-14"></a>
 ## QB-14 — Integer underflow in `readCborInitial`
 
 Added `if (ctx->cborLength < 1) THROW(SWO_INCORRECT_DATA)` before the first decrement
@@ -168,43 +205,44 @@ was carried forward through the rename to `displayCbor.c` (Hjort, 2021-12-15), t
 (`f1c5511`, **n4l5u0r**, 2024-12-03), and the move to `cbor_data_blob.c` (`93d496a`,
 **dbaranov-hoodies**, 2026-04-08) without ever adding the missing guards.
 
-## QB-13 — Read out of bounds in `hashAccountTransactionHeaderAndKind`
+<a id="qb-15"></a>
+## QB-15 — Buffer overflow guard in `readCborContent`
 
-Added `if (dataLength < ADDRESS_LENGTH) THROW(ERROR_INVALID_TRANSACTION)` at the top of
-`hashAccountTransactionHeaderAndKind` in `tx_hash.c`, before the `base58check_encode` call.
-`base58check_encode` reads exactly `ADDRESS_LENGTH` (32) bytes from `cdata`, but `dataLength`
-was never checked first. `handleHeaderAndToAddress` correctly computes `remainingDataLength`
-after stripping the derivation path and passes it in, but that value was ignored.
-`hashHeaderAndType` (called afterward) does check `dataLength < ACCOUNT_TRANSACTION_HEADER_LENGTH + 1`,
-but that check arrives too late — the 32-byte read has already happened.
+Added a bounds check before `memmove` into `ctx->display` in `cbor_data_blob.c`.
+A multi-chunk CBOR string could otherwise overflow the 255-byte display buffer.
 
-**Root cause:** `f1f8f0be` (**jo**, 2021-05-28, *"Show sender address for all account
-transactions"*) added `base58check_encode(cdata, 32, ...)` to a function that had no
-`dataLength` parameter at all at the time — so a bounds check was not possible. The
-`dataLength` parameter was added later as part of the `hashHeaderAndType` refactor but
-no one added a guard for the preceding `base58check_encode` call. The omission was carried
-through the December 2024 replatform (`f1c5511`, **n4l5u0r**) and the April 2026
-reorganisation (`93d496a`, **dbaranov-hoodies**) unchanged.
+**Root cause:** The `memoDisplayUsed` accumulator and the unbounded `memmove` were
+introduced by **Hjort** (`524137ab`, 2021-09-07, *"fixes to memo based on feedback"*) in
+the original `memo.c`. The code was carried forward without a fix through three
+refactors: rename to `displayCbor.c` (Hjort, 2021-12-15), port to `sign.c` (n4l5u0r,
+2024-12-03), and move to `cbor_data_blob.c` (dbaranov-hoodies, 2026-04-08).
 
-## QB-10 / QB-11 — Read out of bounds in `parse_derivation_path_legacy` / `parse_derivation_path_new`
+<a id="qb-16"></a>
+## QB-16 — Buffer overflow in `timeToDisplayText`
 
-Added `if (lc < 8) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_legacy`
-and `if (lc < 12) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_new` in
-`derivation_path.c`. Both functions called `read_u32_be` (which performs no bounds check)
-before any length validation; `check_lc` at the end verified the exact length only after
-the out-of-bounds reads had already occurred.
+Added `time.tm_year <= 0` guard at function entry in `time.c`, `size_t offset` replacing
+`int offset`, and `offset >= dstLength` checks before each separator write.
 
-**Root cause:** Both functions were introduced in the April 2026 reorganisation (`93d496a`,
-**dbaranov-hoodies**) by extracting repeated derivation-path parsing from the individual
-handlers. The original `handleExportPrivateKeyNewPath` and `handleExportPrivateKeyLegacyPath`
-had explicit `if (remainingDataLength < 4) THROW(ERROR_INVALID_PATH)` guards before each
-`U4BE` read. The extracted helpers replaced those per-field guards with a single
-post-read `check_lc`, introducing the window.
+A negative `tm_year` (possible when `secondsToTm` receives a value near `INT_MAX *
+31622400LL`) is silently cast to a huge `uint64_t` by `number_to_text`, producing a
+20-digit string that overflows the 20-byte timestamp buffer before any separator is
+written. The same unchecked separator offset pattern as QB-12 then causes further
+underflow of `dstLength - offset`.
 
-## QB-8 / QB-9 — Same underflow in `handle_update_contract`
+**Root cause:** `timeToDisplayText` was written from scratch by **Jakob Ørhøj**
+(`f03824ba`, 2021-06-23, *"Refactor epoch to date conversion"*) with `int offset`, no
+`tm_year` sign check, and no separator bounds guards. Carried through the replatform
+(`f1c5511`, n4l5u0r, 2024-12-03) and reorganization (`93d496a`, dbaranov-hoodies,
+2026-04-08) unchanged.
 
-Identical fix applied to `update_contract.c`: bounds checks added in both
-`UPDATE_CONTRACT_NAME_FIRST` and `UPDATE_CONTRACT_PARAMS_FIRST` branches.
+<a id="qb-17"></a>
+## QB-17 — Instruction-switching guard in dispatcher.c
 
-**Root cause:** `update_contract.c` was written from scratch by **keiff3r** (`c7fc099`,
-2024-12-11) with the same omission as `init_contract.c` above.
+Added a guard in `apdu_dispatcher()` rejecting any APDU whose `ins` differs from
+`global_tx_state.currentInstruction` while a multi-step flow is active.
+
+The guard was missing since `handler.c` was first created by **keiff3r** (`ae19e3395b`,
+2024-12-04) — `currentInstruction` was already in `globals.h` (added by **n4l5u0r** in
+the replatform `f1c5511`, 2024-12-03) but no check was ever wired into the dispatcher.
+The April 2026 reorganization (`93d496a`, **dbaranov-hoodies**) rewrote `handler.c` into
+`dispatcher.c` and carried the omission forward.
