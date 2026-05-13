@@ -45,6 +45,9 @@ void parse_derivation_path_new(uint8_t lc,
                                bool mainnet,
                                derivation_path_t *derivation_path_out,
                                uint32_t *cred_counter_out) {
+    if (lc < 12) {
+        THROW(SWO_INCORRECT_DATA);
+    }
     size_t offset = 0;
     uint32_t identity_provider = 0;
     offset = read_u32_be(cdata, offset, &identity_provider);
@@ -68,6 +71,9 @@ void parse_derivation_path_legacy(uint8_t lc,
                                   uint8_t *cdata,
                                   derivation_path_t *derivation_path_out,
                                   uint32_t *cred_counter_out) {
+    if (lc < 8) {
+        THROW(SWO_INCORRECT_DATA);
+    }
     size_t offset = 0;
     uint32_t identity;
     offset = read_u32_be(cdata, offset, &identity);

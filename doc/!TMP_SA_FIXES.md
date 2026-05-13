@@ -148,6 +148,21 @@ defined but never used as a state guard. The December 2024 replatform (`313463a`
 and the April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the incomplete guard
 forward unchanged.
 
+## QB-10 / QB-11 — Read out of bounds in `parse_derivation_path_legacy` / `parse_derivation_path_new`
+
+Added `if (lc < 8) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_legacy`
+and `if (lc < 12) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_new` in
+`derivation_path.c`. Both functions called `read_u32_be` (which performs no bounds check)
+before any length validation; `check_lc` at the end verified the exact length only after
+the out-of-bounds reads had already occurred.
+
+**Root cause:** Both functions were introduced in the April 2026 reorganisation (`93d496a`,
+**dbaranov-hoodies**) by extracting repeated derivation-path parsing from the individual
+handlers. The original `handleExportPrivateKeyNewPath` and `handleExportPrivateKeyLegacyPath`
+had explicit `if (remainingDataLength < 4) THROW(ERROR_INVALID_PATH)` guards before each
+`U4BE` read. The extracted helpers replaced those per-field guards with a single
+post-read `check_lc`, introducing the window.
+
 ## QB-8 / QB-9 — Same underflow in `handle_update_contract`
 
 Identical fix applied to `update_contract.c`: bounds checks added in both
