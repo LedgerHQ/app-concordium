@@ -148,6 +148,24 @@ defined but never used as a state guard. The December 2024 replatform (`313463a`
 and the April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the incomplete guard
 forward unchanged.
 
+## QB-13 — Read out of bounds in `hashAccountTransactionHeaderAndKind`
+
+Added `if (dataLength < ADDRESS_LENGTH) THROW(ERROR_INVALID_TRANSACTION)` at the top of
+`hashAccountTransactionHeaderAndKind` in `tx_hash.c`, before the `base58check_encode` call.
+`base58check_encode` reads exactly `ADDRESS_LENGTH` (32) bytes from `cdata`, but `dataLength`
+was never checked first. `handleHeaderAndToAddress` correctly computes `remainingDataLength`
+after stripping the derivation path and passes it in, but that value was ignored.
+`hashHeaderAndType` (called afterward) does check `dataLength < ACCOUNT_TRANSACTION_HEADER_LENGTH + 1`,
+but that check arrives too late — the 32-byte read has already happened.
+
+**Root cause:** `f1f8f0be` (**jo**, 2021-05-28, *"Show sender address for all account
+transactions"*) added `base58check_encode(cdata, 32, ...)` to a function that had no
+`dataLength` parameter at all at the time — so a bounds check was not possible. The
+`dataLength` parameter was added later as part of the `hashHeaderAndType` refactor but
+no one added a guard for the preceding `base58check_encode` call. The omission was carried
+through the December 2024 replatform (`f1c5511`, **n4l5u0r**) and the April 2026
+reorganisation (`93d496a`, **dbaranov-hoodies**) unchanged.
+
 ## QB-10 / QB-11 — Read out of bounds in `parse_derivation_path_legacy` / `parse_derivation_path_new`
 
 Added `if (lc < 8) THROW(SWO_INCORRECT_DATA)` at entry to `parse_derivation_path_legacy`
