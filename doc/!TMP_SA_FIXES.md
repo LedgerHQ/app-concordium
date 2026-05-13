@@ -21,9 +21,9 @@ This document tracks every finding addressed on branch `1360-sa-fixes`. For each
 | [QB-15](#qb-15) | <span style="color:orangered">High</span>      | Buffer overflow in `readCborContent`                                    | 2021-09-07 · Hjort · `524137ab`                    |
 | [QB-16](#qb-16) | <span style="color:darkorange">Medium</span>   | Buffer overflow in `timeToDisplayText`                                  | 2021-06-23 · Jakob Ørhøj · `f03824ba`              |
 | [QB-17](#qb-17) | <span style="color:crimson">Critical</span>    | Instruction-switching guard missing in `dispatcher.c`                   | 2024-12-04 · keiff3r · `ae19e339`                  |
-| [QB-18](#qb-18) | <span style="color:forestgreen">Low</span>     | Insufficient fuzzing coverage across APDU handlers                      | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
-| [QB-19](#qb-19) | <span style="color:forestgreen">Low</span>     | Global-buffer-overflow in export-private-key display (memmove overread) | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
-| [QB-20](#qb-20) | <span style="color:darkorange">Medium</span>   | Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength| 2022-01-17 · Jakob Ørhøj · `cfcbb47`               |
+| [QB-18/1](#qb-18-1) | <span style="color:forestgreen">Low</span>     | Insufficient fuzzing coverage across APDU handlers                      | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
+| [QB-18/2](#qb-18-2) | <span style="color:forestgreen">Low</span>     | Global-buffer-overflow in export-private-key display (memmove overread) | 2026-04-08 · dbaranov-hoodies · `93d496a`           |
+| [QB-18/3](#qb-18-3) | <span style="color:darkorange">Medium</span>   | Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength| 2022-01-17 · Jakob Ørhøj · `cfcbb47`               |
 
 ---
 
@@ -250,8 +250,8 @@ the replatform `f1c5511`, 2024-12-03) but no check was ever wired into the dispa
 The April 2026 reorganization (`93d496a`, **dbaranov-hoodies**) rewrote `handler.c` into
 `dispatcher.c` and carried the omission forward.
 
-<a id="qb-18"></a>
-## QB-18 — Insufficient fuzzing coverage across APDU handlers
+<a id="qb-18-1"></a>
+## QB-18/1 — Insufficient fuzzing coverage across APDU handlers
 
 Rewrote the fuzzing infrastructure so all 19 APDU handler fuzz targets compile the real
 handler source files rather than re-implementing simplified logic inline. Changes:
@@ -268,7 +268,7 @@ handler source files rather than re-implementing simplified logic inline. Change
   duration, accumulates corpus in `fuzzing/corpus/`, and reports any crashes.
 
 Running the harnesses for one minute each immediately found two previously unknown
-memory-safety bugs in production handler code (QB-19, QB-20) that the old stub-based
+memory-safety bugs in production handler code (QB-18/2, QB-18/3) that the old stub-based
 fuzzers could not have detected.
 
 **Root cause:** The `fuzzing/` directory (last restructured `93d496a`, **dbaranov-hoodies**,
@@ -276,8 +276,8 @@ fuzzers could not have detected.
 logic rather than calling the real handler. Any memory-safety violation in the actual source
 was invisible to the fuzzer.
 
-<a id="qb-19"></a>
-## QB-19 — Global-buffer-overflow in export-private-key display (memmove overread)
+<a id="qb-18-2"></a>
+## QB-18/2 — Global-buffer-overflow in export-private-key display (memmove overread)
 
 Changed all `memmove(ctx->display_sign_verb, "...", EXPORT_PRIVATE_KEY_SIGN_VERB_LEN)` and
 `memmove(ctx->display_review_verb, "...", EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN)` calls in
@@ -299,8 +299,8 @@ constants were introduced as buffer-size annotations on the destination array, b
 accidentally reused as the `memmove` byte-count argument for every string regardless of
 its actual length.
 
-<a id="qb-20"></a>
-## QB-20 — Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength
+<a id="qb-18-3"></a>
+## QB-18/3 — Heap-buffer-overflow in `sign_configure_delegation` via stale dataLength
 
 Introduced `uint8_t remaining = dataLength - keyDerivationPathLength` immediately after
 advancing `cdata` past the derivation path in `handle_sign_configure_delegation`, and
