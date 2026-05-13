@@ -127,6 +127,27 @@ declared length, causing an unsigned underflow on `remaining -= lc` with a corru
 first-chunk path was left unchecked. Carried forward by the April 2026 reorganisation
 (`93d496a`, **dbaranov-hoodies**).
 
+## QB-7 — Unguarded P1_INITIAL in `handle_sign_configure_baker`
+
+Added `if (isInitialCall) { ctx_conf_baker->state = CONFIGURE_BAKER_INITIAL; }` before the
+dispatch block in `sign_configure_baker.c`, and changed the first branch guard from
+`P1_INITIAL == p1 && isInitialCall` to `P1_INITIAL == p1 && ctx_conf_baker->state ==
+CONFIGURE_BAKER_INITIAL`. A client could previously call the initial sub-command at any
+point in an active signing session because `ctx_conf_baker->state` was never checked in the
+`P1_INITIAL` branch — only `isInitialCall` was tested. With QB-17's dispatcher guard in
+place, `isInitialCall` is always false mid-flow, so the window is narrow; the fix makes the
+guard consistent with every other multi-step handler in the codebase and uses the existing
+`CONFIGURE_BAKER_INITIAL` state that was defined but never consumed.
+
+**Root cause:** `handleSignConfigureBaker` was written from scratch by **jo** (`024cd076`,
+2022-01-20, *"Initial configure baker"*) with `if (P1_INITIAL == p1)` and no guard at all.
+Commit `db4a1cc` (**jo**, 2022-04-12, *"Add state checking to configure baker"*) added state
+checks to all subsequent sub-commands and introduced the `CONFIGURE_BAKER_INITIAL` enum value,
+but added only `&& isInitialCall` to the `P1_INITIAL` branch — leaving `CONFIGURE_BAKER_INITIAL`
+defined but never used as a state guard. The December 2024 replatform (`313463a`, **n4l5u0r**)
+and the April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the incomplete guard
+forward unchanged.
+
 ## QB-8 / QB-9 — Same underflow in `handle_update_contract`
 
 Identical fix applied to `update_contract.c`: bounds checks added in both
