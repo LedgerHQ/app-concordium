@@ -85,6 +85,9 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
             ctx_init_contract->nameLength = U2BE(cdata, 0);
             // calculate the remaining name length
             ctx_init_contract->remainingNameLength = ctx_init_contract->nameLength + lengthSize;
+            if (ctx_init_contract->remainingNameLength < lc) {
+                THROW(ERROR_INVALID_NAME_LENGTH);
+            }
             // set the state to the next state
             ctx_init_contract->state = INIT_CONTRACT_NAME_NEXT;
         } else if (ctx_init_contract->remainingNameLength < lc) {
@@ -111,6 +114,9 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
             ctx_init_contract->paramsLength = U2BE(cdata, 0);
             // calculate the remaining params length
             ctx_init_contract->remainingParamsLength = ctx_init_contract->paramsLength + lengthSize;
+            if (ctx_init_contract->remainingParamsLength < lc) {
+                THROW(ERROR_INVALID_PARAMS_LENGTH);
+            }
             // set the state to the next state
             ctx_init_contract->state = INIT_CONTRACT_PARAMS_NEXT;
         } else if (ctx_init_contract->remainingParamsLength < lc) {

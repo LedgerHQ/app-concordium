@@ -112,3 +112,25 @@ confirm.
 `isInitialCall` parameter or any state guard. Unlike other transaction handlers added at the
 same time, the delegation handler was never updated to accept the parameter as the codebase
 evolved.
+
+## QB-5 / QB-6 — Missing bounds check in `*_FIRST` state of `handle_init_contract`
+
+Added `if (remainingNameLength < lc) THROW(ERROR_INVALID_NAME_LENGTH)` immediately after
+computing `remainingNameLength` in the `INIT_CONTRACT_NAME_FIRST` branch, and the equivalent
+check for `remainingParamsLength` in the `INIT_CONTRACT_PARAMS_FIRST` branch of
+`init_contract.c`. The identical guard already existed in each `else` branch (continuation
+chunks) but was absent for the first chunk, so a client could send an `lc` larger than the
+declared length, causing an unsigned underflow on `remaining -= lc` with a corrupted counter.
+
+**Root cause:** `init_contract.c` was written from scratch by **keiff3r** (`8acba8c`,
+2024-12-11). The `else if (remaining < lc)` guard was added for continuation chunks but the
+first-chunk path was left unchecked. Carried forward by the April 2026 reorganisation
+(`93d496a`, **dbaranov-hoodies**).
+
+## QB-8 / QB-9 — Same underflow in `handle_update_contract`
+
+Identical fix applied to `update_contract.c`: bounds checks added in both
+`UPDATE_CONTRACT_NAME_FIRST` and `UPDATE_CONTRACT_PARAMS_FIRST` branches.
+
+**Root cause:** `update_contract.c` was written from scratch by **keiff3r** (`c7fc099`,
+2024-12-11) with the same omission as `init_contract.c` above.

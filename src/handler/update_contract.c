@@ -97,6 +97,9 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
             ctx_update_contract->nameLength = U2BE(cdata, 0);
             // calculate the remaining name length
             ctx_update_contract->remainingNameLength = ctx_update_contract->nameLength + lengthSize;
+            if (ctx_update_contract->remainingNameLength < lc) {
+                THROW(ERROR_INVALID_NAME_LENGTH);
+            }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_NAME_NEXT;
         } else if (ctx_update_contract->remainingNameLength < lc) {
@@ -124,6 +127,9 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
             // calculate the remaining params length
             ctx_update_contract->remainingParamsLength =
                 ctx_update_contract->paramsLength + lengthSize;
+            if (ctx_update_contract->remainingParamsLength < lc) {
+                THROW(ERROR_INVALID_PARAMS_LENGTH);
+            }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_PARAMS_NEXT;
         } else if (ctx_update_contract->remainingParamsLength < lc) {
