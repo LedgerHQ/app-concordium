@@ -29,7 +29,10 @@ static cborContext_t *ctx = &global.withDataBlob.cborContext;
 
 void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
     uint8_t remainingDataLength = dataLength;
-    if (remainingDataLength < 1) {
+    /* remainingDataLength guards the physical APDU buffer; cborLength guards the
+     * protocol-declared stream total (set from a prior APDU) — both must have
+     * at least one byte before consuming the CBOR header. */
+    if (remainingDataLength < 1 || ctx->cborLength < 1) {
         THROW(SWO_INCORRECT_DATA);
     }
     uint8_t header = cdata[0];
@@ -82,6 +85,9 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
         THROW(ERROR_INVALID_PARAM);
     }
     cdata += sizeLength;
+    if (ctx->cborLength < sizeLength) {
+        THROW(SWO_INCORRECT_DATA);
+    }
     ctx->cborLength -= sizeLength;
     switch (ctx->majorType) {
         case 0:

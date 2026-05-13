@@ -148,6 +148,26 @@ defined but never used as a state guard. The December 2024 replatform (`313463a`
 and the April 2026 reorganisation (`93d496a`, **dbaranov-hoodies**) carried the incomplete guard
 forward unchanged.
 
+## QB-14 — Integer underflow in `readCborInitial`
+
+Added `if (ctx->cborLength < 1) THROW(SWO_INCORRECT_DATA)` before the first decrement
+(`ctx->cborLength -= 1` for the header byte) and `if (ctx->cborLength < sizeLength)
+THROW(SWO_INCORRECT_DATA)` before the second decrement (`ctx->cborLength -= sizeLength`
+for the length-of-length bytes) in `cbor_data_blob.c`. `ctx->cborLength` is `uint32_t`
+and is set from a user-supplied 2-byte field (0–256); decrementing it past zero wraps to
+~4 GiB and corrupts all subsequent length accounting. The worst case is a header byte
+(`-= 1`) followed by an 8-byte length prefix (`-= 8`) against a `cborLength` of 0,
+giving the nine-unit underflow the audit describes.
+
+**Root cause:** `readMemoInitial` was written from scratch by **Hjort** (`5b108ea6`,
+2021-09-07, *"split memo transactions from their non-memo counterparts"*) with no pre-decrement
+guard. The same file included `if (ctx->memoLength < 0) THROW(ERROR_INVALID_STATE)` in the
+unrelated `handleMemoStep()` callback, but `memoLength` was declared `uint32_t`, making the
+check always false and leaving the actual decrements in `readMemoInitial` unprotected. The code
+was carried forward through the rename to `displayCbor.c` (Hjort, 2021-12-15), the replatform
+(`f1c5511`, **n4l5u0r**, 2024-12-03), and the move to `cbor_data_blob.c` (`93d496a`,
+**dbaranov-hoodies**, 2026-04-08) without ever adding the missing guards.
+
 ## QB-13 — Read out of bounds in `hashAccountTransactionHeaderAndKind`
 
 Added `if (dataLength < ADDRESS_LENGTH) THROW(ERROR_INVALID_TRANSACTION)` at the top of
