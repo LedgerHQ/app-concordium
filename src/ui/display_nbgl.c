@@ -124,7 +124,7 @@ void uiGeneratePubkey(volatile unsigned int *flags) {
     pairs[0].value = (char *) global.exportPublicKeyContext.display;
 
     static nbgl_contentTagValueList_t content;
-    content.nbPairs = 2;
+    content.nbPairs = 1;
     content.pairs = pairs;
     content.smallCaseForValue = false;
     content.nbMaxLinesForValue = 0;

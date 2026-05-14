@@ -123,6 +123,9 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
 }
 
 void readCborContent(uint8_t *cdata, uint8_t contentLength) {
+    if (ctx->cborLength < contentLength) {
+        THROW(SWO_INCORRECT_DATA);
+    }
     ctx->cborLength -= contentLength;
     switch (ctx->majorType) {
         case 3:
