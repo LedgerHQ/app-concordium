@@ -42,7 +42,11 @@ string(REPLACE " " ";" COMPILATION_FLAGS ${COMPILATION_FLAGS_})
 # Paths
 # ---------------------------------------------------------------------------
 set(APP_SRC    ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-set(LEDGER_SDK ${CMAKE_CURRENT_SOURCE_DIR}/../../ledger-secure-sdk)
+if(DEFINED BOLOS_SDK)
+    set(LEDGER_SDK ${BOLOS_SDK})
+else()
+    set(LEDGER_SDK ${CMAKE_CURRENT_SOURCE_DIR}/../../ledger-secure-sdk)
+endif()
 
 # ---------------------------------------------------------------------------
 # Sources compiled into every fuzz target.
