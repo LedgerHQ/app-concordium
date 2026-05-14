@@ -72,6 +72,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
     if (global_tx_state.currentInstruction != INSTRUCTION_NONE &&
         global_tx_state.currentInstruction != (int) cmd->ins) {
         PRINTF("CMD GUARD TRIGGERED");
+        global_tx_state.currentInstruction = INSTRUCTION_NONE;
         return io_send_sw(ERROR_INVALID_STATE);
     }
 
