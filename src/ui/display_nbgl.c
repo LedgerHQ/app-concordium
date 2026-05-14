@@ -122,8 +122,6 @@ void uiComparePubkey(void) {
 void uiGeneratePubkey(volatile unsigned int *flags) {
     pairs[0].item = "Identity";
     pairs[0].value = (char *) global.exportPublicKeyContext.display;
-    // pairs[1].item = "Public key";
-    // pairs[1].value = global.exportPublicKeyContext.publicKey;
 
     static nbgl_contentTagValueList_t content;
     content.nbPairs = 2;
