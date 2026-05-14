@@ -15,8 +15,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (setjmp(g_fuzzer_jmp_buf) != 0) return 0;
 
     uint8_t p1 = data[0];
-    uint8_t *payload = (uint8_t *)(data + 1);
-    uint8_t payload_len = (uint8_t)((size - 1) > 255 ? 255 : (size - 1));
+    uint8_t *payload = (uint8_t *) (data + 1);
+    uint8_t payload_len = (uint8_t) ((size - 1) > 255 ? 255 : (size - 1));
 
     readCborInitial(payload, payload_len);
 
@@ -27,4 +27,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
 }
 
-int LLVMFuzzerInitialize(int *argc, char ***argv) { (void)argc; (void)argv; return 0; }
+int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    (void) argc;
+    (void) argv;
+    return 0;
+}

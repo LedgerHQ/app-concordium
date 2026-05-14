@@ -121,7 +121,7 @@ int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 
-    size_t offset = number_to_text(dst, dstLength, (uint64_t)(time.tm_year + 1900));
+    size_t offset = number_to_text(dst, dstLength, (uint64_t) (time.tm_year + 1900));
 
     if (offset >= dstLength) THROW(ERROR_BUFFER_OVERFLOW);
     memmove(dst + offset, "-", 1);

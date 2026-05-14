@@ -15,13 +15,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     volatile unsigned int flags = 0;
     command_t cmd;
-    cmd.p1   = data[0];
-    cmd.p2   = data[1];
-    cmd.lc   = (uint8_t)((size - 2) > 255 ? 255 : (size - 2));
-    cmd.data = (uint8_t *)(data + 2);
+    cmd.p1 = data[0];
+    cmd.p2 = data[1];
+    cmd.lc = (uint8_t) ((size - 2) > 255 ? 255 : (size - 2));
+    cmd.data = (uint8_t *) (data + 2);
 
     handle_export_private_key_legacy_path(&cmd, &flags);
     return 0;
 }
 
-int LLVMFuzzerInitialize(int *argc, char ***argv) { (void)argc; (void)argv; return 0; }
+int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    (void) argc;
+    (void) argv;
+    return 0;
+}

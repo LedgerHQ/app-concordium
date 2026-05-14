@@ -238,12 +238,8 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
     memmove(ctx->display_sign, "Sign operation", EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN);
 
     if (p1 == P1_IDENTITY_CREDENTIAL_CREATION) {
-        memmove(ctx->display_review_verb,
-                "to create credentials",
-                sizeof("to create credentials"));
-        memmove(ctx->display_sign_verb,
-                "to create credentials?",
-                sizeof("to create credentials?"));
+        memmove(ctx->display_review_verb, "to create credentials", sizeof("to create credentials"));
+        memmove(ctx->display_sign_verb, "to create credentials?", sizeof("to create credentials?"));
     } else if (p1 == P1_ACCOUNT_CREATION) {
         memmove(ctx->display_review_verb, "to create account", sizeof("to create account"));
         memmove(ctx->display_sign_verb, "to create account?", sizeof("to create account?"));
