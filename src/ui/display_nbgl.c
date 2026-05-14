@@ -150,7 +150,7 @@ void uiExportPrivateKey(volatile unsigned int *flags) {
     memcpy(global.exportPrivateKeyContext.display_review_operation +
                EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
            global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN - 1);
+           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
 
     global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
 
@@ -190,7 +190,7 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
     memcpy(global.exportPrivateKeyContext.display_review_operation +
                EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
            global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN - 1);
+           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
 
     global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
 
