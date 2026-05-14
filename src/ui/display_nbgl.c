@@ -106,13 +106,26 @@ void uiComparePubkey(void) {
 }
 
 void uiGeneratePubkey(volatile unsigned int *flags) {
-    nbgl_useCaseAddressReview((char *) global.exportPublicKeyContext.display,  // Address to display
-                              NULL,                     // No additional tag-value list
-                              &ICON_APP_HOME,           // Icon to display
-                              "Public Key",             // Review title
-                              NULL,                     // No review subtitle
-                              review_public_key_choice  // Callback function
-    );
+    pairs[0].item = "Identity";
+    pairs[0].value = (char *) global.exportPublicKeyContext.display;
+    pairs[1].item = "Public key";
+    pairs[1].value = global.exportPublicKeyContext.publicKey;
+
+    static nbgl_contentTagValueList_t content;
+    content.nbPairs = 2;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = false;
+
+    nbgl_useCaseReview(TYPE_OPERATION,
+                       &content,
+                       &ICON_APP_HOME,
+                       "Public Key",
+                       NULL,
+                       "Export public key",
+                       review_public_key_choice);
     *flags |= IO_ASYNCH_REPLY;
 }
 
