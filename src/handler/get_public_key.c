@@ -91,6 +91,11 @@ void handle_get_public_key(const command_t *cmd, volatile unsigned int *flags) {
     }
 
     harden_derivation_path(dp);
+
+    uint8_t publicKey[KEY_LENGTH];
+    get_public_key(publicKey);
+    to_paginated_hex(publicKey, sizeof(publicKey), ctx->publicKey, sizeof(ctx->publicKey));
+
     uiGeneratePubkey(flags);
 }
 

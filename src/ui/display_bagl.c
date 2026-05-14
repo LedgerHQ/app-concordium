@@ -68,7 +68,7 @@ UX_STEP_NOCB(ux_generate_public_flow_pubkey_step,
              {.title = "Public key", .text = (char *) global.exportPublicKeyContext.publicKey});
 UX_STEP_VALID(ux_generate_public_flow_accept_step,
               pb,
-              send_public_key(false),
+              send_public_key(true),
               {&C_icon_validate_14, "Accept"});
 UX_FLOW(ux_generate_public_flow,
         &ux_generate_public_flow_identity_step,

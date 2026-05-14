@@ -9,13 +9,14 @@ from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 
 nano_accept_instructions = [
-    # NavInsID.BOTH_CLICK,
+    NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.BOTH_CLICK,
 ]
 
 nano_refuse_instructions = [
+    NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
