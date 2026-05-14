@@ -60,15 +60,24 @@ UX_STEP_VALID(ux_decline_step, pb, send_user_rejection(), {&C_icon_crossmark, "D
 
 // UI definitions for the approval of the generation of a public-key. This prompts the user to
 // accept that a public-key will be generated and returned to the computer.
-UX_STEP_VALID(ux_generate_public_flow_0_step,
-              pnn,
-              send_public_key(true),
-              {&C_icon_validate_14, "Public key", (char *) global.exportPublicKeyContext.display});
-UX_FLOW(ux_generate_public_flow, &ux_generate_public_flow_0_step, &ux_decline_step, FLOW_LOOP);
+UX_STEP_NOCB(ux_generate_public_flow_identity_step,
+             bnnn_paging,
+             {.title = "Identity", .text = (char *) global.exportPublicKeyContext.display});
+UX_STEP_NOCB(ux_generate_public_flow_pubkey_step,
+             bnnn_paging,
+             {.title = "Public key", .text = (char *) global.exportPublicKeyContext.publicKey});
+UX_STEP_VALID(ux_generate_public_flow_accept_step,
+              pb,
+              send_public_key(false),
+              {&C_icon_validate_14, "Accept"});
+UX_FLOW(ux_generate_public_flow,
+        &ux_generate_public_flow_identity_step,
+        &ux_generate_public_flow_pubkey_step,
+        &ux_generate_public_flow_accept_step,
+        &ux_decline_step,
+        FLOW_LOOP);
 
 void uiGeneratePubkey(volatile unsigned int *flags) {
-    // Display the UI for the public-key flow, where the user can validate that the
-    // public-key being generated is the expected one.
     ux_flow_init(0, ux_generate_public_flow, NULL);
 
     // Tell the main process to wait for a button press.
