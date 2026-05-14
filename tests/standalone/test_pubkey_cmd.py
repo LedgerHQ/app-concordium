@@ -17,6 +17,8 @@ nano_accept_instructions = [
 
 nano_refuse_instructions = [
     NavInsID.RIGHT_CLICK,
+    NavInsID.RIGHT_CLICK,
+    NavInsID.RIGHT_CLICK,
     NavInsID.BOTH_CLICK,
 ]
 
