@@ -187,6 +187,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
                 return io_send_sw(SWO_INCORRECT_P1_P2);
             }
             handle_get_app_name();
+            global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         case INS_SET_TRUSTED_NAME:
             handle_set_trusted_name(cmd);
@@ -227,6 +228,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             }
 
             handle_get_app_version();
+            global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         default:
             THROW(SWO_INVALID_INS);
