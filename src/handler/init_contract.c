@@ -41,7 +41,7 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
         uint8_t remainingDataLength = lc - offset;
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, INIT_CONTRACT);
-        if (offset > lc) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;

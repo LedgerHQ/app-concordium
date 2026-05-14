@@ -39,7 +39,7 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
         cdata += offset;
         remainingDataLength -= offset;
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, UPDATE_CONTRACT);
-        if (offset > lc) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;

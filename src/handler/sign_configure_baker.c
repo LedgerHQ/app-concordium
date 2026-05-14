@@ -110,7 +110,7 @@ void handle_sign_configure_baker(const command_t *cmd,
         cdata += offset;
         uint8_t remainingDataLength = dataLength - offset;
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, CONFIGURE_BAKER);
-        if (offset > dataLength) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;

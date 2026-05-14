@@ -38,7 +38,7 @@ void handle_deploy_module(const command_t *cmd, bool isInitialCall) {
         uint8_t remainingDataLength = lc - offset;
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, DEPLOY_MODULE);
-        if (offset > lc) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
