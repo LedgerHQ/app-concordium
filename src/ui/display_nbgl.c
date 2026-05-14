@@ -1126,7 +1126,7 @@ void uiSignScheduledTransferPairFlowDisplay(void) {
     pairIndex++;
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value =
-        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayAmount;
     pairIndex++;
 
     // Create the page content
@@ -1155,7 +1155,7 @@ void uiSignScheduledTransferPairFlowSignDisplay(void) {
     pairIndex++;
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value =
-        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayAmount;
     pairIndex++;
 
     // Create the page content

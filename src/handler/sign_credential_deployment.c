@@ -410,9 +410,8 @@ void handle_sign_credential_deployment(const command_t *cmd,
         } else {
             THROW(ERROR_INVALID_TRANSACTION);
         }
+        *flags |= IO_ASYNCH_REPLY;
     } else {
         THROW(ERROR_INVALID_STATE);
     }
-
-    *flags |= IO_ASYNCH_REPLY;
 }
