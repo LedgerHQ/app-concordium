@@ -24,9 +24,9 @@ wallet_accept_instructions = [
     NavInsID.USE_CASE_REVIEW_NEXT,     # intro → content
     NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
     NavInsID.USE_CASE_REVIEW_CONFIRM,
-    NavInsID.USE_CASE_REVIEW_NEXT,     # intro → content
-
-    NavInsID.USE_CASE_CHOICE_CONFIRM,
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_CONFIRM,
     NavInsID.WAIT_FOR_HOME_SCREEN,
 ]
 

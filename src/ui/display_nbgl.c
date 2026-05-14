@@ -97,19 +97,33 @@ static void processNextVerificationKeyNoIdleCallback(bool confirm) {
 }
 
 void uiComparePubkey(void) {
-    nbgl_useCaseAddressReview(global.exportPublicKeyContext.publicKey,
-                              NULL,
-                              &ICON_APP_HOME,
-                              "Compare",
-                              NULL,
-                              review_choice);
+    pairs[0].item = "Identity";
+    pairs[0].value = (char *) global.exportPublicKeyContext.display;
+    pairs[1].item = "Public key";
+    pairs[1].value = global.exportPublicKeyContext.publicKey;
+
+    static nbgl_contentTagValueList_t content;
+    content.nbPairs = 2;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = false;
+
+    nbgl_useCaseReview(TYPE_OPERATION,
+                       &content,
+                       &ICON_APP_HOME,
+                       "Public Key",
+                       NULL,
+                       "Export public key",
+                       review_choice);
 }
 
 void uiGeneratePubkey(volatile unsigned int *flags) {
     pairs[0].item = "Identity";
     pairs[0].value = (char *) global.exportPublicKeyContext.display;
-    pairs[1].item = "Public key";
-    pairs[1].value = global.exportPublicKeyContext.publicKey;
+    // pairs[1].item = "Public key";
+    // pairs[1].value = global.exportPublicKeyContext.publicKey;
 
     static nbgl_contentTagValueList_t content;
     content.nbPairs = 2;
