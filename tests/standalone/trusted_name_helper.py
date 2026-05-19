@@ -11,7 +11,7 @@ Flow:
     4. Sign with ``sign_tlv``
     5. SET_TRUSTED_NAME with the full TLV (including signature tag)
 
-The TLV ``signer_key_id`` is set to 0 (test) matching ``TRUSTED_NAME_TEST_KEY``.
+The TLV ``signer_key_id`` is set to 0 (test) matching ``SIGNER_KEY_ID_TEST`` in debug/CI firmware builds.
 """
 
 from __future__ import annotations

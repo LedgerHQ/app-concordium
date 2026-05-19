@@ -379,7 +379,6 @@ typedef struct trustedNameTlvExtracted_s {
 } trustedNameTlvExtracted_t;
 
 typedef struct trustedNamePkiContext_s {
-    uint64_t stored_challenge;
     trustedNameMultiHashCtx_t hash_ctx;
     trustedNameTlvExtracted_t tlv;
 } trustedNamePkiContext_t;

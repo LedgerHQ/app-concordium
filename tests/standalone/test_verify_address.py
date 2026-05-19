@@ -19,7 +19,6 @@ from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns, NavigateWithScenario
 
 from test_set_trusted_name import (
-    _ensure_trusted_name_test_key,
     _get_device_name,
     _requires_speculos_pki,
 )
@@ -80,7 +79,7 @@ def _get_ed25519_pubkey_32(client: CommandSender, path_cdata: bytes) -> bytes:
 
 def _load_pki_certificate_only(backend, client: CommandSender) -> None:
     """Load Nano PKI cert for trusted_name (does not call GET_CHALLENGE)."""
-    _ensure_trusted_name_test_key(backend, client)
+    _requires_speculos_pki(backend)
     cert = get_pki_certificate(_get_device_name(backend))
     if cert is None:
         pytest.skip(f"No PKI certificate for device {_get_device_name(backend)}")
