@@ -9,7 +9,7 @@ from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID, NavIns
 
 nano_accept_instructions = [
-    NavInsID.BOTH_CLICK,
+    NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.RIGHT_CLICK,
     NavInsID.BOTH_CLICK,
@@ -17,20 +17,27 @@ nano_accept_instructions = [
 
 nano_refuse_instructions = [
     NavInsID.RIGHT_CLICK,
+    NavInsID.RIGHT_CLICK,
+    NavInsID.RIGHT_CLICK,
+    NavInsID.RIGHT_CLICK,
     NavInsID.BOTH_CLICK,
 ]
 
 wallet_accept_instructions = [
-    NavInsID.SWIPE_CENTER_TO_LEFT,
-    NavInsID.USE_CASE_CHOICE_CONFIRM,
-    NavInsID.SWIPE_CENTER_TO_LEFT,
-    NavInsID.USE_CASE_CHOICE_CONFIRM,
+    NavInsID.USE_CASE_REVIEW_NEXT,     # intro → content
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_CONFIRM,
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_CONFIRM,
     NavInsID.WAIT_FOR_HOME_SCREEN,
 ]
 
 wallet_refuse_instructions = [
-    NavInsID.SWIPE_CENTER_TO_LEFT,
-    NavInsID.USE_CASE_CHOICE_REJECT,
+    NavInsID.USE_CASE_REVIEW_NEXT,     # intro → content
+    NavInsID.USE_CASE_REVIEW_NEXT,     # content → confirm
+    NavInsID.USE_CASE_REVIEW_REJECT,   # opens rejection confirmation dialog
+    NavInsID.USE_CASE_CHOICE_CONFIRM,  # confirm rejection
     NavInsID.WAIT_FOR_HOME_SCREEN,
 ]
 

@@ -95,7 +95,11 @@ void handle_sign_configure_baker(const command_t *cmd,
     uint8_t p1 = cmd->p1;
     uint8_t dataLength = cmd->lc;
 
-    if (P1_INITIAL == p1 && isInitialCall) {
+    if (isInitialCall) {
+        ctx_conf_baker->state = CONFIGURE_BAKER_INITIAL;
+    }
+
+    if (P1_INITIAL == p1 && ctx_conf_baker->state == CONFIGURE_BAKER_INITIAL) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
@@ -106,7 +110,7 @@ void handle_sign_configure_baker(const command_t *cmd,
         cdata += offset;
         uint8_t remainingDataLength = dataLength - offset;
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, CONFIGURE_BAKER);
-        if (offset > dataLength) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;

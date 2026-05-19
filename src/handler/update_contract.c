@@ -22,13 +22,13 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_NAME    0x01
 #define P1_PARAMS  0x02
 
-void handle_update_contract(const command_t *cmd) {
+void handle_update_contract(const command_t *cmd, bool isInitialCall) {
     uint8_t *cdata = cmd->data;
     uint8_t p1 = cmd->p1;
     uint8_t lc = cmd->lc;
 
     uint8_t remainingDataLength = lc;
-    if (p1 == P1_INITIAL) {
+    if (p1 == P1_INITIAL && isInitialCall) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
@@ -39,7 +39,7 @@ void handle_update_contract(const command_t *cmd) {
         cdata += offset;
         remainingDataLength -= offset;
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, UPDATE_CONTRACT);
-        if (offset > lc) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;
@@ -97,6 +97,9 @@ void handle_update_contract(const command_t *cmd) {
             ctx_update_contract->nameLength = U2BE(cdata, 0);
             // calculate the remaining name length
             ctx_update_contract->remainingNameLength = ctx_update_contract->nameLength + lengthSize;
+            if (ctx_update_contract->remainingNameLength < lc) {
+                THROW(ERROR_INVALID_NAME_LENGTH);
+            }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_NAME_NEXT;
         } else if (ctx_update_contract->remainingNameLength < lc) {
@@ -124,6 +127,9 @@ void handle_update_contract(const command_t *cmd) {
             // calculate the remaining params length
             ctx_update_contract->remainingParamsLength =
                 ctx_update_contract->paramsLength + lengthSize;
+            if (ctx_update_contract->remainingParamsLength < lc) {
+                THROW(ERROR_INVALID_PARAMS_LENGTH);
+            }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_PARAMS_NEXT;
         } else if (ctx_update_contract->remainingParamsLength < lc) {

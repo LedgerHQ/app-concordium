@@ -46,6 +46,9 @@ static int hashHeaderAndType(uint8_t *cdata,
 int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
                                         uint8_t dataLength,
                                         uint8_t validTransactionKind) {
+    if (dataLength < ADDRESS_LENGTH) {
+        THROW(ERROR_INVALID_TRANSACTION);
+    }
     size_t outputSize = sizeof(accountSender->sender);
     if (base58check_encode(cdata, ADDRESS_LENGTH, accountSender->sender, &outputSize) == -1) {
         PRINTF("The received address bytes are not valid base85 encoded\n");

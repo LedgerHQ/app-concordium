@@ -21,12 +21,12 @@ static tx_state_t *tx_state = &global_tx_state;
 #define P1_INITIAL 0x00
 #define P1_SOURCE  0x01
 
-void handle_deploy_module(const command_t *cmd) {
+void handle_deploy_module(const command_t *cmd, bool isInitialCall) {
     uint8_t *cdata = cmd->data;
     uint8_t p1 = cmd->p1;
     uint8_t lc = cmd->lc;
 
-    if (p1 == P1_INITIAL) {
+    if (p1 == P1_INITIAL && isInitialCall) {
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
@@ -38,7 +38,7 @@ void handle_deploy_module(const command_t *cmd) {
         uint8_t remainingDataLength = lc - offset;
 
         offset = hashAccountTransactionHeaderAndKind(cdata, remainingDataLength, DEPLOY_MODULE);
-        if (offset > lc) {
+        if (offset > remainingDataLength) {
             THROW(SWO_INCORRECT_DATA);
         }
         cdata += offset;

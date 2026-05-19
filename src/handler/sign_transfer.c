@@ -24,7 +24,7 @@ void handle_sign_transfer(const command_t *cmd, volatile unsigned int *flags) {
     uint8_t lc = cmd->lc;
     uint8_t p2 = cmd->p2;
 
-    if (p2 > P2_SIGN_TX_FEE_DISPLAY) {
+    if (cmd->p1 != P1_INITIAL || p2 > P2_SIGN_TX_FEE_DISPLAY) {
         THROW(SWO_WRONG_P1_P2);
     }
     uint8_t fee_suffix = (p2 == P2_SIGN_TX_FEE_DISPLAY) ? FEE_DISPLAY_U64_SIZE : 0;

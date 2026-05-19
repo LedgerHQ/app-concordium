@@ -43,7 +43,7 @@
 #define P2_MAINNET 0x00
 #define P2_TESTNET 0x01
 
-#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       40
+#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       41
 #define EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN 17
 #define EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN   15
 #define EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN     15
@@ -257,7 +257,7 @@ typedef struct {
     char accountVerificationKey[68];
     uint8_t signatureThreshold[COMMON_THRESHOLD_SIZE];
 
-    uint8_t anonymityRevocationThreshold[13];
+    uint8_t anonymityRevocationThreshold[17];
     uint16_t anonymityRevocationListLength;
 
     char regIdCred[48 * 2 + 1];

@@ -97,22 +97,47 @@ static void processNextVerificationKeyNoIdleCallback(bool confirm) {
 }
 
 void uiComparePubkey(void) {
-    nbgl_useCaseAddressReview(global.exportPublicKeyContext.publicKey,
-                              NULL,
-                              &ICON_APP_HOME,
-                              "Compare",
-                              NULL,
-                              review_choice);
+    pairs[0].item = "Identity";
+    pairs[0].value = (char *) global.exportPublicKeyContext.display;
+    pairs[1].item = "Public key";
+    pairs[1].value = global.exportPublicKeyContext.publicKey;
+
+    static nbgl_contentTagValueList_t content;
+    content.nbPairs = 2;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = false;
+
+    nbgl_useCaseReview(TYPE_OPERATION,
+                       &content,
+                       &ICON_APP_HOME,
+                       "Public Key",
+                       NULL,
+                       "Export public key",
+                       review_choice);
 }
 
 void uiGeneratePubkey(volatile unsigned int *flags) {
-    nbgl_useCaseAddressReview((char *) global.exportPublicKeyContext.display,  // Address to display
-                              NULL,                     // No additional tag-value list
-                              &ICON_APP_HOME,           // Icon to display
-                              "Public Key",             // Review title
-                              NULL,                     // No review subtitle
-                              review_public_key_choice  // Callback function
-    );
+    pairs[0].item = "Identity";
+    pairs[0].value = (char *) global.exportPublicKeyContext.display;
+
+    static nbgl_contentTagValueList_t content;
+    content.nbPairs = 1;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = false;
+
+    nbgl_useCaseReview(TYPE_OPERATION,
+                       &content,
+                       &ICON_APP_HOME,
+                       "Public Key",
+                       NULL,
+                       "Export public key",
+                       review_public_key_choice);
     *flags |= IO_ASYNCH_REPLY;
 }
 
@@ -351,7 +376,7 @@ void startConfigureBakerDisplay(void) {
 
     // If there are additional steps, then show continue screen. If this is the
     // last step, then show signing screens.
-    if (ctx->hasMetadataUrl || hasCommissionRate()) {
+    if (ctx->hasMetadataUrl || hasCommissionRate() || ctx->hasSuspended) {
         // Create the page content
         nbgl_contentTagValueList_t content;
         content.nbPairs = pairIndex;
@@ -419,7 +444,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
 
     // If there are additional steps show the continue screen, otherwise go
     // to signing screens.
-    if (hasCommissionRate()) {
+    if (hasCommissionRate() || ctx->hasSuspended) {
         // Create the page content
         nbgl_contentTagValueList_t content;
         content.nbPairs = pairIndex;
@@ -1101,7 +1126,7 @@ void uiSignScheduledTransferPairFlowDisplay(void) {
     pairIndex++;
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value =
-        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayAmount;
     pairIndex++;
 
     // Create the page content
@@ -1130,7 +1155,7 @@ void uiSignScheduledTransferPairFlowSignDisplay(void) {
     pairIndex++;
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value =
-        (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
+        (char *) global.withDataBlob.signTransferWithScheduleContext.displayAmount;
     pairIndex++;
 
     // Create the page content

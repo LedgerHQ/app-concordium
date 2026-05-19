@@ -243,11 +243,10 @@ class CommandSender:
             p2 = P2.P2_TX_FEE_DISPLAY
             data += display_fee_microccd.to_bytes(8, byteorder="big")
 
-        index = P1.P1_NONE + 1
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_TRANSFER,
-            p1=index,
+            p1=P1.P1_NONE,
             p2=p2,
             data=data,
         ) as response:

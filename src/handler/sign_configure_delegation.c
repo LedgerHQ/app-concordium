@@ -19,7 +19,13 @@
 static signConfigureDelegationContext_t *ctx = &global.signConfigureDelegation;
 static tx_state_t *tx_state = &global_tx_state;
 
-void handle_sign_configure_delegation(const command_t *cmd, volatile unsigned int *flags) {
+void handle_sign_configure_delegation(const command_t *cmd,
+                                      bool isInitialCall,
+                                      volatile unsigned int *flags) {
+    if (!isInitialCall) {
+        THROW(ERROR_INVALID_STATE);
+    }
+
     uint8_t *cdata = cmd->data;
     uint8_t dataLength = cmd->lc;
 
@@ -28,17 +34,18 @@ void handle_sign_configure_delegation(const command_t *cmd, volatile unsigned in
         THROW(SWO_INCORRECT_DATA);
     }
     cdata += keyDerivationPathLength;
+    uint8_t remaining = dataLength - keyDerivationPathLength;
 
     if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     int accountTransactionHeaderAndKindLength =
-        hashAccountTransactionHeaderAndKind(cdata, dataLength, CONFIGURE_DELEGATION);
-    if (accountTransactionHeaderAndKindLength > dataLength) {
+        hashAccountTransactionHeaderAndKind(cdata, remaining, CONFIGURE_DELEGATION);
+    if (accountTransactionHeaderAndKindLength > remaining) {
         THROW(SWO_INCORRECT_DATA);
     }
     cdata += accountTransactionHeaderAndKindLength;
-    uint8_t remainingDataLength = dataLength - accountTransactionHeaderAndKindLength;
+    uint8_t remainingDataLength = remaining - accountTransactionHeaderAndKindLength;
 
     // The initial 2 bytes tells us the fields we are receiving.
     if (remainingDataLength < 2) {

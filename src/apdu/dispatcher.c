@@ -67,6 +67,15 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
      * the specialized handler. Handlers are responsible for detailed parsing and for
      * populating the response buffer / status words.
      */
+    /* Prevent instruction-switching attacks: once a multi-step flow is started the
+     * host must not change the instruction byte mid-transaction. */
+    if (global_tx_state.currentInstruction != INSTRUCTION_NONE &&
+        global_tx_state.currentInstruction != (int) cmd->ins) {
+        PRINTF("CMD GUARD TRIGGERED");
+        global_tx_state.currentInstruction = INSTRUCTION_NONE;
+        return io_send_sw(ERROR_INVALID_STATE);
+    }
+
     switch (cmd->ins) {
         /* Key and address-related queries: return public information, do not modify state. */
         case INS_GET_PUBLIC_KEY:
@@ -162,7 +171,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_sign_configure_delegation(cmd, flags);
+            handle_sign_configure_delegation(cmd, isInitialCall, flags);
             break;
         case INS_SIGN_UPDATE_CREDENTIAL:
             if (!cmd->data) {
@@ -178,6 +187,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
                 return io_send_sw(SWO_INCORRECT_P1_P2);
             }
             handle_get_app_name();
+            global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         case INS_SET_TRUSTED_NAME:
             handle_set_trusted_name(cmd);
@@ -195,19 +205,19 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_deploy_module(cmd);
+            handle_deploy_module(cmd, isInitialCall);
             break;
         case INS_INIT_CONTRACT:
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_init_contract(cmd);
+            handle_init_contract(cmd, isInitialCall);
             break;
         case INS_UPDATE_CONTRACT:
             if (!cmd->data) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
-            handle_update_contract(cmd);
+            handle_update_contract(cmd, isInitialCall);
             break;
         case INS_APP_VERSION:
             if (cmd->data != NULL) {
@@ -218,6 +228,7 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             }
 
             handle_get_app_version();
+            global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         default:
             THROW(SWO_INVALID_INS);

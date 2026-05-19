@@ -110,7 +110,7 @@ void to_paginated_hex(uint8_t *byteArray, const uint64_t len, char *asHex, const
 
     static uint8_t const hex[] = "0123456789abcdef";
 
-    if (asHexSize < len * 2 + len / HEX_PAGINATION_WIDTH + 1) {
+    if (len > 0 && asHexSize < len * 2 + (2 * len - 1) / HEX_PAGINATION_WIDTH + 1) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
 

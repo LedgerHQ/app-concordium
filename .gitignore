@@ -17,6 +17,7 @@ unit-tests/coverage.info
 # Fuzzing
 fuzzing/build/
 fuzzing/corpus/
+fuzzing/crashes/
 fuzzing/out/
 fuzzing/.cache/
 
@@ -34,7 +35,7 @@ doc/html
 doc/latex
 
 # Virtual env for sideload (macOS and Windows)
-ledger/
+/ledger/
 
 # macOS
 .DS_Store
