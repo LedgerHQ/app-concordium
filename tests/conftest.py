@@ -31,7 +31,9 @@ def pytest_configure(config):
 
 def pytest_runtest_logreport(report):
     if report.skipped and os.getenv("CI"):
-        pytest.fail(f"Unexpected skip in CI:\n{report.longrepr}")
+        skip_reason = report.longrepr[2] if isinstance(report.longrepr, tuple) else str(report.longrepr)
+        report.outcome = "failed"
+        report.longrepr = f"Unexpected skip in CI: {skip_reason}"
 
 # Pull all features from the base ragger conftest using the overridden configuration
 pytest_plugins = ("ragger.conftest.base_conftest",)

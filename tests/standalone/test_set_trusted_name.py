@@ -10,9 +10,12 @@ The TLV is built and signed in Python using ``trusted_name_helper.py`` with the
 same test key/certificate pair that Speculos accepts.
 
 Tests require a Speculos backend with a device that supports PKI (Nano S Plus or newer).
-"""
 
-import os
+If you see ``ExceptionRAPDU: Error [0x6b03]`` on the PKI tests, the firmware was built
+without ``ENABLE_TRUSTED_NAME_TEST_KEY=1``. These tests use signer_key_id=0x0000 (test key),
+which is structurally rejected by production firmware before signature verification.
+Rebuild with ``make DEBUG=1`` or ``make ENABLE_TRUSTED_NAME_TEST_KEY=1`` and re-run.
+"""
 
 import pytest
 
@@ -50,11 +53,6 @@ def _requires_speculos_pki(backend):
         pytest.skip("PKI test certificates only work with Speculos backend")
 
 
-def _requires_test_key_build():
-    if not os.environ.get("ENABLE_TRUSTED_NAME_TEST_KEY"):
-        pytest.skip("requires firmware built with ENABLE_TRUSTED_NAME_TEST_KEY=1")
-
-
 def _get_device_name(backend) -> str:
     if hasattr(backend, "device") and hasattr(backend.device, "type"):
         return backend.device.type.name.lower()
@@ -63,7 +61,6 @@ def _get_device_name(backend) -> str:
 
 def _load_pki(backend, client: CommandSender) -> None:
     _requires_speculos_pki(backend)
-    _requires_test_key_build()
     cert = get_pki_certificate(_get_device_name(backend))
     if cert is None:
         pytest.skip(f"No PKI certificate for device {_get_device_name(backend)}")
@@ -90,6 +87,16 @@ def _expect_set_trusted_name_sw(
         assert rapdu.status == expected_sw
 
 
+def _assert_set_trusted_name_ok(client: CommandSender, payload: bytes) -> None:
+    try:
+        rapdu = client.set_trusted_name(payload)
+    except ExceptionRAPDU as e:
+        if e.status == SW_INVALID_PARAM:
+            pytest.fail("0x6b03: test key (0x0000) rejected — missing ENABLE_TRUSTED_NAME_TEST_KEY=1?")
+        raise
+    assert rapdu.status == StatusWords.SWO_SUCCESS
+
+
 # ── Positive tests ───────────────────────────────────────────────────────────
 
 
@@ -105,8 +112,7 @@ def test_set_trusted_name_accepts_valid_pki_payload(backend):
         chain_id=1,
         challenge=challenge,
     )
-    response = client.set_trusted_name(builder.build_signed())
-    assert response.status == StatusWords.SWO_SUCCESS
+    _assert_set_trusted_name_ok(client, builder.build_signed())
 
 
 @pytest.mark.active_test_scope
@@ -121,8 +127,7 @@ def test_set_trusted_name_long_name(backend):
         chain_id=1,
         challenge=challenge,
     )
-    response = client.set_trusted_name(builder.build_signed())
-    assert response.status == StatusWords.SWO_SUCCESS
+    _assert_set_trusted_name_ok(client, builder.build_signed())
 
 
 # ── Negative tests ───────────────────────────────────────────────────────────
@@ -209,7 +214,6 @@ def test_set_trusted_name_rejects_bad_signature(backend):
 def test_set_trusted_name_rejects_no_pki_cert_loaded(backend):
     """SET_TRUSTED_NAME without prior PKI certificate load -> reject."""
     _requires_speculos_pki(backend)
-    _requires_test_key_build()
     client = CommandSender(backend)
 
     resp = client.get_challenge()
