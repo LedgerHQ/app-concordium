@@ -18,14 +18,14 @@ char g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 uint8_t g_trusted_address_len;
 bool g_trusted_name_valid;
+uint64_t g_stored_challenge;
 
-/** GET_CHALLENGE nonce; only used by SET_TRUSTED_NAME in this translation unit. */
 static void erase_stored_challenge(void) {
-    explicit_bzero(&global.trustedNamePki.stored_challenge, sizeof(uint64_t));
+    explicit_bzero(&g_stored_challenge, sizeof(g_stored_challenge));
 }
 
 static uint64_t get_stored_challenge(void) {
-    return U8BE((const uint8_t *) &global.trustedNamePki.stored_challenge, 0);
+    return g_stored_challenge;
 }
 
 /* ── Signer algorithm enum (mirrors SDK tlv_use_case_trusted_name.h) ─────── */
@@ -111,6 +111,11 @@ static int finalize_multi_hash(trustedNameMultiHashCtx_t *h,
 
 /* ── TLV extraction context ──────────────────────────────────────────────── */
 
+/* SIGNER_KEY_ID_TEST (0x0000) is accepted only in debug/CI builds (TRUSTED_NAME_TEST_KEY).
+ * SIGNER_KEY_ID_PROD (0x0007) is the live Ledger Live key accepted in production builds.
+ * This provides defense-in-depth: a TLV signed with the Speculos test key (id 0) is
+ * structurally rejected on production firmware before reaching check_signature_with_pki().
+ * The PKI chain check remains the primary security boundary in all builds. */
 #define SIGNER_KEY_ID_TEST 0x0000
 #define SIGNER_KEY_ID_PROD 0x0007
 
@@ -119,8 +124,7 @@ static int finalize_multi_hash(trustedNameMultiHashCtx_t *h,
 #define DER_SIG_MIN 64
 #define DER_SIG_MAX 72
 
-/** Clears TLV + hash only; preserves GET_CHALLENGE value in global.trustedNamePki.stored_challenge.
- */
+/** Clears TLV + hash state only; g_stored_challenge is a separate global untouched here. */
 static void clear_trusted_name_pki_working_state(void) {
     explicit_bzero(&global.trustedNamePki.hash_ctx, sizeof(global.trustedNamePki.hash_ctx));
     explicit_bzero(&global.trustedNamePki.tlv, sizeof(global.trustedNamePki.tlv));

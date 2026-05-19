@@ -14,6 +14,10 @@ extern char g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 extern uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 extern uint8_t g_trusted_address_len;
 extern bool g_trusted_name_valid;
+/** GET_CHALLENGE nonce stored here so it survives the explicit_bzero(&global) in app_main.c that
+ * runs before each new instruction.  Written by handle_get_challenge, consumed and erased by
+ * handle_set_trusted_name. */
+extern uint64_t g_stored_challenge;
 
 /**
  * SET_TRUSTED_NAME -- CLA E0, INS 22, P1 00, P2 00.
