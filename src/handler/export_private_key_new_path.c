@@ -64,8 +64,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
                                        size_t outputPrivateKeySize) {
-    cx_ecfp_private_key_t tempPrivateKeyEd25519;
-    uint8_t tempPrivateKey[KEY_LENGTH];
+    uint8_t tempPrivateKey[ED25519_EXTENDED_PRIVATE_KEY_LENGTH];
 
     uint8_t keysToExport[MAX_KEYS_TO_EXPORT] = {0, 0, 0};
     uint8_t keysToExportLength = 0;
@@ -109,12 +108,6 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             THROW(ERROR_INVALID_PARAM);
     }
 
-    // check if the buffer is big enough
-    if (keysToExportLength * LENGTH_AND_PRIVATE_KEY_SIZE > outputPrivateKeySize) {
-        PRINTF("There is not enough space for the keys in the output buffer\n");
-        THROW(ERROR_BUFFER_OVERFLOW);
-    }
-
     uint8_t tx = 0;
 
     // iterate over the keys to export
@@ -134,25 +127,36 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
         harden_derivation_path(&subpath);
 
-        outputPrivateKey[tx++] = KEY_LENGTH;
         if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
-            // export raw key
-            get_private_key(&subpath, &tempPrivateKeyEd25519);
-            for (int i = 0; i < KEY_LENGTH; i++) {
-                tempPrivateKey[i] = tempPrivateKeyEd25519.d[i];
+            const size_t exportedKeyLength = ED25519_EXTENDED_PRIVATE_KEY_LENGTH;
+            if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
+                PRINTF("There is not enough space for the keys in the output buffer\n");
+                THROW(ERROR_BUFFER_OVERFLOW);
             }
+
+            outputPrivateKey[tx++] = exportedKeyLength;
+            get_extended_private_key(&subpath,
+                                     tempPrivateKey,
+                                     KEY_LENGTH,
+                                     tempPrivateKey + KEY_LENGTH,
+                                     KEY_LENGTH);
         } else {
-            // export bls key
+            const size_t exportedKeyLength = KEY_LENGTH;
+            if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
+                PRINTF("There is not enough space for the keys in the output buffer\n");
+                THROW(ERROR_BUFFER_OVERFLOW);
+            }
+
+            outputPrivateKey[tx++] = exportedKeyLength;
             get_bls_private_key(&subpath, tempPrivateKey, sizeof(tempPrivateKey));
         }
 
-        for (int i = 0; i < KEY_LENGTH; i++) {
+        for (size_t i = 0; i < outputPrivateKey[tx - 1]; i++) {
             outputPrivateKey[tx] = tempPrivateKey[i];
             tx++;
         }
     }
     explicit_bzero(&tempPrivateKey, sizeof(tempPrivateKey));
-    explicit_bzero(&tempPrivateKeyEd25519, sizeof(tempPrivateKeyEd25519));
     return tx;
 }
 

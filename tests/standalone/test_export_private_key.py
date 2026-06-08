@@ -294,7 +294,7 @@ def test_export_creation_of_zk_proof_private_key_new_path_mainnet(
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 1
+    assert len(result.data) == 65 * 1
     assert result.data == bytes.fromhex(
         "20d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e00"
     )
@@ -322,7 +322,7 @@ def test_export_creation_of_zk_proof_private_key_new_path_testnet(
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 1
+    assert len(result.data) == 65 * 1
     assert result.data == bytes.fromhex(
         "206b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce"
     )
