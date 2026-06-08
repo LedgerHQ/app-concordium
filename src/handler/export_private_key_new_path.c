@@ -127,8 +127,9 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
         harden_derivation_path(&subpath);
 
+        size_t exportedKeyLength;
         if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
-            const size_t exportedKeyLength = ED25519_EXTENDED_PRIVATE_KEY_LENGTH;
+            exportedKeyLength = ED25519_EXTENDED_PRIVATE_KEY_LENGTH;
             if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
                 PRINTF("There is not enough space for the keys in the output buffer\n");
                 THROW(ERROR_BUFFER_OVERFLOW);
@@ -141,7 +142,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                                      tempPrivateKey + KEY_LENGTH,
                                      KEY_LENGTH);
         } else {
-            const size_t exportedKeyLength = KEY_LENGTH;
+            exportedKeyLength = KEY_LENGTH;
             if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
                 PRINTF("There is not enough space for the keys in the output buffer\n");
                 THROW(ERROR_BUFFER_OVERFLOW);
@@ -151,7 +152,7 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             get_bls_private_key(&subpath, tempPrivateKey, sizeof(tempPrivateKey));
         }
 
-        for (size_t i = 0; i < outputPrivateKey[tx - 1]; i++) {
+        for (size_t i = 0; i < exportedKeyLength; i++) {
             outputPrivateKey[tx] = tempPrivateKey[i];
             tx++;
         }

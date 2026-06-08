@@ -111,6 +111,8 @@ void get_extended_private_key(const derivation_path_t *path,
             explicit_bzero(chainCode, chainCodeSize);
             THROW(e);
         }
+        FINALLY {
+        }
     }
     END_TRY;
 }
