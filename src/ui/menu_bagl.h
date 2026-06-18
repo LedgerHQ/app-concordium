@@ -1,0 +1,16 @@
+#pragma once
+
+#include <ux_layouts.h>
+
+// Stub. APPVERSION is defined in makefile
+#ifndef APPVERSION
+#error "APPVERSION is not set"
+#endif  // APPVERSION
+
+extern const bagl_icon_details_t C_icon_validate_14;
+extern const bagl_icon_details_t C_app_concordium_16px;
+extern const bagl_icon_details_t C_icon_certificate;
+extern const bagl_icon_details_t C_icon_dashboard_x;
+extern const bagl_icon_details_t C_icon_back;
+
+void ui_menu_main(void);

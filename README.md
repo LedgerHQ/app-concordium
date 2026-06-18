@@ -16,8 +16,8 @@ It will allow you, whether you are developing on macOS, Windows or Linux to quic
     * On macOS, install and launch [XQuartz](https://www.xquartz.org/) (make sure to go to XQuartz > Preferences > Security and check "Allow client connections").
     * On Windows, install and launch [VcXsrv](https://sourceforge.net/projects/vcxsrv/) (make sure to configure it to disable access control).
 * Install [VScode](https://code.visualstudio.com/download) and add [Ledger's extension](https://marketplace.visualstudio.com/items?itemName=LedgerHQ.ledger-dev-tools).
-* Open a terminal and clone `concordium-ledger-app` with `git clone git@github.com:LedgerHQ/concordium-ledger-app.git`.
-* Open the `concordium-ledger-app` folder with VSCode.
+* Open a terminal and clone the repository, for example: `git clone git@github.com:blooo-io/concordium-ledger-app.git`.
+* Open the cloned folder (e.g. `concordium-ledger-app`) with VSCode.
 * Use Ledger extension's sidebar menu or open the tasks menu with `ctrl + shift + b` (`command + shift + b` on a Mac) to conveniently execute actions :
     * Build the app for the device model of your choice with `Build`.
     * Test your binary on [Speculos](https://github.com/LedgerHQ/speculos) with `Run with Speculos`.
@@ -132,7 +132,46 @@ python3 -m ledgerblue.runScript --scp --fileName bin/app.apdu --elfFile bin/app.
 
 ## Test
 
-The concordium app comes with functional tests implemented with Ledger's [Ragger](https://github.com/LedgerHQ/ragger) test framework.
+The concordium app comes with both functional tests and fuzz testing capabilities.
+
+### Functional Tests
+
+The functional tests are implemented with Ledger's [Ragger](https://github.com/LedgerHQ/ragger) test framework. For **pytest options, device selection, snapshots, and PKI-related builds**, see [tests/README.md](tests/README.md).
+
+### Fuzzing
+
+The app includes standalone fuzz testing capabilities in the `fuzzing/` directory. One fuzzer is provided:
+
+1. `standalone_export_pk_new_path_fuzzer` - Tests the private key export functionality
+
+To build and run the fuzzers:
+
+```shell
+# Navigate to fuzzing directory
+cd fuzzing
+
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake (requires Clang)
+cmake ..
+
+# Build the fuzzers
+make
+
+# Run a fuzzer 
+./standalone_export_pk_new_path_fuzzer
+```
+
+The fuzzers are designed to be compatible with ClusterFuzzLite and support various sanitizers (Address, Memory) which can be enabled via environment variables:
+
+```shell
+# Run with Address Sanitizer
+SANITIZER=address ./standalone_export_pk_new_path_fuzzer
+
+# Run with Memory Sanitizer
+SANITIZER=memory ./standalone_export_pk_new_path_fuzzer
+```
 
 ### macOS / Windows
 
@@ -161,12 +200,60 @@ Install the tests requirements :
 pip install -r tests/requirements.txt
 ```
 
+**Troubleshooting Installation Issues:**
+
+If you encounter build errors with `coincurve` (a dependency of `ecdsa`), try the following solutions:
+
+**On macOS:**
+```shell
+# Install system dependencies
+brew install libffi openssl
+
+# Set environment variables for compilation
+export LDFLAGS="-L$(brew --prefix openssl)/lib"
+export CPPFLAGS="-I$(brew --prefix openssl)/include"
+
+# Then install requirements
+pip install -r tests/requirements.txt
+```
+
+**On Ubuntu/Debian:**
+```shell
+# Install system dependencies
+sudo apt-get update
+sudo apt-get install build-essential libffi-dev libssl-dev
+
+# Then install requirements
+pip install -r tests/requirements.txt
+```
+
+**Alternative approach (if coincurve continues to fail):**
+```shell
+# Install coincurve separately with pre-compiled wheels
+pip install coincurve --only-binary=coincurve
+
+# Then install the rest
+pip install -r tests/requirements.txt
+```
+
 Then you can :
+
+Build the app for functional tests. **`DEBUG=1`** enables the Speculos **test** PKI signer key for trusted name (`TRUSTED_NAME_TEST_KEY`). PKI integration tests **skip** automatically if the app was built **without** that (release-style build).
+
+```shell
+make DEBUG=1 COIN=CCD
+```
+
+CI without `DEBUG` can pass **`ENABLE_TRUSTED_NAME_TEST_KEY=1`** instead (see `.github/workflows/build_and_functional_tests.yml`).
+
+A plain `make` is **production**: only the production trusted-name key id; trusted-name PKI tests are **skipped** when you run pytest.
+
+**Docker / Ledger extension:** use `DEBUG=1` or add `ENABLE_TRUSTED_NAME_TEST_KEY=1` on the **`make` command line** when you need PKI tests to run. **`export DEBUG=1` in the shell is not enough:** the SDK sets `DEBUG:=0` in `Makefile.target`, which overrides the environment; only `make DEBUG=1 …` (or `ENABLE_TRUSTED_NAME_TEST_KEY=1`) defines `TRUSTED_NAME_TEST_KEY`.
 
 Run the functional tests (here for nanos+ but available for any device once you have built the binaries) :
 
 ```shell
-pytest tests/ --tb=short -v --device nanosp
+pytest tests/standalone/ --tb=short -v --device nanosp
 ```
 
 Or run your app directly with Speculos
@@ -193,7 +280,7 @@ The flow processed in [GitHub Actions](https://github.com/features/actions) is t
 - Code formatting with [clang-format](http://clang.llvm.org/docs/ClangFormat.html)
 - Compilation of the application for all Ledger hardware in [ledger-app-builder](https://github.com/LedgerHQ/ledger-app-builder)
 - Unit tests of C functions with [cmocka](https://cmocka.org/) (see [unit-tests/](unit-tests/))
-- End-to-end tests with [Speculos](https://github.com/LedgerHQ/speculos) emulator and [ragger](https://github.com/LedgerHQ/ragger) (see [tests/](tests/))
+- End-to-end tests with [Speculos](https://github.com/LedgerHQ/speculos) emulator and [ragger](https://github.com/LedgerHQ/ragger) (see [tests/README.md](tests/README.md))
 - Code coverage with [gcov](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)/[lcov](http://ltp.sourceforge.net/coverage/lcov.php) and upload to [codecov.io](https://about.codecov.io)
 - Documentation generation with [doxygen](https://www.doxygen.nl)
 
@@ -201,3 +288,12 @@ It outputs 3 artifacts:
 - `compiled_app_binaries` within binary files of the build process for each device
 - `code-coverage` within HTML details of code coverage
 - `documentation` within HTML auto-generated documentation
+
+## Useful commands 
+
+Clang-format locally 
+```docker exec app-concordium-container find /app/src -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} \;```
+
+Run a certain test, with full logs and generate new snapshots 
+```source .venv/bin/activate && pytest ./tests/standalone/test_verify_address.py --tb=short -v --device nanosp --golden_run -s```
+

@@ -29,7 +29,7 @@ APPNAME = "Concordium"
 
 # Application version
 APPVERSION_M = 5
-APPVERSION_N = 3
+APPVERSION_N = 6
 APPVERSION_P = 2
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
@@ -38,6 +38,7 @@ DEFINES += APPVERSION=\"$(APPVERSION)\"
 DEFINES += APPVERSION_M=$(APPVERSION_M)
 DEFINES += APPVERSION_N=$(APPVERSION_N)
 DEFINES += APPVERSION_P=$(APPVERSION_P)
+
 
 # Application source files
 APP_SOURCE_PATH += src
@@ -65,7 +66,7 @@ CURVE_APP_LOAD_PARAMS = ed25519
 # If your app needs it, you can specify multiple path by using:
 # `PATH_APP_LOAD_PARAMS = "44'/1'" "45'/1'"`
 # purpose=coin(44) / coin_type=Testnet(1)
-PATH_APP_LOAD_PARAMS = "44'/919'" "1105'/0'"
+PATH_APP_LOAD_PARAMS = "44'/919'" "44'/1'" "1105'/0'"
 
 # Setting to allow building variant applications
 # - <VARIANT_PARAM> is the name of the parameter which should be set
@@ -95,6 +96,13 @@ ENABLE_BLUETOOTH = 1
 #ENABLE_NFC = 1
 
 ########################################
+#    Nano PKI + TLV (lib_pki/lib_tlv)  #
+########################################
+# Required for trusted-name verification (TLV descriptor format + PKI signature).
+ENABLE_PKI_LIBRARY = 1
+ENABLE_TLV_LIBRARY = 1
+
+########################################
 #         NBGL custom features         #
 ########################################
 ENABLE_NBGL_QRCODE = 1
@@ -116,4 +124,30 @@ ENABLE_NBGL_QRCODE = 1
 #DISABLE_DEBUG_LEDGER_ASSERT = 1
 #DISABLE_DEBUG_THROW = 1
 
+
+# Accept test signer key ID (0x00) for trusted name TLV (Speculos / PKI tests).
+# - DEBUG=1: enabled for local dev (pytest skips PKI tests on release builds automatically).
+# - ENABLE_TRUSTED_NAME_TEST_KEY=1: optional (e.g. CI without DEBUG).
+# Production: plain `make` (no DEBUG, no ENABLE).
+ifeq ($(DEBUG),1)
+DEFINES += TRUSTED_NAME_TEST_KEY
+endif
+ifeq ($(ENABLE_TRUSTED_NAME_TEST_KEY),1)
+DEFINES += TRUSTED_NAME_TEST_KEY
+endif
+
+# HKDF API is implemented in the SDK but declared only under lib_cxng/src (not in the public cx.h umbrella).
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+
 include $(BOLOS_SDK)/Makefile.standard_app
+
+# Berkeley `size` (text / data / bss / dec / hex), not `size -A`.
+# Depend on all SDK `default` outputs so this runs last (after .apdu / .sha256 copies), not right after link.
+# For full per-section listing: arm-none-eabi-size -A $(BIN_DIR)/app.elf
+.PHONY: app-size-report
+app-size-report: $(BIN_TARGETS) $(DBG_TARGETS)
+	@echo ""
+	@echo "Finished Concordium Ledger app ($(TARGET_NAME)) → $(BIN_DIR)/app.elf"
+	$(L)$(GCCPATH)arm-none-eabi-size $(BIN_DIR)/app.elf
+
+default: app-size-report
