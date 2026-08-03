@@ -110,54 +110,70 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
 
     uint8_t tx = 0;
 
-    // iterate over the keys to export
-    for (int keyIndex = 0; keyIndex < keysToExportLength; keyIndex++) {
-        derivation_path_t subpath;
-        init_derivation_path(&subpath);
-        subpath.len = 4;
-        subpath.nodes[0] = NEW_PURPOSE;
-        subpath.nodes[1] = coin_type;
-        subpath.nodes[2] = identityProvider;
-        subpath.nodes[3] = identity;
+    BEGIN_TRY {
+        TRY {
+            // iterate over the keys to export
+            for (int keyIndex = 0; keyIndex < keysToExportLength; keyIndex++) {
+                derivation_path_t subpath;
+                init_derivation_path(&subpath);
+                subpath.len = 4;
+                subpath.nodes[0] = NEW_PURPOSE;
+                subpath.nodes[1] = coin_type;
+                subpath.nodes[2] = identityProvider;
+                subpath.nodes[3] = identity;
 
-        if (!append_export_key_type(&subpath, keysToExport[keyIndex], account)) {
-            PRINTF("The derivation path length is too long\n");
-            THROW(ERROR_BUFFER_OVERFLOW);
-        }
+                if (!append_export_key_type(&subpath, keysToExport[keyIndex], account)) {
+                    PRINTF("The derivation path length is too long\n");
+                    THROW(ERROR_BUFFER_OVERFLOW);
+                }
 
-        harden_derivation_path(&subpath);
+                harden_derivation_path(&subpath);
 
-        size_t exportedKeyLength;
-        if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
-            exportedKeyLength = ED25519_EXTENDED_PRIVATE_KEY_LENGTH;
-            if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
-                PRINTF("There is not enough space for the keys in the output buffer\n");
-                THROW(ERROR_BUFFER_OVERFLOW);
+                // The wire format is a 1-byte length prefix followed by the key, so the
+                // exported length must always fit in a uint8_t.
+                size_t exportedKeyLength;
+                if (keysToExport[keyIndex] == NEW_COMMITMENT_RANDOMNESS) {
+                    exportedKeyLength = ED25519_EXTENDED_PRIVATE_KEY_LENGTH;
+                    if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
+                        PRINTF("There is not enough space for the keys in the output buffer\n");
+                        THROW(ERROR_BUFFER_OVERFLOW);
+                    }
+
+                    outputPrivateKey[tx++] = (uint8_t) exportedKeyLength;
+                    get_extended_private_key(&subpath,
+                                             tempPrivateKey,
+                                             KEY_LENGTH,
+                                             tempPrivateKey + KEY_LENGTH,
+                                             KEY_LENGTH);
+                } else {
+                    exportedKeyLength = KEY_LENGTH;
+                    if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
+                        PRINTF("There is not enough space for the keys in the output buffer\n");
+                        THROW(ERROR_BUFFER_OVERFLOW);
+                    }
+
+                    outputPrivateKey[tx++] = (uint8_t) exportedKeyLength;
+                    get_bls_private_key(&subpath, tempPrivateKey, sizeof(tempPrivateKey));
+                }
+
+                for (size_t i = 0; i < exportedKeyLength; i++) {
+                    outputPrivateKey[tx] = tempPrivateKey[i];
+                    tx++;
+                }
             }
-
-            outputPrivateKey[tx++] = exportedKeyLength;
-            get_extended_private_key(&subpath,
-                                     tempPrivateKey,
-                                     KEY_LENGTH,
-                                     tempPrivateKey + KEY_LENGTH,
-                                     KEY_LENGTH);
-        } else {
-            exportedKeyLength = KEY_LENGTH;
-            if (tx + 1 + exportedKeyLength > outputPrivateKeySize) {
-                PRINTF("There is not enough space for the keys in the output buffer\n");
-                THROW(ERROR_BUFFER_OVERFLOW);
-            }
-
-            outputPrivateKey[tx++] = exportedKeyLength;
-            get_bls_private_key(&subpath, tempPrivateKey, sizeof(tempPrivateKey));
         }
-
-        for (size_t i = 0; i < exportedKeyLength; i++) {
-            outputPrivateKey[tx] = tempPrivateKey[i];
-            tx++;
+        CATCH_OTHER(e) {
+            // A partially completed export leaves plaintext key material in the output
+            // buffer, which is only wiped on the success path in sendPrivateKeysNewPath.
+            explicit_bzero(outputPrivateKey, outputPrivateKeySize);
+            THROW(e);
+        }
+        FINALLY {
+            explicit_bzero(tempPrivateKey, sizeof(tempPrivateKey));
         }
     }
-    explicit_bzero(&tempPrivateKey, sizeof(tempPrivateKey));
+    END_TRY;
+
     return tx;
 }
 
