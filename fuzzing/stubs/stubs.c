@@ -236,6 +236,16 @@ void get_public_key(uint8_t *publicKeyArray) {
     memset(publicKeyArray, 0, KEY_LENGTH);
 }
 
+void get_extended_private_key(const derivation_path_t *path,
+                              uint8_t *privateKey,
+                              size_t privateKeySize,
+                              uint8_t *chainCode,
+                              size_t chainCodeSize) {
+    (void)path;
+    memset(privateKey, 0, privateKeySize);
+    memset(chainCode, 0, chainCodeSize);
+}
+
 void sign(uint8_t *input, uint8_t *signatureOnInput) {
     (void)input;
     memset(signatureOnInput, 0, 64);
