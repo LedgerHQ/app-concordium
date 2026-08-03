@@ -18,6 +18,7 @@ extern const uint8_t BLS_G1_ORDER[32];
 #define ED25519_SEED_LENGTH           12
 #define ED25519_PUBLIC_KEY_CURVE_SIZE 64
 #define ED25519_SIGN_COMPRESSED_BIT   0x80
+
 #define ED25519_EXTENDED_PRIVATE_KEY_LENGTH (2 * KEY_LENGTH)
 
 /** HKDF salt prefix length for BLS keygen ("BLS-SIG-KEYGEN-SALT-" …). */
