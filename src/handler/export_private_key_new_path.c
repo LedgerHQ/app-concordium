@@ -109,6 +109,9 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
     }
 
     uint8_t tx = 0;
+    // Distinguishes the success path from an unwind inside TRY. Must be volatile: it is
+    // written inside TRY and read in FINALLY, i.e. potentially across a longjmp.
+    volatile bool exportComplete = false;
 
     BEGIN_TRY {
         TRY {
@@ -161,15 +164,19 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                     tx++;
                 }
             }
+            exportComplete = true;
         }
-        CATCH_OTHER(e) {
-            // A partially completed export leaves plaintext key material in the output
-            // buffer, which is only wiped on the success path in sendPrivateKeysNewPath.
-            explicit_bzero(outputPrivateKey, outputPrivateKeySize);
-            THROW(e);
-        }
+        // No CATCH clause on purpose: a THROW inside a CATCH runs after CLOSE_TRY has
+        // popped this context, so it would unwind straight past FINALLY and skip the
+        // wipes below. Letting END_TRY re-throw keeps a single cleanup path.
         FINALLY {
             explicit_bzero(tempPrivateKey, sizeof(tempPrivateKey));
+            if (!exportComplete) {
+                // A partial export leaves plaintext key material in the output buffer,
+                // which is otherwise only wiped on the success path in
+                // sendPrivateKeysNewPath.
+                explicit_bzero(outputPrivateKey, outputPrivateKeySize);
+            }
         }
     }
     END_TRY;
