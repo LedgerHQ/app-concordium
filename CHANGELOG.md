@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - CBOR payloads requiring more than two APDU packets (e.g. a memo or registered-data blob split across three or more packets) are now processed correctly instead of returning an error.
+- Stored challenge is erased on any `set_trusted_name` failure, preventing a rejected command from being retried with the same nonce.
 
 ## [5.6.2] - 2026-05-19
 
@@ -103,3 +104,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial Ledger fork base derived from blooo-io/concordium-ledger-app; tests adapted for Stax and Flex.
 - Nano S test snapshots added; CI adapted for multi-device matrix.
+
+---
+*Entries below are upstream blooo-io releases that form the base of this fork.*
+
+## [5.2.0] - 2025-03-17
+
+### Added
+- QR code display in verify-address flow.
+
+### Changed
+- `exportPrivateKey` split into two separate instructions (legacy path vs. new derivation path).
+
+## [5.1.3] - 2025-03-12
+
+### Changed
+- Merged LedgerHQ/app-concordium develop branch (blooo-io versions kept); CI now triggers on develop branch.
+
+## [5.1.2] - 2025-03-06
+
+### Fixed
+- Additional buffer overflow and length checks in `signCredentialDeployment`, `signConfigureBaker`, `exportPrivateKey`, and `sign.c` (audit, round 2).
+
+## [5.1.1] - 2025-03-05
+
+### Fixed
+- Recipient address now base58-encoded for transfer-to-public display.
+
+## [5.1.0] - 2025-03-04
+
+### Added
+- Recipient address display for transfer-to-public transactions.
+- Four additional context fields shown in credential deployment and public-info-for-IP signing flows.
+
+### Fixed
+- Comprehensive buffer overflow checks across multiple transaction handlers and time/amount display functions.
+
+## [5.0.2] - 2025-01-31
+
+### Fixed
+- Warnings and bugs raised by security audit; magic numbers removed from CBOR reader.
+
+## [5.0.1] - 2025-01-24
+
+### Added
+- `suspended` boolean flag added to the `configureBaker` instruction.
+
+## [5.0.0] - 2024-12-17
+
+### Added
+- Full NBGL display support (Stax, Flex) for all instruction types: transfer, transfer with memo, scheduled transfers, register data, credential deployment, configure baker/delegation, public info for IP, init/update contract, deploy module, export private key, verify address, get public key.
+- New derivation path formats supported in get-public-key and verify-address flows.
+
+### Changed
+- Handler logic split from display layer across all instructions (BAGL and NBGL).
+- Deprecated SDK methods removed; replaced with current equivalents.
