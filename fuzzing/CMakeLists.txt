@@ -16,7 +16,7 @@ if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Favor ClusterFuzzLite-provided flags if present; otherwise use safe defaults.
-set(FALLBACK_CFLAGS "-O1 -g -fno-omit-frame-pointer -fsanitize-coverage=trace-cmp,indirect-calls,8bit-counters")
+set(FALLBACK_CFLAGS "-O1 -g -fno-omit-frame-pointer -fsanitize-coverage=trace-cmp,indirect-calls,8bit-counters -Wno-implicit-fallthrough")
 if(DEFINED ENV{SANITIZER})
   if("$ENV{SANITIZER}" STREQUAL "address")
     string(APPEND FALLBACK_CFLAGS " -fsanitize=address -fsanitize-address-use-after-scope")
@@ -29,9 +29,9 @@ endif()
 
 # Compatible with ClusterFuzzLite.
 if(NOT DEFINED ENV{LIB_FUZZING_ENGINE})
-    set(COMPILATION_FLAGS_ "-g -Wall -fsanitize=fuzzer,address,undefined")
+    set(COMPILATION_FLAGS_ "-g -Wall -Wno-implicit-fallthrough -fsanitize=fuzzer,address,undefined")
 else()
-    set(COMPILATION_FLAGS_ "$ENV{LIB_FUZZING_ENGINE} $ENV{CFLAGS}")
+    set(COMPILATION_FLAGS_ "$ENV{LIB_FUZZING_ENGINE} $ENV{CFLAGS} -Wno-implicit-fallthrough")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -54,11 +54,14 @@ endif()
 #           set_trusted_name.c (stubbed), apdu_response.c (stubbed),
 #           display_bagl.c / display_nbgl.c (stubbed).
 # ---------------------------------------------------------------------------
+set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor-ledger/cborparser.c)
+
 set(SHARED_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs/stubs.c
     ${LEDGER_SDK}/lib_standard_app/format.c
     ${APP_SRC}/helpers/base58check.c
     ${APP_SRC}/helpers/cbor_data_blob.c
+    ${TINYCBOR_SRC}
     ${APP_SRC}/helpers/derivation_path.c
     ${APP_SRC}/helpers/fee_display.c
     ${APP_SRC}/helpers/numberHelpers.c
@@ -81,6 +84,7 @@ set(FUZZ_INCLUDE_DIRS
     ${APP_SRC}/apdu
     ${APP_SRC}/ui
     ${LEDGER_SDK}/lib_standard_app
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src
 )
 
 # ---------------------------------------------------------------------------
