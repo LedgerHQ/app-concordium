@@ -30,7 +30,7 @@ APPNAME = "Concordium"
 # Application version
 APPVERSION_M = 5
 APPVERSION_N = 6
-APPVERSION_P = 2
+APPVERSION_P = 3
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += APPVERSION=\"$(APPVERSION)\"
@@ -139,15 +139,24 @@ endif
 # HKDF API is implemented in the SDK but declared only under lib_cxng/src (not in the public cx.h umbrella).
 INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
+# tinycbor (CBOR parser, v0.6.0) — parser only, encoder excluded
+DEFINES          += CBOR_NO_ENCODER_API
+APP_SOURCE_FILES += deps/tinycbor-ledger/cborparser.c
+INCLUDES_PATH    += deps/tinycbor/src
+
 include $(BOLOS_SDK)/Makefile.standard_app
 
-# Berkeley `size` (text / data / bss / dec / hex), not `size -A`.
-# Depend on all SDK `default` outputs so this runs last (after .apdu / .sha256 copies), not right after link.
-# For full per-section listing: arm-none-eabi-size -A $(BIN_DIR)/app.elf
+# arm-none-eabi-size always reports bss == total SRAM on Ledger targets: the
+# linker script extends .bss to END_STACK to reserve stack space, so the bss
+# column is the whole SRAM budget, not just BSS variables.  Use nm to extract
+# the linker-defined _bss/_ebss/_stack/_estack labels and compute the real split.
 .PHONY: app-size-report
 app-size-report: $(BIN_TARGETS) $(DBG_TARGETS)
 	@echo ""
 	@echo "Finished Concordium Ledger app ($(TARGET_NAME)) → $(BIN_DIR)/app.elf"
-	$(L)$(GCCPATH)arm-none-eabi-size $(BIN_DIR)/app.elf
+	@$(GCCPATH)arm-none-eabi-size $(BIN_DIR)/app.elf | \
+	  awk 'NR==2 { printf "  flash  %6d B\n", $$1 }'
+	@$(GCCPATH)arm-none-eabi-nm $(BIN_DIR)/app.elf 2>/dev/null | \
+	  python3 -c "import sys; s={p[2]:int(p[0],16) for l in sys.stdin for p in [l.split()] if len(p)==3}; bss=s.get('_bss'); ebss=s.get('_ebss'); stk=s.get('_stack'); estk=s.get('_estack'); print(f'  SRAM   {(ebss-bss)+(estk-stk):6d} B total: {ebss-bss} B BSS variables, {estk-stk} B stack headroom') if all(v is not None for v in [bss,ebss,stk,estk]) else print('  SRAM   (nm symbols _bss/_ebss/_stack/_estack not found; SDK linker script may have changed)')"
 
 default: app-size-report

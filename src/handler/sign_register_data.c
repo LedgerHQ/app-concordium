@@ -77,9 +77,6 @@ void handle_sign_register_data(const command_t *cmd,
                 readCborInitial(cdata, dataLength);
                 break;
             case TX_REGISTER_DATA_PAYLOAD:
-                if (ctx->dataLength != 0) {
-                    THROW(ERROR_INVALID_STATE);
-                }
                 readCborContent(cdata, dataLength);
                 break;
             default:
