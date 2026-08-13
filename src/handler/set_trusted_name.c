@@ -287,6 +287,10 @@ static bool verify_signature(const trustedNameTlvExtracted_t *ctx) {
 }
 
 void trusted_name_send_set_error(uint16_t sw) {
+    // Erase the nonce on every failure so a rejected SET_TRUSTED_NAME cannot be
+    // retried with the same challenge (g_stored_challenge is not in `global` and
+    // survives explicit_bzero(&global) in app_main.c).
+    erase_stored_challenge();
     global_tx_state.currentInstruction = INSTRUCTION_NONE;
     io_send_sw(sw);
 }

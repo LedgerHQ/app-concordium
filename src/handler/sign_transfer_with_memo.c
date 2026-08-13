@@ -60,7 +60,7 @@ void handle_sign_transfer_with_memo(const command_t *cmd,
             THROW(SWO_INCORRECT_DATA);
         }
         memo_ctx->cborLength = U2BE(cdata, 0);
-        if (memo_ctx->cborLength > MAX_MEMO_CBOR_SIZE) {
+        if (memo_ctx->cborLength > MAX_CBOR_BLOB_SIZE) {
             THROW(ERROR_INVALID_PARAM);
         }
 
@@ -96,12 +96,10 @@ void handle_sign_transfer_with_memo(const command_t *cmd,
 
         readCborContent(cdata, dataLength);
         if (memo_ctx->cborLength != 0) {
-            // The memo size is <=256 bytes, so we should always have received the complete memo by
-            // this point
-            THROW(ERROR_INVALID_STATE);
+            send_success_no_idle();
+        } else {
+            finish_transfer_memo();
         }
-
-        finish_transfer_memo();
     } else if (p1 == P1_AMOUNT && ctx->state == TX_TRANSFER_AMOUNT) {
         if (p2 != P2_SIGN_TX_DEFAULT) {
             THROW(SWO_WRONG_P1_P2);
