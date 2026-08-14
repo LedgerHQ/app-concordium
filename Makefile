@@ -141,10 +141,14 @@ INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
 
 # tinycbor (CBOR parser, v0.6.0) — parser only, encoder excluded
 DEFINES          += CBOR_NO_ENCODER_API
-APP_SOURCE_FILES += deps/tinycbor-ledger/cborparser.c
+APP_SOURCE_FILES += deps/tinycbor/src/cborparser.c
 INCLUDES_PATH    += deps/tinycbor/src
 
 include $(BOLOS_SDK)/Makefile.standard_app
+
+# Suppress -Wimplicit-fallthrough only for the tinycbor submodule source.
+# OBJ_DIR is defined by the SDK (Makefile.target) so must come after the include above.
+$(OBJ_DIR)/deps/tinycbor/src/cborparser.o: CFLAGS += -Wno-implicit-fallthrough
 
 # arm-none-eabi-size always reports bss == total SRAM on Ledger targets: the
 # linker script extends .bss to END_STACK to reserve stack space, so the bss
