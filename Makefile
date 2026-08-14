@@ -148,7 +148,7 @@ include $(BOLOS_SDK)/Makefile.standard_app
 
 # Suppress -Wimplicit-fallthrough only for the tinycbor submodule source.
 # OBJ_DIR is defined by the SDK (Makefile.target) so must come after the include above.
-$(OBJ_DIR)/deps/tinycbor/src/cborparser.o: CFLAGS += -Wno-implicit-fallthrough
+$(OBJ_DIR)/app/deps/tinycbor/src/cborparser.o: CFLAGS += -Wno-implicit-fallthrough
 
 # arm-none-eabi-size always reports bss == total SRAM on Ledger targets: the
 # linker script extends .bss to END_STACK to reserve stack space, so the bss
