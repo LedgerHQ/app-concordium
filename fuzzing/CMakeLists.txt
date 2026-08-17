@@ -54,7 +54,7 @@ endif()
 #           set_trusted_name.c (stubbed), apdu_response.c (stubbed),
 #           display_bagl.c / display_nbgl.c (stubbed).
 # ---------------------------------------------------------------------------
-set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor-ledger/cborparser.c)
+set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src/cborparser.c)
 
 set(SHARED_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs/stubs.c
