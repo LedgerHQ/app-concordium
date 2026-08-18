@@ -93,8 +93,8 @@ void to_paginated_hex(uint8_t *byteArray, const uint64_t len, char *asHex, size_
  * Throws ERROR_BUFFER_OVERFLOW if dst is too small.
  */
 void plt_amount_to_display(char *dst,
-                            size_t dstLen,
-                            uint64_t significand,
-                            int8_t exponent,
-                            const char *tokenId,
-                            uint8_t tokenIdLen);
+                           size_t dstLen,
+                           uint64_t significand,
+                           int8_t exponent,
+                           const char *tokenId,
+                           uint8_t tokenIdLen);

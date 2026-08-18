@@ -104,11 +104,11 @@ size_t amount_to_ccd_display(uint8_t *dst, size_t dstLength, uint64_t microCcdAm
 }
 
 void plt_amount_to_display(char *dst,
-                            size_t dstLen,
-                            uint64_t significand,
-                            int8_t exponent,
-                            const char *tokenId,
-                            uint8_t tokenIdLen) {
+                           size_t dstLen,
+                           uint64_t significand,
+                           int8_t exponent,
+                           const char *tokenId,
+                           uint8_t tokenIdLen) {
     uint8_t decimals = (exponent < 0) ? (uint8_t) (-exponent) : 0;
     if (decimals > 18) {
         decimals = 18; /* sanity cap; no real token uses > 18 decimal places */
