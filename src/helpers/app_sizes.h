@@ -19,6 +19,8 @@
 #define MAX_CDATA_LENGTH 255
 
 // CBOR blob wire bounds (shared across memo, register-data, and future CBOR flows)
+// MAX_CBOR_STRING_SIZE=255 → CBOR header is 0x78 (1B) + 1-byte length = 2 bytes.
+// (A 3-byte header would only arise for strings ≥256 bytes, which we do not support.)
 #define MAX_CBOR_STRING_SIZE 255
 #define MAX_CBOR_BLOB_SIZE   (2 + MAX_CBOR_STRING_SIZE)  // 2-byte CBOR header + payload
 #define MAX_DATA_SIZE        MAX_CBOR_BLOB_SIZE

@@ -100,6 +100,9 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
 
 void readCborContent(uint8_t *cdata, uint8_t contentLength) {
     if (contentLength > ctx->cborLength) THROW(SWO_INCORRECT_DATA);
+    // Defence-in-depth: callers already verify cborLength <= MAX_CBOR_BLOB_SIZE before
+    // calling readCborInitial, so this guard is not reachable in current flows, but it
+    // protects against future callers that omit the upfront length check.
     if (ctx->cborBufLen + contentLength > MAX_CBOR_BLOB_SIZE) THROW(SWO_INCORRECT_DATA);
 
     memmove(ctx->cborBuf + ctx->cborBufLen, cdata, contentLength);
