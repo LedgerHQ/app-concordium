@@ -103,6 +103,31 @@ size_t amount_to_ccd_display(uint8_t *dst, size_t dstLength, uint64_t microCcdAm
     return offset;
 }
 
+void plt_amount_to_display(char *dst,
+                            size_t dstLen,
+                            uint64_t significand,
+                            int8_t exponent,
+                            const char *tokenId,
+                            uint8_t tokenIdLen) {
+    uint8_t decimals = (exponent < 0) ? (uint8_t) (-exponent) : 0;
+    if (decimals > 18) {
+        decimals = 18; /* sanity cap; no real token uses > 18 decimal places */
+    }
+    FPU64_TMP_ZERO_INIT;
+    if (!format_fpu64_trimmed(tmp, sizeof(tmp), significand, decimals)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    size_t numLen = strlen(tmp);
+    /* need: numLen + 1 (space) + tokenIdLen + 1 (NUL) */
+    if (dstLen < numLen + 1u + tokenIdLen + 1u) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    memmove(dst, tmp, numLen);
+    dst[numLen] = ' ';
+    memmove(dst + numLen + 1, tokenId, tokenIdLen);
+    dst[numLen + 1 + tokenIdLen] = '\0';
+}
+
 void to_paginated_hex(uint8_t *byteArray, const uint64_t len, char *asHex, const size_t asHexSize) {
     if (byteArray == NULL) {
         THROW(ERROR_INVALID_PARAM);

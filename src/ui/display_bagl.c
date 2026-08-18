@@ -989,4 +989,59 @@ void uiUpdateContractDisplay(void) {
     ux_flow_init(0, ux_update_contract, NULL);
 }
 
+/* PLT (Protocol Level Token) signing — INS 0x27 */
+
+UX_STEP_NOCB(ux_plt_review_step, nn, {"Review PLT", "transaction"});
+UX_STEP_NOCB(ux_plt_token_step,
+             bnnn_paging,
+             {.title = "Token", .text = (char *) global.signPlt.tokenId});
+UX_STEP_NOCB(ux_plt_op_step,
+             bnnn_paging,
+             {.title = "Operation", .text = global.signPlt.displayOp});
+UX_STEP_NOCB(ux_plt_amount_step,
+             bnnn_paging,
+             {.title = "Amount", .text = global.signPlt.displayAmount});
+UX_STEP_NOCB(ux_plt_recipient_step,
+             bnnn_paging,
+             {.title = "Recipient", .text = global.signPlt.displayAddress});
+UX_STEP_NOCB(ux_plt_target_step,
+             bnnn_paging,
+             {.title = "Target", .text = global.signPlt.displayAddress});
+UX_STEP_NOCB(ux_plt_memo_step,
+             bnnn_paging,
+             {.title = "Memo", .text = global.signPlt.displayMemo});
+
+static const ux_flow_step_t *ux_sign_plt[10];
+
+void startPltDisplay(volatile unsigned int *flags) {
+    signPltContext_t *plt = &global.signPlt;
+    uint8_t idx = 0;
+
+    ux_sign_plt[idx++] = &ux_plt_review_step;
+    ux_sign_plt[idx++] = &ux_plt_token_step;
+    ux_sign_plt[idx++] = &ux_plt_op_step;
+
+    if (plt->opType == PLT_OP_TRANSFER || plt->opType == PLT_OP_MINT
+        || plt->opType == PLT_OP_BURN) {
+        ux_sign_plt[idx++] = &ux_plt_amount_step;
+    }
+
+    if (plt->opType == PLT_OP_TRANSFER) {
+        ux_sign_plt[idx++] = &ux_plt_recipient_step;
+        if (plt->hasMemo) {
+            ux_sign_plt[idx++] = &ux_plt_memo_step;
+        }
+    } else if (plt->opType == PLT_OP_ADD_ALLOW_LIST || plt->opType == PLT_OP_REM_ALLOW_LIST
+               || plt->opType == PLT_OP_ADD_DENY_LIST || plt->opType == PLT_OP_REM_DENY_LIST) {
+        ux_sign_plt[idx++] = &ux_plt_target_step;
+    }
+
+    ux_sign_plt[idx++] = &ux_sign_flow_shared_sign;
+    ux_sign_plt[idx++] = &ux_sign_flow_shared_decline;
+    ux_sign_plt[idx++] = FLOW_END_STEP;
+
+    ux_flow_init(0, ux_sign_plt, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
 #endif

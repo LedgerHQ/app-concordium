@@ -37,5 +37,6 @@ extern tx_state_t global_tx_state;
 #define ERROR_PLT_CBOR_ERROR  0x6B0D
 #define ERROR_PLT_BUFFER_ERROR 0x6B0E
 #define ERROR_PLT_DATA_ERROR  0x6B0F
+#define ERROR_PLT_MULTI_OP    0x6B10  /* payload has > 1 operation; rejected to prevent confirmation-blindness */
 
 #define ERROR_DEVICE_LOCKED 0x530C

@@ -15,8 +15,9 @@ The last CONT returns a 64-byte Ed25519 signature in the response data.
 Error status words (all in 0x6Bxx range):
   0x6B04  ERROR_INVALID_TRANSACTION — wrong transaction kind byte (must be 27/0x1B)
   0x6B0D  ERROR_PLT_CBOR_ERROR      — CONT sends more bytes than cbor_total_length
-  0x6B0E  ERROR_PLT_BUFFER_ERROR    — cbor_total_length is 0 or > APP_PLT_CBOR_MAX (1024)
+  0x6B0E  ERROR_PLT_BUFFER_ERROR    — cbor_total_length is 0 or > APP_PLT_CBOR_MAX (512)
   0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128]
+  0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
   0x6B01  ERROR_INVALID_STATE       — CONT before INIT
 """
 
@@ -60,7 +61,7 @@ _CBOR_SMALL = bytes.fromhex("a1617801")
 _CBOR_LARGE = bytes.fromhex("59012c") + bytes(300)
 
 # APP_PLT_CBOR_MAX constant (must match src/helpers/app_sizes.h).
-_APP_PLT_CBOR_MAX = 1024
+_APP_PLT_CBOR_MAX = 512
 
 
 # ------------------------------------------------------------------ #
