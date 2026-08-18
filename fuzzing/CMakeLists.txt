@@ -16,7 +16,7 @@ if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
 endif()
 
 # Favor ClusterFuzzLite-provided flags if present; otherwise use safe defaults.
-set(FALLBACK_CFLAGS "-O1 -g -fno-omit-frame-pointer -fsanitize-coverage=trace-cmp,indirect-calls,8bit-counters -Wno-implicit-fallthrough")
+set(FALLBACK_CFLAGS "-O1 -g -fno-omit-frame-pointer -fsanitize-coverage=trace-cmp,indirect-calls,8bit-counters")
 if(DEFINED ENV{SANITIZER})
   if("$ENV{SANITIZER}" STREQUAL "address")
     string(APPEND FALLBACK_CFLAGS " -fsanitize=address -fsanitize-address-use-after-scope")
@@ -29,9 +29,9 @@ endif()
 
 # Compatible with ClusterFuzzLite.
 if(NOT DEFINED ENV{LIB_FUZZING_ENGINE})
-    set(COMPILATION_FLAGS_ "-g -Wall -Wno-implicit-fallthrough -fsanitize=fuzzer,address,undefined")
+    set(COMPILATION_FLAGS_ "-g -Wall -fsanitize=fuzzer,address,undefined")
 else()
-    set(COMPILATION_FLAGS_ "$ENV{LIB_FUZZING_ENGINE} $ENV{CFLAGS} -Wno-implicit-fallthrough")
+    set(COMPILATION_FLAGS_ "$ENV{LIB_FUZZING_ENGINE} $ENV{CFLAGS}")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -55,6 +55,8 @@ endif()
 #           display_bagl.c / display_nbgl.c (stubbed).
 # ---------------------------------------------------------------------------
 set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src/cborparser.c)
+# cborparser.c uses intentional fall-throughs; suppress only for this file.
+set_source_files_properties(${TINYCBOR_SRC} PROPERTIES COMPILE_FLAGS "-Wno-implicit-fallthrough")
 
 set(SHARED_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs/stubs.c

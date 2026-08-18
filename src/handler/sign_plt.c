@@ -89,7 +89,7 @@ static bool parse_amount_value(CborValue *it) {
             cbor_value_leave_container(it, &tagged);
             return false;
         }
-        exponent = (int8_t) (-(int64_t)(raw + 1u));
+        exponent = (int8_t) (-(int64_t) (raw + 1u));
     } else if (cbor_value_is_unsigned_integer(&arr)) {
         uint64_t v = 0;
         cbor_value_get_uint64(&arr, &v);
@@ -131,7 +131,7 @@ static bool parse_amount_value(CborValue *it) {
     if (cbor_value_leave_container(it, &tagged) != CborNoError) return false;
 
     ctx->amountSignificand = sig;
-    ctx->amountExponent    = exponent;
+    ctx->amountExponent = exponent;
     return true;
 }
 
@@ -154,8 +154,8 @@ static bool parse_address_value(CborValue *it) {
     }
 
     size_t addrLen = ADDRESS_LENGTH;
-    if (cbor_value_copy_byte_string(&tagged, ctx->address, &addrLen, &tagged) != CborNoError
-        || addrLen != ADDRESS_LENGTH) {
+    if (cbor_value_copy_byte_string(&tagged, ctx->address, &addrLen, &tagged) != CborNoError ||
+        addrLen != ADDRESS_LENGTH) {
         cbor_value_leave_container(it, &tagged);
         return false;
     }
@@ -186,7 +186,7 @@ static void format_memo_display(const uint8_t *bytes, size_t displayLen, size_t 
         /* Truncate long ASCII with ellipsis. */
         size_t fit = sizeof(ctx->displayMemo) - 4u; /* leave room for "...\0" */
         memmove(ctx->displayMemo, bytes, fit);
-        ctx->displayMemo[fit]     = '.';
+        ctx->displayMemo[fit] = '.';
         ctx->displayMemo[fit + 1] = '.';
         ctx->displayMemo[fit + 2] = '.';
         ctx->displayMemo[fit + 3] = '\0';
@@ -196,7 +196,7 @@ static void format_memo_display(const uint8_t *bytes, size_t displayLen, size_t 
         ctx->displayMemo[1] = 'x';
         size_t hexBytes = displayLen < MEMO_DISPLAY_BYTES ? displayLen : MEMO_DISPLAY_BYTES;
         for (size_t i = 0; i < hexBytes; i++) {
-            ctx->displayMemo[2u + i * 2u]      = hex[bytes[i] >> 4];
+            ctx->displayMemo[2u + i * 2u] = hex[bytes[i] >> 4];
             ctx->displayMemo[2u + i * 2u + 1u] = hex[bytes[i] & 0x0Fu];
         }
         ctx->displayMemo[2u + hexBytes * 2u] = '\0';
@@ -281,16 +281,26 @@ static bool parse_plt_cbor(void) {
     }
     opName[opNameLen] = '\0';
 
-    if      (strcmp(opName, "transfer")       == 0) ctx->opType = PLT_OP_TRANSFER;
-    else if (strcmp(opName, "mint")           == 0) ctx->opType = PLT_OP_MINT;
-    else if (strcmp(opName, "burn")           == 0) ctx->opType = PLT_OP_BURN;
-    else if (strcmp(opName, "addAllowList")   == 0) ctx->opType = PLT_OP_ADD_ALLOW_LIST;
-    else if (strcmp(opName, "removeAllowList")== 0) ctx->opType = PLT_OP_REM_ALLOW_LIST;
-    else if (strcmp(opName, "addDenyList")    == 0) ctx->opType = PLT_OP_ADD_DENY_LIST;
-    else if (strcmp(opName, "removeDenyList") == 0) ctx->opType = PLT_OP_REM_DENY_LIST;
-    else if (strcmp(opName, "pause")          == 0) ctx->opType = PLT_OP_PAUSE;
-    else if (strcmp(opName, "unpause")        == 0) ctx->opType = PLT_OP_UNPAUSE;
-    else return false; /* unknown operation */
+    if (strcmp(opName, "transfer") == 0)
+        ctx->opType = PLT_OP_TRANSFER;
+    else if (strcmp(opName, "mint") == 0)
+        ctx->opType = PLT_OP_MINT;
+    else if (strcmp(opName, "burn") == 0)
+        ctx->opType = PLT_OP_BURN;
+    else if (strcmp(opName, "addAllowList") == 0)
+        ctx->opType = PLT_OP_ADD_ALLOW_LIST;
+    else if (strcmp(opName, "removeAllowList") == 0)
+        ctx->opType = PLT_OP_REM_ALLOW_LIST;
+    else if (strcmp(opName, "addDenyList") == 0)
+        ctx->opType = PLT_OP_ADD_DENY_LIST;
+    else if (strcmp(opName, "removeDenyList") == 0)
+        ctx->opType = PLT_OP_REM_DENY_LIST;
+    else if (strcmp(opName, "pause") == 0)
+        ctx->opType = PLT_OP_PAUSE;
+    else if (strcmp(opName, "unpause") == 0)
+        ctx->opType = PLT_OP_UNPAUSE;
+    else
+        return false; /* unknown operation */
 
     /* Parse fields map (order not guaranteed by CIS-7). */
     if (!cbor_value_is_map(&op_map)) return false;
@@ -342,15 +352,15 @@ static bool parse_plt_cbor(void) {
 static void format_plt_display(void) {
     /* Operation name. */
     static const char *const op_names[] = {
-        [PLT_OP_TRANSFER]       = "Transfer",
-        [PLT_OP_MINT]           = "Mint",
-        [PLT_OP_BURN]           = "Burn",
+        [PLT_OP_TRANSFER] = "Transfer",
+        [PLT_OP_MINT] = "Mint",
+        [PLT_OP_BURN] = "Burn",
         [PLT_OP_ADD_ALLOW_LIST] = "Add to allow list",
         [PLT_OP_REM_ALLOW_LIST] = "Remove from allow list",
-        [PLT_OP_ADD_DENY_LIST]  = "Add to deny list",
-        [PLT_OP_REM_DENY_LIST]  = "Remove from deny list",
-        [PLT_OP_PAUSE]          = "Pause",
-        [PLT_OP_UNPAUSE]        = "Unpause",
+        [PLT_OP_ADD_DENY_LIST] = "Add to deny list",
+        [PLT_OP_REM_DENY_LIST] = "Remove from deny list",
+        [PLT_OP_PAUSE] = "Pause",
+        [PLT_OP_UNPAUSE] = "Unpause",
     };
     const char *name = op_names[ctx->opType];
     size_t nameLen = strlen(name);
@@ -359,8 +369,8 @@ static void format_plt_display(void) {
     ctx->displayOp[nameLen] = '\0';
 
     /* Amount — for transfer, mint, burn. */
-    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT
-        || ctx->opType == PLT_OP_BURN) {
+    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
+        ctx->opType == PLT_OP_BURN) {
         plt_amount_to_display(ctx->displayAmount,
                               sizeof(ctx->displayAmount),
                               ctx->amountSignificand,
@@ -370,11 +380,12 @@ static void format_plt_display(void) {
     }
 
     /* Address — for transfer (recipient) and allow/deny list ops (target). */
-    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST
-        || ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST
-        || ctx->opType == PLT_OP_REM_DENY_LIST) {
+    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
+        ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
+        ctx->opType == PLT_OP_REM_DENY_LIST) {
         size_t addrOutLen = sizeof(ctx->displayAddress);
-        if (base58check_encode(ctx->address, ADDRESS_LENGTH,
+        if (base58check_encode(ctx->address,
+                               ADDRESS_LENGTH,
                                (unsigned char *) ctx->displayAddress,
                                &addrOutLen) != 0) {
             /* Encoding failure: show raw hex prefix as fallback. */
@@ -388,12 +399,10 @@ static void format_plt_display(void) {
 /* APDU handler                                                        */
 /* ------------------------------------------------------------------ */
 
-void handle_sign_plt(const command_t *cmd,
-                     volatile unsigned int *flags,
-                     bool isInitialCall) {
+void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool isInitialCall) {
     uint8_t *cdata = cmd->data;
-    uint8_t  p1    = cmd->p1;
-    uint8_t  lc    = cmd->lc;
+    uint8_t p1 = cmd->p1;
+    uint8_t lc = cmd->lc;
 
     if (isInitialCall) {
         ctx->state = TX_PLT_INITIAL;
@@ -402,33 +411,33 @@ void handle_sign_plt(const command_t *cmd,
     /* ---- P1=0x00 INIT ---- */
     if (p1 == PLT_P1_INIT) {
         if (ctx->state != TX_PLT_INITIAL) THROW(ERROR_INVALID_STATE);
-        if (cmd->p2 != 0x00)              THROW(SWO_WRONG_P1_P2);
+        if (cmd->p2 != 0x00) THROW(SWO_WRONG_P1_P2);
 
         size_t pathLen = parse_derivation_path(cdata, lc);
-        cdata         += pathLen;
+        cdata += pathLen;
         uint8_t remaining = lc - (uint8_t) pathLen;
 
         if (cx_sha256_init(&tx_state->hash) != CX_SHA256) THROW(ERROR_FAILED_CX_OPERATION);
         int headerAndKind = hashAccountTransactionHeaderAndKind(cdata, remaining, (uint8_t) PLT);
-        cdata     += headerAndKind;
+        cdata += headerAndKind;
         remaining -= (uint8_t) headerAndKind;
 
         /* token_id_length[1] */
         if (remaining < 1u) THROW(ERROR_PLT_DATA_ERROR);
         uint8_t tokenIdLen = cdata[0];
         if (tokenIdLen < 1u || tokenIdLen > PLT_TOKEN_ID_MAX) THROW(ERROR_PLT_DATA_ERROR);
-        cdata     += 1;
+        cdata += 1;
         remaining -= 1;
 
         /* token_id[tokenIdLen] + cbor_total_length[4] */
-        if (remaining < (uint8_t)(tokenIdLen + 4u)) THROW(ERROR_PLT_DATA_ERROR);
+        if (remaining < (uint8_t) (tokenIdLen + 4u)) THROW(ERROR_PLT_DATA_ERROR);
         update_hash((cx_hash_t *) &tx_state->hash,
-                    cdata - 1,   /* include the length byte in the hash */
+                    cdata - 1, /* include the length byte in the hash */
                     1u + tokenIdLen);
         memmove(ctx->tokenId, cdata, tokenIdLen);
         ctx->tokenId[tokenIdLen] = '\0'; /* NUL-terminate for display */
-        ctx->tokenIdLength       = tokenIdLen;
-        cdata     += tokenIdLen;
+        ctx->tokenIdLength = tokenIdLen;
+        cdata += tokenIdLen;
         remaining -= tokenIdLen;
 
         /* cbor_total_length[4] big-endian */
@@ -440,8 +449,8 @@ void handle_sign_plt(const command_t *cmd,
         if (remaining != 0u) THROW(SWO_INCORRECT_DATA);
 
         ctx->cborTotalLength = cborTotal;
-        ctx->cborReceived    = 0;
-        ctx->state           = TX_PLT_CBOR;
+        ctx->cborReceived = 0;
+        ctx->state = TX_PLT_CBOR;
 
         send_success_no_idle();
         return;
@@ -450,8 +459,8 @@ void handle_sign_plt(const command_t *cmd,
     /* ---- P1=0x01 CONT ---- */
     if (p1 == PLT_P1_CONT) {
         if (ctx->state != TX_PLT_CBOR) THROW(ERROR_INVALID_STATE);
-        if (cmd->p2 != 0x00)           THROW(SWO_WRONG_P1_P2);
-        if (lc == 0u)                  THROW(ERROR_PLT_CBOR_ERROR);
+        if (cmd->p2 != 0x00) THROW(SWO_WRONG_P1_P2);
+        if (lc == 0u) THROW(ERROR_PLT_CBOR_ERROR);
         if ((uint32_t) lc > ctx->cborTotalLength - ctx->cborReceived) THROW(ERROR_PLT_CBOR_ERROR);
 
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
