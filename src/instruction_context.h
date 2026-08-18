@@ -81,10 +81,11 @@ typedef struct {
 } signRegisterData_t;
 
 typedef struct {
-    uint32_t cborLength;
-    uint32_t displayUsed;
-    uint8_t display[COMMON_DISPLAY_SIZE];
-    uint8_t majorType;
+    uint16_t cborLength;                        // remaining bytes to receive (counts down)
+    uint8_t cborBuf[MAX_CBOR_BLOB_SIZE];        // raw CBOR accumulation buffer
+    uint16_t cborBufLen;                        // bytes written into cborBuf so far
+    uint8_t displayLen;                         // decoded text length; 0 for integer types
+    uint8_t display[MAX_CBOR_STRING_SIZE + 1];  // decoded text or NUL-terminated decimal
 } cborContext_t;
 
 typedef enum {

@@ -1,0 +1,6 @@
+[submodule "deps/tinycbor"]
+	path = deps/tinycbor
+	url = https://github.com/intel/tinycbor.git
+[submodule "ledger-app-ai-instructions"]
+	path = ledger-app-ai-instructions
+	url = https://github.com/LedgerHQ/ledger-app-ai-instructions.git
