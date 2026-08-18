@@ -86,3 +86,6 @@ void uiSignScheduledTransferPairFlowDisplay(void);
 void uiDeployModuleDisplay(void);
 void uiInitContractDisplay(void);
 void uiUpdateContractDisplay(void);
+
+/* PLT (Protocol Level Token) signing — INS 0x27 */
+void startPltDisplay(volatile unsigned int *flags);

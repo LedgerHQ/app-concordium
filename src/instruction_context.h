@@ -359,16 +359,42 @@ typedef struct {
 
 typedef enum {
     TX_PLT_INITIAL = 80,
-    TX_PLT_CBOR = 81,
+    TX_PLT_CBOR    = 81,
 } pltState_t;
+
+/* CIS-7 §4 operation kinds (single-op per transaction enforced by the app). */
+typedef enum {
+    PLT_OP_TRANSFER       = 0,
+    PLT_OP_MINT           = 1,
+    PLT_OP_BURN           = 2,
+    PLT_OP_ADD_ALLOW_LIST = 3,
+    PLT_OP_REM_ALLOW_LIST = 4,
+    PLT_OP_ADD_DENY_LIST  = 5,
+    PLT_OP_REM_DENY_LIST  = 6,
+    PLT_OP_PAUSE          = 7,
+    PLT_OP_UNPAUSE        = 8,
+} pltOpType_t;
 
 typedef struct {
     pltState_t state;
-    uint32_t cborTotalLength;
-    uint32_t cborReceived;
-    uint8_t tokenId[PLT_TOKEN_ID_MAX];
-    uint8_t tokenIdLength;
-    uint8_t cborBuf[APP_PLT_CBOR_MAX];
+    uint32_t   cborTotalLength;
+    uint32_t   cborReceived;
+    uint8_t    tokenId[PLT_TOKEN_ID_MAX + 1]; /* +1 for NUL terminator, used directly in display */
+    uint8_t    tokenIdLength;
+    uint8_t    cborBuf[APP_PLT_CBOR_MAX];
+
+    /* Parsed from CBOR — valid after cborReceived == cborTotalLength: */
+    pltOpType_t opType;
+    uint64_t    amountSignificand; /* tag-4 significand; used for transfer/mint/burn */
+    int8_t      amountExponent;    /* tag-4 exponent (≤ 0); absolute value = decimal places */
+    uint8_t     address[32];       /* recipient (transfer) or target (allow/deny list ops) */
+    bool        hasMemo;           /* transfer only */
+
+    /* Formatted display strings (NUL-terminated, filled by format_plt_display): */
+    char displayOp[24];      /* e.g. "Transfer", "Add to allow list" */
+    char displayAmount[40];  /* e.g. "1.500000 UPEU" */
+    char displayAddress[56]; /* base58check, 55 chars + NUL */
+    char displayMemo[30];    /* ASCII (truncated) or "0x<hex>" fallback */
 } signPltContext_t;
 
 typedef struct trustedNameMultiHashCtx_s {
