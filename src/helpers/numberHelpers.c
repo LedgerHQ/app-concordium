@@ -109,23 +109,31 @@ void plt_amount_to_display(char *dst,
                            int8_t exponent,
                            const char *tokenId,
                            uint8_t tokenIdLen) {
+    PRINTF("DBG: plt_amt entry sig=%llu exp=%d dec=%u\n",
+           (unsigned long long) significand,
+           exponent,
+           (unsigned) ((exponent < 0) ? (uint8_t) (-exponent) : 0));
     uint8_t decimals = (exponent < 0) ? (uint8_t) (-exponent) : 0;
     if (decimals > 18) {
-        decimals = 18; /* sanity cap; no real token uses > 18 decimal places */
+        decimals = 18;
     }
     FPU64_TMP_ZERO_INIT;
+    PRINTF("DBG: plt_amt calling format_fpu64_trimmed\n");
     if (!format_fpu64_trimmed(tmp, sizeof(tmp), significand, decimals)) {
+        PRINTF("DBG: plt_amt format_fpu64_trimmed FAILED\n");
         THROW(ERROR_BUFFER_OVERFLOW);
     }
+    PRINTF("DBG: plt_amt num=%s\n", tmp);
     size_t numLen = strlen(tmp);
-    /* need: numLen + 1 (space) + tokenIdLen + 1 (NUL) */
     if (dstLen < numLen + 1u + tokenIdLen + 1u) {
+        PRINTF("DBG: plt_amt buf too small\n");
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     memmove(dst, tmp, numLen);
     dst[numLen] = ' ';
     memmove(dst + numLen + 1, tokenId, tokenIdLen);
     dst[numLen + 1 + tokenIdLen] = '\0';
+    PRINTF("DBG: plt_amt done\n");
 }
 
 void to_paginated_hex(uint8_t *byteArray, const uint64_t len, char *asHex, const size_t asHexSize) {

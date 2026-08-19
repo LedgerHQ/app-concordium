@@ -45,3 +45,26 @@ target_link_options(test_cbor_data_blob PRIVATE --coverage)
 
 include(CTest)
 add_test(NAME test_cbor_data_blob COMMAND test_cbor_data_blob)
+
+# ---------------------------------------------------------------------------
+# test_sign_plt
+# Uses fuzzing/stubs/stubs.c (not stubs.c) to get the full set of display,
+# crypto, and APDU-response stubs required by sign_plt.c and its helpers.
+# ---------------------------------------------------------------------------
+add_executable(test_sign_plt
+    test_sign_plt.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../fuzzing/stubs/stubs.c
+    ${APP_SRC}/handler/sign_plt.c
+    ${APP_SRC}/helpers/numberHelpers.c
+    ${APP_SRC}/helpers/base58check.c
+    ${APP_SRC}/helpers/derivation_path.c
+    ${APP_SRC}/helpers/tx_hash.c
+    ${LEDGER_SDK}/lib_standard_app/format.c
+    ${TINYCBOR_SRC}/cborparser.c
+)
+target_include_directories(test_sign_plt PRIVATE ${UNIT_INCLUDES} ${APP_SRC}/ui ${APP_SRC}/apdu)
+target_compile_options(test_sign_plt PRIVATE ${COMPILE_FLAGS} -Wno-implicit-fallthrough)
+target_link_libraries(test_sign_plt PRIVATE cmocka)
+target_link_options(test_sign_plt PRIVATE --coverage)
+
+add_test(NAME test_sign_plt COMMAND test_sign_plt)

@@ -65,19 +65,19 @@ static bool parse_amount_value(CborValue *it) {
     cbor_value_get_tag(it, &tag);
     if (tag != CBOR_TAG_DECIMAL_FRACTION) return false;
 
-    CborValue tagged;
-    if (cbor_value_enter_container(it, &tagged) != CborNoError) return false;
+    /*
+     * Tags are not containers in tinycbor (cbor_value_is_container is false
+     * for CborTagType).  Use advance_fixed to skip the tag header bytes; the
+     * tinycbor internals treat CborTagType as a fixed-width item and do NOT
+     * decrement the parent container's remaining count, so after this call
+     * `it` points at the tagged content with the parent remaining unchanged.
+     */
+    if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_array(&tagged)) {
-        cbor_value_leave_container(it, &tagged);
-        return false;
-    }
+    if (!cbor_value_is_array(it)) return false;
 
     CborValue arr;
-    if (cbor_value_enter_container(&tagged, &arr) != CborNoError) {
-        cbor_value_leave_container(it, &tagged);
-        return false;
-    }
+    if (cbor_value_enter_container(it, &arr) != CborNoError) return false;
 
     /* Exponent: negative integer (most common) or zero (unsigned 0). */
     int8_t exponent = 0;
@@ -85,8 +85,7 @@ static bool parse_amount_value(CborValue *it) {
         uint64_t raw = 0;
         cbor_value_get_raw_integer(&arr, &raw);
         if (raw >= 255u) {
-            cbor_value_leave_container(&tagged, &arr);
-            cbor_value_leave_container(it, &tagged);
+            cbor_value_leave_container(it, &arr);
             return false;
         }
         exponent = (int8_t) (-(int64_t) (raw + 1u));
@@ -94,41 +93,32 @@ static bool parse_amount_value(CborValue *it) {
         uint64_t v = 0;
         cbor_value_get_uint64(&arr, &v);
         if (v != 0u) {
-            cbor_value_leave_container(&tagged, &arr);
-            cbor_value_leave_container(it, &tagged);
+            cbor_value_leave_container(it, &arr);
             return false; /* CIS-7: exponent ≤ 0 */
         }
         exponent = 0;
     } else {
-        cbor_value_leave_container(&tagged, &arr);
-        cbor_value_leave_container(it, &tagged);
+        cbor_value_leave_container(it, &arr);
         return false;
     }
     if (cbor_value_advance(&arr) != CborNoError) {
-        cbor_value_leave_container(&tagged, &arr);
-        cbor_value_leave_container(it, &tagged);
+        cbor_value_leave_container(it, &arr);
         return false;
     }
 
     /* Significand: unsigned 64-bit integer. */
     if (!cbor_value_is_unsigned_integer(&arr)) {
-        cbor_value_leave_container(&tagged, &arr);
-        cbor_value_leave_container(it, &tagged);
+        cbor_value_leave_container(it, &arr);
         return false;
     }
     uint64_t sig = 0;
     cbor_value_get_uint64(&arr, &sig);
     if (cbor_value_advance(&arr) != CborNoError) {
-        cbor_value_leave_container(&tagged, &arr);
-        cbor_value_leave_container(it, &tagged);
+        cbor_value_leave_container(it, &arr);
         return false;
     }
 
-    if (cbor_value_leave_container(&tagged, &arr) != CborNoError) {
-        cbor_value_leave_container(it, &tagged);
-        return false;
-    }
-    if (cbor_value_leave_container(it, &tagged) != CborNoError) return false;
+    if (cbor_value_leave_container(it, &arr) != CborNoError) return false;
 
     ctx->amountSignificand = sig;
     ctx->amountExponent = exponent;
@@ -145,22 +135,18 @@ static bool parse_address_value(CborValue *it) {
     cbor_value_get_tag(it, &tag);
     if (tag != CBOR_TAG_ACCOUNT_ADDRESS) return false;
 
-    CborValue tagged;
-    if (cbor_value_enter_container(it, &tagged) != CborNoError) return false;
+    /* Skip the tag header (same reasoning as parse_amount_value above). */
+    if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_byte_string(&tagged)) {
-        cbor_value_leave_container(it, &tagged);
-        return false;
-    }
+    if (!cbor_value_is_byte_string(it)) return false;
 
     size_t addrLen = ADDRESS_LENGTH;
-    if (cbor_value_copy_byte_string(&tagged, ctx->address, &addrLen, &tagged) != CborNoError ||
+    if (cbor_value_copy_byte_string(it, ctx->address, &addrLen, it) != CborNoError ||
         addrLen != ADDRESS_LENGTH) {
-        cbor_value_leave_container(it, &tagged);
         return false;
     }
 
-    return cbor_value_leave_container(it, &tagged) == CborNoError;
+    return true;
 }
 
 /*
@@ -255,20 +241,36 @@ skip:
  * ctx->address, ctx->hasMemo, and ctx->displayMemo.
  */
 static bool parse_plt_cbor(void) {
+    PRINTF("DBG: parse_plt entry len=%u buf[0]=%02x\n",
+           (unsigned) ctx->cborReceived,
+           (unsigned) (ctx->cborReceived > 0 ? ctx->cborBuf[0] : 0xff));
     CborParser parser;
     CborValue it;
     if (cbor_parser_init(ctx->cborBuf, ctx->cborReceived, 0, &parser, &it) != CborNoError) {
+        PRINTF("DBG: parse_plt: cbor_parser_init fail\n");
         return false;
     }
 
     /* Outer array: [ single-op ] */
-    if (!cbor_value_is_array(&it)) return false;
+    if (!cbor_value_is_array(&it)) {
+        PRINTF("DBG: parse_plt: not array\n");
+        return false;
+    }
     CborValue arr;
-    if (cbor_value_enter_container(&it, &arr) != CborNoError) return false;
-    if (cbor_value_at_end(&arr)) return false; /* empty array */
+    if (cbor_value_enter_container(&it, &arr) != CborNoError) {
+        PRINTF("DBG: parse_plt: enter arr fail\n");
+        return false;
+    }
+    if (cbor_value_at_end(&arr)) {
+        PRINTF("DBG: parse_plt: arr empty\n");
+        return false;
+    }
 
     /* Single op: a map { "opName": { ...fields... } } */
-    if (!cbor_value_is_map(&arr)) return false;
+    if (!cbor_value_is_map(&arr)) {
+        PRINTF("DBG: parse_plt: first item not map\n");
+        return false;
+    }
     CborValue op_map;
     if (cbor_value_enter_container(&arr, &op_map) != CborNoError) return false;
 
@@ -334,10 +336,15 @@ static bool parse_plt_cbor(void) {
     if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return false;
 
     /* Multi-op guard: outer array must be exhausted after the first op. */
+    PRINTF("DBG: parse_plt: arr.remaining=%u at_end=%d\n",
+           (unsigned) arr.remaining,
+           (int) cbor_value_at_end(&arr));
     if (!cbor_value_at_end(&arr)) {
+        PRINTF("DBG: parse_plt: THROW ERROR_PLT_MULTI_OP\n");
         THROW(ERROR_PLT_MULTI_OP);
     }
 
+    PRINTF("DBG: parse_plt: success opType=%d\n", ctx->opType);
     return true;
 }
 
@@ -350,49 +357,83 @@ static bool parse_plt_cbor(void) {
  * Called after parse_plt_cbor() succeeds.
  */
 static void format_plt_display(void) {
-    /* Operation name. */
-    static const char *const op_names[] = {
-        [PLT_OP_TRANSFER] = "Transfer",
-        [PLT_OP_MINT] = "Mint",
-        [PLT_OP_BURN] = "Burn",
-        [PLT_OP_ADD_ALLOW_LIST] = "Add to allow list",
-        [PLT_OP_REM_ALLOW_LIST] = "Remove from allow list",
-        [PLT_OP_ADD_DENY_LIST] = "Add to deny list",
-        [PLT_OP_REM_DENY_LIST] = "Remove from deny list",
-        [PLT_OP_PAUSE] = "Pause",
-        [PLT_OP_UNPAUSE] = "Unpause",
-    };
-    const char *name = op_names[ctx->opType];
-    size_t nameLen = strlen(name);
-    if (nameLen >= sizeof(ctx->displayOp)) nameLen = sizeof(ctx->displayOp) - 1u;
-    memmove(ctx->displayOp, name, nameLen);
-    ctx->displayOp[nameLen] = '\0';
+    PRINTF("DBG: fmt entry opType=%d\n", ctx->opType);
+
+/* Copying string literals with sizeof avoids strlen — which can fault on
+ * Cortex-M0 when the literal lives at an unaligned flash address, because
+ * some strlen implementations use word-aligned loads.  sizeof(literal)
+ * is a compile-time constant so no runtime load is needed. */
+#define COPY_OP_NAME(str) memmove(ctx->displayOp, str, sizeof(str))
+    switch (ctx->opType) {
+        case PLT_OP_TRANSFER:
+            COPY_OP_NAME("Transfer");
+            break;
+        case PLT_OP_MINT:
+            COPY_OP_NAME("Mint");
+            break;
+        case PLT_OP_BURN:
+            COPY_OP_NAME("Burn");
+            break;
+        case PLT_OP_ADD_ALLOW_LIST:
+            COPY_OP_NAME("Add to allow list");
+            break;
+        case PLT_OP_REM_ALLOW_LIST:
+            COPY_OP_NAME("Remove from allow list");
+            break;
+        case PLT_OP_ADD_DENY_LIST:
+            COPY_OP_NAME("Add to deny list");
+            break;
+        case PLT_OP_REM_DENY_LIST:
+            COPY_OP_NAME("Remove from deny list");
+            break;
+        case PLT_OP_PAUSE:
+            COPY_OP_NAME("Pause");
+            break;
+        case PLT_OP_UNPAUSE:
+            COPY_OP_NAME("Unpause");
+            break;
+        default:
+            COPY_OP_NAME("?");
+            break;
+    }
+#undef COPY_OP_NAME
+    PRINTF("DBG: displayOp=%s\n", ctx->displayOp);
 
     /* Amount — for transfer, mint, burn. */
     if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
         ctx->opType == PLT_OP_BURN) {
+        PRINTF("DBG: calling plt_amount_to_display sig=%llu exp=%d\n",
+               (unsigned long long) ctx->amountSignificand,
+               ctx->amountExponent);
         plt_amount_to_display(ctx->displayAmount,
                               sizeof(ctx->displayAmount),
                               ctx->amountSignificand,
                               ctx->amountExponent,
                               (const char *) ctx->tokenId,
                               ctx->tokenIdLength);
+        PRINTF("DBG: amount=%s\n", ctx->displayAmount);
     }
 
     /* Address — for transfer (recipient) and allow/deny list ops (target). */
     if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
         ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
         ctx->opType == PLT_OP_REM_DENY_LIST) {
+        PRINTF("DBG: calling base58check_encode addr[0]=%02x\n", ctx->address[0]);
         size_t addrOutLen = sizeof(ctx->displayAddress);
-        if (base58check_encode(ctx->address,
-                               ADDRESS_LENGTH,
-                               (unsigned char *) ctx->displayAddress,
-                               &addrOutLen) != 0) {
-            /* Encoding failure: show raw hex prefix as fallback. */
+        int b58ret = base58check_encode(ctx->address,
+                                        ADDRESS_LENGTH,
+                                        (unsigned char *) ctx->displayAddress,
+                                        &addrOutLen);
+        PRINTF("DBG: b58ret=%d addrOutLen=%u\n", b58ret, (unsigned) addrOutLen);
+        if (b58ret <= 0) {
             ctx->displayAddress[0] = '?';
             ctx->displayAddress[1] = '\0';
+        } else {
+            ctx->displayAddress[b58ret] = '\0';
         }
+        PRINTF("DBG: addr=%s\n", ctx->displayAddress);
     }
+    PRINTF("DBG: fmt done\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -469,9 +510,13 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
 
         if (ctx->cborReceived == ctx->cborTotalLength) {
             /* All CBOR received: parse, format display strings, show UI. */
+            PRINTF("DBG: calling parse_plt_cbor\n");
             if (!parse_plt_cbor()) THROW(ERROR_PLT_CBOR_ERROR);
+            PRINTF("DBG: parse_plt_cbor OK, opType=%d\n", ctx->opType);
             format_plt_display();
+            PRINTF("DBG: format_plt_display OK\n");
             startPltDisplay(flags);
+            PRINTF("DBG: startPltDisplay OK\n");
             *flags |= IO_ASYNCH_REPLY;
         } else {
             send_success_no_idle();

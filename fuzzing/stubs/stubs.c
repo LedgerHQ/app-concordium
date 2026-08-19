@@ -327,6 +327,7 @@ void uiInitContractDisplay(void)                                     {}
 void uiUpdateContractDisplay(void)                                   {}
 
 void uiVerifyAddress(volatile unsigned int *flags)                   { (void)flags; }
+void startPltDisplay(volatile unsigned int *flags)                   { (void)flags; }
 
 /* ──────────────────────────────────────────────────────────────────────
  * set_trusted_name stubs (replaces src/handler/set_trusted_name.c definitions)
