@@ -81,9 +81,18 @@ void app_main() {
         }
 
         // Dispatch structured APDU command
-        if (apdu_dispatcher(&cmd, &flags, isInitialCall) < 0) {
-            PRINTF("=> apdu_dispatcher failure\n");
-            return;
+        BEGIN_TRY {
+            TRY {
+                if (apdu_dispatcher(&cmd, &flags, isInitialCall) < 0) {
+                    PRINTF("=> apdu_dispatcher failure\n");
+                    return;
+                }
+            }
+            CATCH_OTHER(e) {
+                io_send_sw(e);
+            }
+            FINALLY {}
         }
+        END_TRY;
     }
 }

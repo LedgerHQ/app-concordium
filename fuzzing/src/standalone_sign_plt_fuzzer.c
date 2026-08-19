@@ -19,6 +19,7 @@
 #include "../stubs/ledger/parser.h"
 #include "instruction_context.h"
 #include "handler/sign_plt.h"
+#include "tx_state.h"
 
 extern instructionContext global;
 extern tx_state_t global_tx_state;
