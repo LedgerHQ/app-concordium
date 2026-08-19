@@ -1010,6 +1010,7 @@ UX_STEP_NOCB(ux_plt_memo_step, bnnn_paging, {.title = "Memo", .text = global.sig
 static const ux_flow_step_t *ux_sign_plt[10];
 
 void startPltDisplay(volatile unsigned int *flags) {
+    PRINTF("DBG: startPltDisplay entry\n");
     signPltContext_t *plt = &global.signPlt;
     uint8_t idx = 0;
 

@@ -166,3 +166,9 @@ add_fuzz_target(standalone_init_contract_fuzzer
 
 add_fuzz_target(standalone_update_contract_fuzzer
     ${APP_SRC}/handler/update_contract.c)
+
+add_fuzz_target(standalone_sign_plt_fuzzer
+    ${APP_SRC}/handler/sign_plt.c
+    ${APP_SRC}/helpers/base58check.c
+    ${APP_SRC}/helpers/derivation_path.c
+    ${APP_SRC}/helpers/tx_hash.c)

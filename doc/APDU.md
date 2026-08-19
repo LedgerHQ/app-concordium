@@ -26,3 +26,33 @@ Status words tend to be similar to common [APDU responses](https://www.eftlab.co
 | ---------- | -------------- | ---------------------------------------------------------------------------- |
 | RData      | var            | Response data (can be empty)                                                 |
 | SW         | 2              | Status word containing command processing status (e.g. `0x9000` for success) |
+
+## Instruction set
+
+All commands use `CLA = 0xE0`.
+
+| INS    | Name                                    | Packets | Reference                                                           |
+| ------ | --------------------------------------- | ------- | ------------------------------------------------------------------- |
+| `0x00` | Verify address                          | Single  | [verify_address.md](verify_address.md)                              |
+| `0x01` | Get public key                          | Single  | [ins_public_key.md](ins_public_key.md)                              |
+| `0x02` | Sign transfer                           | Single  | [ins_transfer.md](ins_transfer.md)                                  |
+| `0x03` | Sign transfer with schedule             | Multi   | [ins_transfer_with_schedule.md](ins_transfer_with_schedule.md)      |
+| `0x04` | Credential deployment                   | Multi   | —                                                                   |
+| `0x05` | Export private key (legacy)             | Single  | [export_private_key.md](export_private_key.md)                      |
+| `0x06` | Deploy module                           | Multi   | —                                                                   |
+| `0x07` | Init contract                           | Multi   | —                                                                   |
+| `0x08` | Update contract                         | Multi   | —                                                                   |
+| `0x12` | Transfer to public                      | Multi   | [ins_transfer_to_public.md](ins_transfer_to_public.md)              |
+| `0x17` | Configure delegation                    | Single  | [ins_configure_delegation.md](ins_configure_delegation.md)          |
+| `0x18` | Configure baker                         | Multi   | [ins_configure_baker.md](ins_configure_baker.md)                    |
+| `0x20` | Public info for IP                      | Multi   | [ins_public_info_for_ip.md](ins_public_info_for_ip.md)              |
+| `0x21` | Get app name                            | Single  | —                                                                   |
+| `0x22` | Set trusted name                        | Multi   | [ins_set_trusted_name.md](ins_set_trusted_name.md)                  |
+| `0x23` | Get challenge                           | Single  | [ins_get_challenge.md](ins_get_challenge.md)                        |
+| `0x27` | Sign PLT (Protocol Level Token)         | Multi   | [ins_sign_plt.md](ins_sign_plt.md)                                  |
+| `0x31` | Sign update credential                  | Multi   | —                                                                   |
+| `0x32` | Sign transfer with memo                 | Multi   | [ins_transfer.md](ins_transfer.md#transfer-with-memo)               |
+| `0x34` | Sign transfer with schedule and memo    | Multi   | [ins_transfer_with_schedule.md](ins_transfer_with_schedule.md)      |
+| `0x35` | Register data                           | Multi   | [ins_register_data.md](ins_register_data.md)                        |
+| `0x37` | Export private key (new)                | Single  | [export_private_key.md](export_private_key.md)                      |
+| `0x40` | Get app version                         | Single  | [ins_get_app_version.md](ins_get_app_version.md)                    |

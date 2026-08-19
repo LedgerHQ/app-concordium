@@ -1359,5 +1359,28 @@ class CommandSender:
                 raise ExceptionRAPDU(resp.status)
         return resp
 
+    @contextmanager
+    def sign_plt_with_ui(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+    ) -> Generator[None, None, None]:
+        """PLT signing flow for UI tests: INIT + intermediate CONTs synchronous,
+        final CONT via exchange_async (caller navigates inside the with-block)."""
+        resp = self.sign_plt_init(path, header_60, token_id, len(cbor_payload))
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks[:-1]:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        with self.backend.exchange_async(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunks[-1]
+        ) as response:
+            yield response
+
     def get_async_response(self) -> Optional[RAPDU]:
         return self.backend.last_async_response
