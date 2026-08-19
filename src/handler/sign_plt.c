@@ -240,7 +240,7 @@ skip:
  * On success populates ctx->opType, ctx->amountSignificand/Exponent,
  * ctx->address, ctx->hasMemo, and ctx->displayMemo.
  */
-static bool parse_plt_cbor(void) {
+static uint16_t parse_plt_cbor(void) {
     PRINTF("DBG: parse_plt entry len=%u buf[0]=%02x\n",
            (unsigned) ctx->cborReceived,
            (unsigned) (ctx->cborReceived > 0 ? ctx->cborBuf[0] : 0xff));
@@ -248,38 +248,38 @@ static bool parse_plt_cbor(void) {
     CborValue it;
     if (cbor_parser_init(ctx->cborBuf, ctx->cborReceived, 0, &parser, &it) != CborNoError) {
         PRINTF("DBG: parse_plt: cbor_parser_init fail\n");
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
 
     /* Outer array: [ single-op ] */
     if (!cbor_value_is_array(&it)) {
         PRINTF("DBG: parse_plt: not array\n");
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
     CborValue arr;
     if (cbor_value_enter_container(&it, &arr) != CborNoError) {
         PRINTF("DBG: parse_plt: enter arr fail\n");
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
     if (cbor_value_at_end(&arr)) {
         PRINTF("DBG: parse_plt: arr empty\n");
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
 
     /* Single op: a map { "opName": { ...fields... } } */
     if (!cbor_value_is_map(&arr)) {
         PRINTF("DBG: parse_plt: first item not map\n");
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
     CborValue op_map;
-    if (cbor_value_enter_container(&arr, &op_map) != CborNoError) return false;
+    if (cbor_value_enter_container(&arr, &op_map) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     /* Read op name key. */
-    if (!cbor_value_is_text_string(&op_map)) return false;
+    if (!cbor_value_is_text_string(&op_map)) return ERROR_PLT_CBOR_ERROR;
     char opName[PLT_OP_NAME_MAX];
     size_t opNameLen = sizeof(opName) - 1u;
     if (cbor_value_copy_text_string(&op_map, opName, &opNameLen, &op_map) != CborNoError) {
-        return false;
+        return ERROR_PLT_CBOR_ERROR;
     }
     opName[opNameLen] = '\0';
 
@@ -302,50 +302,50 @@ static bool parse_plt_cbor(void) {
     else if (strcmp(opName, "unpause") == 0)
         ctx->opType = PLT_OP_UNPAUSE;
     else
-        return false; /* unknown operation */
+        return ERROR_PLT_CBOR_ERROR; /* unknown operation */
 
     /* Parse fields map (order not guaranteed by CIS-7). */
-    if (!cbor_value_is_map(&op_map)) return false;
+    if (!cbor_value_is_map(&op_map)) return ERROR_PLT_CBOR_ERROR;
     CborValue inner;
-    if (cbor_value_enter_container(&op_map, &inner) != CborNoError) return false;
+    if (cbor_value_enter_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     ctx->hasMemo = false;
 
     while (!cbor_value_at_end(&inner)) {
-        if (!cbor_value_is_text_string(&inner)) return false;
+        if (!cbor_value_is_text_string(&inner)) return ERROR_PLT_CBOR_ERROR;
         char fieldName[12];
         size_t fieldLen = sizeof(fieldName) - 1u;
         if (cbor_value_copy_text_string(&inner, fieldName, &fieldLen, &inner) != CborNoError) {
-            return false;
+            return ERROR_PLT_CBOR_ERROR;
         }
         fieldName[fieldLen] = '\0';
 
         if (strcmp(fieldName, "amount") == 0) {
-            if (!parse_amount_value(&inner)) return false;
+            if (!parse_amount_value(&inner)) return ERROR_PLT_CBOR_ERROR;
         } else if (strcmp(fieldName, "recipient") == 0 || strcmp(fieldName, "target") == 0) {
-            if (!parse_address_value(&inner)) return false;
+            if (!parse_address_value(&inner)) return ERROR_PLT_CBOR_ERROR;
         } else if (strcmp(fieldName, "memo") == 0) {
-            if (!parse_memo_value(&inner)) return false;
+            if (!parse_memo_value(&inner)) return ERROR_PLT_CBOR_ERROR;
         } else {
             /* Unknown field — skip its value. */
-            if (cbor_value_advance(&inner) != CborNoError) return false;
+            if (cbor_value_advance(&inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
         }
     }
 
-    if (cbor_value_leave_container(&op_map, &inner) != CborNoError) return false;
-    if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return false;
+    if (cbor_value_leave_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+    if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     /* Multi-op guard: outer array must be exhausted after the first op. */
     PRINTF("DBG: parse_plt: arr.remaining=%u at_end=%d\n",
            (unsigned) arr.remaining,
            (int) cbor_value_at_end(&arr));
     if (!cbor_value_at_end(&arr)) {
-        PRINTF("DBG: parse_plt: THROW ERROR_PLT_MULTI_OP\n");
-        THROW(ERROR_PLT_MULTI_OP);
+        PRINTF("DBG: parse_plt: multi-op rejected\n");
+        return ERROR_PLT_MULTI_OP;
     }
 
     PRINTF("DBG: parse_plt: success opType=%d\n", ctx->opType);
-    return true;
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -501,8 +501,16 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
     if (p1 == PLT_P1_CONT) {
         if (ctx->state != TX_PLT_CBOR) THROW(ERROR_INVALID_STATE);
         if (cmd->p2 != 0x00) THROW(SWO_WRONG_P1_P2);
-        if (lc == 0u) THROW(ERROR_PLT_CBOR_ERROR);
-        if ((uint32_t) lc > ctx->cborTotalLength - ctx->cborReceived) THROW(ERROR_PLT_CBOR_ERROR);
+        if (lc == 0u) {
+            ctx->state = TX_PLT_INITIAL;
+            io_send_sw(ERROR_PLT_CBOR_ERROR);
+            return;
+        }
+        if ((uint32_t) lc > ctx->cborTotalLength - ctx->cborReceived) {
+            ctx->state = TX_PLT_INITIAL;
+            io_send_sw(ERROR_PLT_CBOR_ERROR);
+            return;
+        }
 
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
         memmove(ctx->cborBuf + ctx->cborReceived, cdata, lc);
@@ -511,7 +519,12 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
         if (ctx->cborReceived == ctx->cborTotalLength) {
             /* All CBOR received: parse, format display strings, show UI. */
             PRINTF("DBG: calling parse_plt_cbor\n");
-            if (!parse_plt_cbor()) THROW(ERROR_PLT_CBOR_ERROR);
+            uint16_t parseErr = parse_plt_cbor();
+            if (parseErr != 0) {
+                ctx->state = TX_PLT_INITIAL;
+                io_send_sw(parseErr);
+                return;
+            }
             PRINTF("DBG: parse_plt_cbor OK, opType=%d\n", ctx->opType);
             format_plt_display();
             PRINTF("DBG: format_plt_display OK\n");
