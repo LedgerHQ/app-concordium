@@ -43,6 +43,7 @@ void app_main() {
     command_t cmd;
     io_init();
     explicit_bzero(&global_tx_state, sizeof(global_tx_state));
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
     ui_menu_main();
 
     for (;;) {
@@ -89,9 +90,11 @@ void app_main() {
                 }
             }
             CATCH_OTHER(e) {
+                global_tx_state.currentInstruction = INSTRUCTION_NONE;
                 io_send_sw(e);
             }
-            FINALLY {}
+            FINALLY {
+            }
         }
         END_TRY;
     }
