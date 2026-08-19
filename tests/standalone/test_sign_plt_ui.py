@@ -451,8 +451,12 @@ def test_plt_multi_op_rejected(backend):
     resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
     assert resp.status == StatusWords.SWO_SUCCESS
 
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor)
-    assert resp.status == 0x6B10  # ERROR_PLT_MULTI_OP
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B10  # ERROR_PLT_MULTI_OP
+    else:
+        assert resp.status == 0x6B10  # ERROR_PLT_MULTI_OP
 
 
 @pytest.mark.active_test_scope
@@ -466,5 +470,9 @@ def test_plt_malformed_cbor(backend):
     resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
     assert resp.status == StatusWords.SWO_SUCCESS
 
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor)
-    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+    else:
+        assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR

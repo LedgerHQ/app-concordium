@@ -220,9 +220,11 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             }
             handle_update_contract(cmd, isInitialCall);
             break;
-        /* PLT (Protocol Level Token) blind-signing flow: INIT then one or more CONT chunks. */
+        /* PLT (Protocol Level Token) blind-signing flow: INIT then one or more CONT chunks.
+         * CONT (P1=0x01) with Lc=0 is allowed through so the handler can return the
+         * protocol-correct ERROR_PLT_CBOR_ERROR; only INIT (P1=0x00) requires data. */
         case INS_SIGN_PLT:
-            if (!cmd->data) {
+            if (!cmd->data && cmd->p1 != 0x01) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
             handle_sign_plt(cmd, flags, isInitialCall);

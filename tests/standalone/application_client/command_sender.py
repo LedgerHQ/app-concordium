@@ -1327,15 +1327,21 @@ class CommandSender:
         data += len(token_id).to_bytes(1, byteorder="big")
         data += token_id
         data += cbor_total_length.to_bytes(4, byteorder="big")
-        return self.backend.exchange(
-            cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data
-        )
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
 
     def sign_plt_cont(self, chunk: bytes) -> RAPDU:
         """Send one PLT CONT frame (P1=0x01). Returns raw RAPDU (caller checks status)."""
-        return self.backend.exchange(
-            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
-        )
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
 
     def sign_plt(
         self,

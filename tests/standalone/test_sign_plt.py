@@ -246,37 +246,42 @@ def test_sign_plt_empty_cont_chunk(backend):
 def test_sign_plt_p1_invalid(backend):
     """P1=0x02 on a fresh session must return ERROR_INVALID_PARAM (0x6B03)."""
     from application_client.command_sender import CLA, InsType
+    from ragger.error import ExceptionRAPDU
 
-    resp = backend.exchange(
-        cla=CLA, ins=InsType.SIGN_PLT, p1=0x02, p2=0x00,
-        data=b"\x01\x00",  # minimal data so lc > 0
-    )
-    assert resp.status == 0x6B03  # ERROR_INVALID_PARAM
+    try:
+        resp = backend.exchange(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x02, p2=0x00,
+            data=b"\x01\x00",  # minimal data so lc > 0
+        )
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B03  # ERROR_INVALID_PARAM
+    else:
+        assert resp.status == 0x6B03  # ERROR_INVALID_PARAM
 
 
 @pytest.mark.active_test_scope
 def test_sign_plt_cont_split_three_ways(backend):
-    """600 raw bytes split into three CONT frames (255+255+90) accumulate correctly."""
+    """512 raw bytes split into three CONT frames (255+255+2) accumulate correctly."""
     client = CommandSender(backend)
 
-    # 600 zero bytes — not CIS-7, so the final frame returns 0x6B0D.
-    cbor_600 = bytes(600)
+    # 512 zero bytes (= APP_PLT_CBOR_MAX) — not CIS-7, so the final frame returns 0x6B0D.
+    cbor_512 = bytes(512)
 
-    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor_600))
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor_512))
     assert resp.status == StatusWords.SWO_SUCCESS
 
     # Chunk 1: 255 bytes — intermediate.
-    resp = client.sign_plt_cont(cbor_600[:255])
+    resp = client.sign_plt_cont(cbor_512[:255])
     assert resp.status == StatusWords.SWO_SUCCESS
     assert resp.data == b""
 
     # Chunk 2: 255 bytes — still intermediate.
-    resp = client.sign_plt_cont(cbor_600[255:510])
+    resp = client.sign_plt_cont(cbor_512[255:510])
     assert resp.status == StatusWords.SWO_SUCCESS
     assert resp.data == b""
 
-    # Chunk 3: final 90 bytes — raw bytes fail CIS-7 parse.
-    resp = client.sign_plt_cont(cbor_600[510:])
+    # Chunk 3: final 2 bytes — raw bytes fail CIS-7 parse.
+    resp = client.sign_plt_cont(cbor_512[510:])
     assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
 
 
@@ -284,6 +289,7 @@ def test_sign_plt_cont_split_three_ways(backend):
 def test_sign_plt_trailing_byte_in_init(backend):
     """Extra byte after cbor_total_length in INIT must return SWO_INCORRECT_DATA (0x6A80)."""
     from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
 
     # Build a valid INIT payload and append one trailing zero byte.
     data = pack_derivation_path(_PATH)
@@ -294,28 +300,36 @@ def test_sign_plt_trailing_byte_in_init(backend):
     data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
     data += b"\x00"                   # trailing byte — must be rejected
 
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data)
-    assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6A80  # SWO_INCORRECT_DATA
+    else:
+        assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
 
 
 @pytest.mark.active_test_scope
 def test_sign_plt_wrong_p2(backend):
     """Any P2 != 0x00 must return SWO_WRONG_P1_P2 (0x6B00)."""
-    client = CommandSender(backend)
     from application_client.command_sender import CLA, InsType
+    from ragger.error import ExceptionRAPDU
 
-    resp = backend.exchange(
-        cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01,
-        data=(
-            b"\x08"                     # path depth 8
-            + b"\x00\x00\x04\x51"       # 1105
-            + b"\x00\x00\x00\x00" * 6
-            + b"\x00\x00\x00\x02"
-            + b"\x00\x00\x00\x00"
-            + _HEADER_60
-            + b"\x1b"                   # kind PLT
-            + b"\x01\x54"               # token_id_length=1, token_id=b"T"
-            + b"\x00\x00\x00\x04"       # cbor_total=4
-        ),
-    )
-    assert resp.status == 0x6B00  # SWO_WRONG_P1_P2
+    try:
+        resp = backend.exchange(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01,
+            data=(
+                b"\x08"                     # path depth 8
+                + b"\x00\x00\x04\x51"       # 1105
+                + b"\x00\x00\x00\x00" * 6
+                + b"\x00\x00\x00\x02"
+                + b"\x00\x00\x00\x00"
+                + _HEADER_60
+                + b"\x1b"                   # kind PLT
+                + b"\x01\x54"               # token_id_length=1, token_id=b"T"
+                + b"\x00\x00\x00\x04"       # cbor_total=4
+            ),
+        )
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B00  # SWO_WRONG_P1_P2
+    else:
+        assert resp.status == 0x6B00  # SWO_WRONG_P1_P2
