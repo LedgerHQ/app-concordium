@@ -97,91 +97,61 @@ _CBOR_LARGE = bytes(300)
 _APP_PLT_CBOR_MAX = 512
 
 
-# ------------------------------------------------------------------ #
-# Positive tests                                                      #
-# ------------------------------------------------------------------ #
-
-
-@pytest.mark.skip(reason="requires UI navigation — covered by test_sign_plt_ui.py")
-@pytest.mark.active_test_scope
-def test_sign_plt_single_cont_frame(backend):
-    """INIT + one CONT frame: small CIS-7 CBOR that fits in a single chunk."""
-    client = CommandSender(backend)
-    resp = client.sign_plt(_PATH, _HEADER_60, _TOKEN_ID_MIN, _CBOR_SMALL)
-
-    assert resp.status == StatusWords.SWO_SUCCESS
-    assert len(resp.data) == 64
-
-
 @pytest.mark.active_test_scope
 def test_sign_plt_multi_cont_frame(backend):
-    """INIT + two CONT frames: _CBOR_LARGE is a raw byte string, not CIS-7.
+    """INIT + two CONT frames: _CBOR_LARGE is raw bytes (not CIS-7).
     The parser rejects it with ERROR_PLT_CBOR_ERROR on the final CONT frame."""
-    from application_client.command_sender import CLA, InsType, pack_derivation_path
-
-    init_data = pack_derivation_path(_PATH) + _HEADER_60 + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN + len(_CBOR_LARGE).to_bytes(4, "big")
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
-    assert resp.status == StatusWords.SWO_SUCCESS
-
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=_CBOR_LARGE[:255])
-    assert resp.status == StatusWords.SWO_SUCCESS
-
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=_CBOR_LARGE[255:])
-    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
-
-
-@pytest.mark.skip(reason="requires UI navigation — covered by test_sign_plt_ui.py")
-@pytest.mark.active_test_scope
-def test_sign_plt_max_token_id(backend):
-    """INIT + one CONT with a 128-byte token ID (maximum allowed length)."""
     client = CommandSender(backend)
-    token_id = bytes(range(128))  # 128 bytes of distinct values
-    resp = client.sign_plt(_PATH, _HEADER_60, token_id, _CBOR_SMALL)
 
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_LARGE))
     assert resp.status == StatusWords.SWO_SUCCESS
-    assert len(resp.data) == 64
+
+    resp = client.sign_plt_cont(_CBOR_LARGE[:255])
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(_CBOR_LARGE[255:])
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
 
 
 @pytest.mark.active_test_scope
 def test_sign_plt_exact_cbor_max(backend):
     """APP_PLT_CBOR_MAX bytes are buffered without overflow then rejected by CIS-7 parser."""
-    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    client = CommandSender(backend)
 
     # 512 raw zero bytes — not a CIS-7 outer array, so parser returns 0x6B0D.
-    # The test verifies the buffer accepts exactly MAX bytes before the parse step.
+    # Split into 255+255+2 because each CONT frame is limited to 255 bytes.
     cbor = bytes(_APP_PLT_CBOR_MAX)
     assert len(cbor) == _APP_PLT_CBOR_MAX
 
-    init_data = pack_derivation_path(_PATH) + _HEADER_60 + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN + len(cbor).to_bytes(4, "big")
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor))
     assert resp.status == StatusWords.SWO_SUCCESS
 
-    # Send in two chunks (255 + 257) to exercise multi-frame buffering.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor[:255])
+    resp = client.sign_plt_cont(cbor[:255])
     assert resp.status == StatusWords.SWO_SUCCESS
 
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor[255:])
+    resp = client.sign_plt_cont(cbor[255:510])
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(cbor[510:])
     assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
 
 
 @pytest.mark.active_test_scope
 def test_sign_plt_intermediate_cont_returns_no_data(backend):
     """Intermediate CONT frames return 0x9000 with an empty data payload."""
-    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    client = CommandSender(backend)
 
     # _CBOR_LARGE is raw bytes (not CIS-7), so the final frame returns 0x6B0D.
-    # The test focuses on verifying the intermediate frame returns empty data.
-    init_data = pack_derivation_path(_PATH) + _HEADER_60 + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN + len(_CBOR_LARGE).to_bytes(4, "big")
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_LARGE))
     assert resp.status == StatusWords.SWO_SUCCESS
 
     # First chunk (255 bytes) — intermediate: 0x9000 + no data.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=_CBOR_LARGE[:255])
+    resp = client.sign_plt_cont(_CBOR_LARGE[:255])
     assert resp.status == StatusWords.SWO_SUCCESS
     assert resp.data == b""
 
     # Final chunk — raw bytes fail CIS-7 parse.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=_CBOR_LARGE[255:])
+    resp = client.sign_plt_cont(_CBOR_LARGE[255:])
     assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
 
 
@@ -287,45 +257,27 @@ def test_sign_plt_p1_invalid(backend):
 @pytest.mark.active_test_scope
 def test_sign_plt_cont_split_three_ways(backend):
     """600 raw bytes split into three CONT frames (255+255+90) accumulate correctly."""
-    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    client = CommandSender(backend)
 
     # 600 zero bytes — not CIS-7, so the final frame returns 0x6B0D.
-    # The test focuses on verifying the two intermediate frames return empty data.
     cbor_600 = bytes(600)
 
-    init_data = pack_derivation_path(_PATH) + _HEADER_60 + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN + len(cbor_600).to_bytes(4, "big")
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor_600))
     assert resp.status == StatusWords.SWO_SUCCESS
 
     # Chunk 1: 255 bytes — intermediate.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor_600[:255])
+    resp = client.sign_plt_cont(cbor_600[:255])
     assert resp.status == StatusWords.SWO_SUCCESS
     assert resp.data == b""
 
     # Chunk 2: 255 bytes — still intermediate.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor_600[255:510])
+    resp = client.sign_plt_cont(cbor_600[255:510])
     assert resp.status == StatusWords.SWO_SUCCESS
     assert resp.data == b""
 
     # Chunk 3: final 90 bytes — raw bytes fail CIS-7 parse.
-    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor_600[510:])
+    resp = client.sign_plt_cont(cbor_600[510:])
     assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
-
-
-@pytest.mark.skip(reason="requires UI navigation for the first full sign — covered by test_sign_plt_ui.py")
-@pytest.mark.active_test_scope
-def test_sign_plt_double_init_resets(backend):
-    """A fresh INIT after a completed sign is accepted (state machine resets)."""
-    client = CommandSender(backend)
-
-    # Complete a full sign.
-    resp = client.sign_plt(_PATH, _HEADER_60, _TOKEN_ID_MIN, _CBOR_SMALL)
-    assert resp.status == StatusWords.SWO_SUCCESS
-    assert len(resp.data) == 64
-
-    # A new INIT on the same session must be accepted.
-    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL))
-    assert resp.status == StatusWords.SWO_SUCCESS
 
 
 @pytest.mark.active_test_scope
