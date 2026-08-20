@@ -84,7 +84,7 @@ static bool parse_amount_value(CborValue *it) {
     if (cbor_value_is_negative_integer(&arr)) {
         uint64_t raw = 0;
         cbor_value_get_raw_integer(&arr, &raw);
-        if (raw >= 255u) {
+        if (raw > 127u) {
             cbor_value_leave_container(it, &arr);
             return false;
         }
@@ -171,6 +171,7 @@ static void format_memo_display(const uint8_t *bytes, size_t displayLen, size_t 
     } else if (is_ascii) {
         /* Truncate long ASCII with ellipsis. */
         size_t fit = sizeof(ctx->displayMemo) - 4u; /* leave room for "...\0" */
+        if (fit > displayLen) fit = displayLen;     /* don't overread the sample buffer */
         memmove(ctx->displayMemo, bytes, fit);
         ctx->displayMemo[fit] = '.';
         ctx->displayMemo[fit + 1] = '.';
@@ -180,7 +181,10 @@ static void format_memo_display(const uint8_t *bytes, size_t displayLen, size_t 
         /* Hex prefix: "0x" + up to MEMO_DISPLAY_BYTES bytes. */
         ctx->displayMemo[0] = '0';
         ctx->displayMemo[1] = 'x';
-        size_t hexBytes = displayLen < MEMO_DISPLAY_BYTES ? displayLen : MEMO_DISPLAY_BYTES;
+        /* "0x" prefix + hexBytes*2 hex chars + NUL must fit in displayMemo[30]:
+         * 2 + hexBytes*2 + 1 <= 30  =>  hexBytes <= 13. */
+        size_t hexMax = (sizeof(ctx->displayMemo) - 3u) / 2u; /* = 13 */
+        size_t hexBytes = displayLen < hexMax ? displayLen : hexMax;
         for (size_t i = 0; i < hexBytes; i++) {
             ctx->displayMemo[2u + i * 2u] = hex[bytes[i] >> 4];
             ctx->displayMemo[2u + i * 2u + 1u] = hex[bytes[i] & 0x0Fu];
@@ -200,17 +204,14 @@ static bool parse_memo_value(CborValue *it) {
     size_t totalLen = 0;
 
     if (cbor_value_is_tag(it)) {
-        /* tag 24 = byte string containing embedded CBOR; unwrap one level. */
-        CborValue tagged;
-        if (cbor_value_enter_container(it, &tagged) != CborNoError) goto skip;
-        if (!cbor_value_is_byte_string(&tagged)) {
-            cbor_value_leave_container(it, &tagged);
-            goto skip;
-        }
-        cbor_value_get_string_length(&tagged, &totalLen);
+        /* tag 24 = byte string containing embedded CBOR; unwrap one level.
+         * Tags are not containers in tinycbor — use advance_fixed to skip the
+         * tag header, then treat the content as a plain byte string. */
+        if (cbor_value_advance_fixed(it) != CborNoError) goto skip;
+        if (!cbor_value_is_byte_string(it)) goto skip;
+        cbor_value_get_string_length(it, &totalLen);
         size_t copyLen = totalLen < sizeof(tmp) ? totalLen : sizeof(tmp);
-        cbor_value_copy_byte_string(&tagged, tmp, &copyLen, &tagged);
-        if (cbor_value_leave_container(it, &tagged) != CborNoError) goto skip;
+        if (cbor_value_copy_byte_string(it, tmp, &copyLen, it) != CborNoError) goto skip;
         format_memo_display(tmp, copyLen, totalLen);
         return true;
     }
@@ -313,11 +314,15 @@ static uint16_t parse_plt_cbor(void) {
 
     while (!cbor_value_at_end(&inner)) {
         if (!cbor_value_is_text_string(&inner)) return ERROR_PLT_CBOR_ERROR;
-        char fieldName[12];
+        char fieldName[PLT_OP_NAME_MAX + 1];
         size_t fieldLen = sizeof(fieldName) - 1u;
-        if (cbor_value_copy_text_string(&inner, fieldName, &fieldLen, &inner) != CborNoError) {
-            return ERROR_PLT_CBOR_ERROR;
+        CborError fieldErr = cbor_value_copy_text_string(&inner, fieldName, &fieldLen, &inner);
+        if (fieldErr == CborErrorDataTooLarge) {
+            /* Field name too long to be any known CIS-7 key — skip its value. */
+            if (cbor_value_advance(&inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+            continue;
         }
+        if (fieldErr != CborNoError) return ERROR_PLT_CBOR_ERROR;
         fieldName[fieldLen] = '\0';
 
         if (strcmp(fieldName, "amount") == 0) {
@@ -414,8 +419,9 @@ static void format_plt_display(void) {
         PRINTF("DBG: amount=%s\n", ctx->displayAmount);
     }
 
-    /* Address — for transfer (recipient) and allow/deny list ops (target). */
-    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
+    /* Address — for transfer/mint/burn (recipient/target) and allow/deny list ops. */
+    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
+        ctx->opType == PLT_OP_BURN || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
         ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
         ctx->opType == PLT_OP_REM_DENY_LIST) {
         PRINTF("DBG: calling base58check_encode addr[0]=%02x\n", ctx->address[0]);
