@@ -40,6 +40,9 @@ doc/latex
 # macOS
 .DS_Store
 
+# JetBrains
+.idea/
+
 # Helpers
 diff
 
