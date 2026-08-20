@@ -29,7 +29,6 @@
 #include "base58check.h"
 
 int base58check_encode(const unsigned char *in, size_t length, unsigned char *out, size_t *outlen) {
-    PRINTF("DBG: b58 entry len=%u outlen=%u\n", (unsigned) length, (unsigned) *outlen);
     if (length != ADDRESS_LENGTH) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
@@ -37,25 +36,18 @@ int base58check_encode(const unsigned char *in, size_t length, unsigned char *ou
     uint8_t buffer[1 + ADDRESS_LENGTH + BASE58_CHECKSUM_LEN];
     buffer[0] = BASE58_VERSION_BYTE;
     memmove(&buffer[1], in, ADDRESS_LENGTH);
-    PRINTF("DBG: b58 buf ready\n");
 
     uint8_t hash[ADDRESS_LENGTH];
     cx_err_t error = 0;
     error = cx_hash_sha256(buffer, ADDRESS_LENGTH + 1, hash, sizeof(hash));
-    PRINTF("DBG: b58 sha256_1 err=%u\n", (unsigned) error);
     if (error == 0) {
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     error = cx_hash_sha256(hash, sizeof(hash), hash, sizeof(hash));
-    PRINTF("DBG: b58 sha256_2 err=%u\n", (unsigned) error);
     if (error == 0) {
         THROW(ERROR_FAILED_CX_OPERATION);
     }
     memmove(&buffer[1 + ADDRESS_LENGTH], hash, BASE58_CHECKSUM_LEN);
-    PRINTF("DBG: b58 calling encode\n");
 
-    int ret =
-        base58_encode(buffer, 1 + ADDRESS_LENGTH + BASE58_CHECKSUM_LEN, (char *) out, *outlen);
-    PRINTF("DBG: b58 encode ret=%d\n", ret);
-    return ret;
+    return base58_encode(buffer, 1 + ADDRESS_LENGTH + BASE58_CHECKSUM_LEN, (char *) out, *outlen);
 }
