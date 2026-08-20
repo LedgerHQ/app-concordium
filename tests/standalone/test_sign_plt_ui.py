@@ -159,7 +159,7 @@ def _navigate_reject(backend, navigator, default_screenshot_path, test_name):
     """
     if backend.device.is_nano:
         navigate_until_text_and_compare(
-            backend, navigator, "Decline", default_screenshot_path, test_name
+            backend, navigator, "Reject", default_screenshot_path, test_name
         )
     else:
         # navigate_until_text_and_compare only supports one confirm instruction,
