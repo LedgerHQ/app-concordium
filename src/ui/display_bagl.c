@@ -1007,7 +1007,7 @@ UX_STEP_NOCB(ux_plt_target_step,
              {.title = "Target", .text = global.signPlt.displayAddress});
 UX_STEP_NOCB(ux_plt_memo_step, bnnn_paging, {.title = "Memo", .text = global.signPlt.displayMemo});
 
-static const ux_flow_step_t *ux_sign_plt[10];
+static const ux_flow_step_t *ux_sign_plt[11];
 
 void startPltDisplay(volatile unsigned int *flags) {
     PRINTF("DBG: startPltDisplay entry\n");
@@ -1015,6 +1015,7 @@ void startPltDisplay(volatile unsigned int *flags) {
     uint8_t idx = 0;
 
     ux_sign_plt[idx++] = &ux_plt_review_step;
+    ux_sign_plt[idx++] = &ux_sign_flow_account_sender_view;
     ux_sign_plt[idx++] = &ux_plt_token_step;
     ux_sign_plt[idx++] = &ux_plt_op_step;
 

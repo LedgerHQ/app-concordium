@@ -1322,6 +1322,10 @@ void startPltDisplay(volatile unsigned int *flags) {
     signPltContext_t *plt = &global.signPlt;
     uint8_t n = 0;
 
+    pairs[n].item = "Sender";
+    pairs[n].value = (char *) global_account_sender.sender;
+    n++;
+
     pairs[n].item = "Token";
     pairs[n].value = (char *) plt->tokenId;
     n++;
