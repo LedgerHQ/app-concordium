@@ -119,6 +119,7 @@ class InsType(IntEnum):
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
     REGISTER_DATA = 0x35
     EXPORT_PRIVATE_KEY_NEW = 0x37
+    SIGN_PLT = 0x27
     GET_APP_VERSION = 0x40
 
 
@@ -1308,6 +1309,82 @@ class CommandSender:
             p1=P1.P1_REGISTER_DATA_PAYLOAD,
             p2=P2.P2_NONE,
             data=last_chunk,
+        ) as response:
+            yield response
+
+    def sign_plt_init(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_total_length: int,
+        kind: int = 0x1B,
+    ) -> RAPDU:
+        """Send PLT INIT frame (P1=0x00). Returns raw RAPDU (caller checks status)."""
+        data = pack_derivation_path(path)
+        data += header_60
+        data += bytes([kind])
+        data += len(token_id).to_bytes(1, byteorder="big")
+        data += token_id
+        data += cbor_total_length.to_bytes(4, byteorder="big")
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt_cont(self, chunk: bytes) -> RAPDU:
+        """Send one PLT CONT frame (P1=0x01). Returns raw RAPDU (caller checks status)."""
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+    ) -> RAPDU:
+        """Full PLT signing flow: INIT + one or more CONT frames.
+
+        Returns the RAPDU from the last CONT frame, which carries the 64-byte signature.
+        Raises ExceptionRAPDU if any intermediate frame returns a non-success status.
+        """
+        resp = self.sign_plt_init(path, header_60, token_id, len(cbor_payload))
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        return resp
+
+    @contextmanager
+    def sign_plt_with_ui(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+    ) -> Generator[None, None, None]:
+        """PLT signing flow for UI tests: INIT + intermediate CONTs synchronous,
+        final CONT via exchange_async (caller navigates inside the with-block)."""
+        resp = self.sign_plt_init(path, header_60, token_id, len(cbor_payload))
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks[:-1]:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        with self.backend.exchange_async(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunks[-1]
         ) as response:
             yield response
 

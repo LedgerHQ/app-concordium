@@ -33,17 +33,10 @@ int base58check_encode(const unsigned char *in, size_t length, unsigned char *ou
         THROW(ERROR_INVALID_TRANSACTION);
     }
 
-    // We need room for the version byte, input, and the first 4 bytes of the checksum.
     uint8_t buffer[1 + ADDRESS_LENGTH + BASE58_CHECKSUM_LEN];
-
-    // Concordium uses a hardcoded version value of '1', therefore this byte is not received from
-    // the computer.
     buffer[0] = BASE58_VERSION_BYTE;
-
     memmove(&buffer[1], in, ADDRESS_LENGTH);
 
-    // Calculate SHA256(SHA256(version + in)), and append the first 4 bytes to the (version + in)
-    // bytes.
     uint8_t hash[ADDRESS_LENGTH];
     cx_err_t error = 0;
     error = cx_hash_sha256(buffer, ADDRESS_LENGTH + 1, hash, sizeof(hash));
