@@ -85,3 +85,16 @@ size_t fraction_to_percentage_display(uint8_t *dst, size_t dstLength, uint32_t n
  * @param asHexSize the number of characters that may be written to 'asHex'
  */
 void to_paginated_hex(uint8_t *byteArray, const uint64_t len, char *asHex, size_t asHexSize);
+
+/**
+ * Formats a CIS-7 PLT amount (CBOR decimal-fraction tag 4) as a human-readable string.
+ * The exponent must be ≤ 0; its absolute value is the number of decimal places.
+ * Result: "<integer>.<fraction> <tokenId>\0", e.g. "1.500000 UPEU".
+ * Throws ERROR_BUFFER_OVERFLOW if dst is too small.
+ */
+void plt_amount_to_display(char *dst,
+                           size_t dstLen,
+                           uint64_t significand,
+                           int8_t exponent,
+                           const char *tokenId,
+                           uint8_t tokenIdLen);

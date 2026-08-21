@@ -43,6 +43,9 @@
 
 #define INS_EXPORT_PRIVATE_KEY_NEW 0x37
 
+/* PLT (Protocol Level Token) multi-step signing: INIT (P1=0x00) + CONT (P1=0x01). */
+#define INS_SIGN_PLT 0x27
+
 #define INS_APP_VERSION 0x40
 
 #define P1_DEFAULT 0

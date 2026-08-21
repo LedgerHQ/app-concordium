@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.0] - 2026-08-20
+
+### Added
+- PLT (Protocol Level Token) signing via new INS `0x27`. Implements the CIS-7 token-operation protocol: the host sends an INIT frame with the transaction header and token ID, followed by one or more CONT frames carrying the raw CBOR payload. Supported operations: `transfer`, `mint`, `burn`, `addAllowList`, `removeAllowList`, `addDenyList`, `removeDenyList`, `pause`, `unpause`. The device displays amount, recipient/target address, and (if present) memo before producing a 64-byte Ed25519 signature on the final CONT.
+- `plt_amount_to_display()` in `numberHelpers`: formats a CIS-7 decimal-fraction amount (CBOR tag 4, `[exponent, significand]`) into a human-readable string appended with the token ID (e.g. `"1.5 MYTOKEN"`).
+- Standalone LibFuzzer target for PLT CBOR parsing (`fuzzing/src/standalone_sign_plt_fuzzer.c`).
+
+### Changed
+- `apdu_dispatcher` call in `app_main` is now wrapped in `BEGIN_TRY / CATCH_OTHER` so any unhandled `THROW` inside a handler is returned to the host as a proper error status word instead of causing an unrecoverable state.
+
+### Fixed
+- `sign_transfer_with_memo` and `sign_transfer_with_schedule_and_memo`: intermediate CONT APDUs (memo split across more than two packets) now return `SW_OK` (`0x9000`) immediately instead of incorrectly throwing `ERROR_INVALID_STATE`.
+
 ## [5.6.3] - 2026-08-13
 
 ### Changed

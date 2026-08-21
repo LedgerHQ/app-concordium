@@ -27,3 +27,13 @@
 
 #define ACCOUNT_TRANSACTION_HEADER_LENGTH 60
 #define UPDATE_HEADER_LENGTH              28
+
+/* Maximum PLT CBOR blob the device will buffer (single-operation limit).
+ * Worst-case single transfer: ~9B map key + ~13B amount (tag4) + ~36B recipient (tag40307)
+ * + ~264B memo (5B header + 256B payload) + ~5B framing ≈ 347 B.
+ * 512 gives ~47% headroom for future mint/burn ops without touching device BSS limits.
+ * A _Static_assert in sign_plt.c verifies this stays below target BSS budgets. */
+#define APP_PLT_CBOR_MAX 512
+
+/* Maximum token-id byte length (1..PLT_TOKEN_ID_MAX per CIS-7 §3). */
+#define PLT_TOKEN_ID_MAX 128
