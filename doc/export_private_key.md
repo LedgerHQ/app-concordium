@@ -40,15 +40,15 @@ The new path supports more diverse key export scenarios for different use cases 
 | INS    | P1     | P2     | CDATA                                                              | Comment                                                                                                   |
 | ------ | ------ | ------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `0x37` | `0x00` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet Identity Credential Creation: Export IDCredSec (BLS) + PRFKey (BLS) + Signature Blinding Randomness (BLS) |
-| `0x37` | `0x01` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (Ed25519)        |
+| `0x37` | `0x01` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (extended Ed25519 key) |
 | `0x37` | `0x02` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet ID Recovery: Export IDCredSec (BLS) + Signature Blinding Randomness (BLS)                            |
 | `0x37` | `0x03` | `0x00` | `identity_provider[uint32],identity[uint32]`                       | MainNet Account Credential Discovery: Export PRFKey (BLS)                                       |
-| `0x37` | `0x04` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Zero-knowledge proofs: Export Commitment Randomness (Ed25519)                                   |
+| `0x37` | `0x04` | `0x00` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | MainNet Zero-knowledge proofs: Export Commitment Randomness (extended Ed25519 key)                      |
 | `0x37` | `0x00` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet Identity Credential Creation: Export IDCredSec (BLS) + PRFKey (BLS) + Signature Blinding Randomness (BLS) |
-| `0x37` | `0x01` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (Ed25519)        |
+| `0x37` | `0x01` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Account Creation: Export PRFKey (BLS) + IDCredSec (BLS) + Commitment Randomness root (extended Ed25519 key) |
 | `0x37` | `0x02` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet ID Recovery: Export IDCredSec (BLS) + Signature Blinding Randomness (BLS)                            |
 | `0x37` | `0x03` | `0x01` | `identity_provider[uint32],identity[uint32]`                       | TestNet Account Credential Discovery: Export PRFKey (BLS)                                       |
-| `0x37` | `0x04` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Zero-knowledge proofs: Export Commitment Randomness (Ed25519)                                   |
+| `0x37` | `0x04` | `0x01` | `identity_provider[uint32],identity[uint32],account_index[uint32]` | TestNet Zero-knowledge proofs: Export Commitment Randomness (extended Ed25519 key)                      |
 
 ### Key Derivation Paths
 
@@ -65,7 +65,7 @@ If P2 = 0x01 then keys are exported for TestNet use with Coin Type `1'` derivati
 
 - PRFKey: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/3'` (BLS field element)
 - IDCredSec: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/2'` (BLS field element)
-- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (Ed25519)
+- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (extended Ed25519 private key)
 
 #### ID Recovery (P1=0x02)
 
@@ -78,7 +78,7 @@ If P2 = 0x01 then keys are exported for TestNet use with Coin Type `1'` derivati
 
 #### Zero-knowledge proofs (P1=0x04)
 
-- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (Ed25519)
+- Commitment Randomness: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/5'/{account_index}'` (extended Ed25519 private key)
 
 ### Key Export Format
 
@@ -89,4 +89,4 @@ For new paths, the output format is `[length of key][key]` and repeats for each 
 - **IDCredSec**: BLS field element
 - **PRFKey**: BLS field element
 - **Signature Blinding Randomness**: BLS field element
-- **Commitment Randomness**: Ed25519 private key (allows SLIP-10 derivation of child keys)
+- **Commitment Randomness**: Extended Ed25519 private key `(k_i, c_i)` encoded as 32-byte private key followed by 32-byte chain code (allows SLIP-10 derivation of child keys)

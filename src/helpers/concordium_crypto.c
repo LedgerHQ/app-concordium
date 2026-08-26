@@ -86,6 +86,37 @@ void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *priva
     END_TRY;
 }
 
+void get_extended_private_key(const derivation_path_t *path,
+                              uint8_t *privateKey,
+                              size_t privateKeySize,
+                              uint8_t *chainCode,
+                              size_t chainCodeSize) {
+    if (privateKeySize < KEY_LENGTH || chainCodeSize < KEY_LENGTH) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+
+    BEGIN_TRY {
+        TRY {
+            ensureNoError(os_derive_bip32_with_seed_no_throw(HDW_ED25519_SLIP10,
+                                                             CX_CURVE_Ed25519,
+                                                             (uint32_t *) path->nodes,
+                                                             path->len,
+                                                             privateKey,
+                                                             chainCode,
+                                                             (unsigned char *) "ed25519 seed",
+                                                             ED25519_SEED_LENGTH));
+        }
+        CATCH_OTHER(e) {
+            explicit_bzero(privateKey, privateKeySize);
+            explicit_bzero(chainCode, chainCodeSize);
+            THROW(e);
+        }
+        FINALLY {
+        }
+    }
+    END_TRY;
+}
+
 void get_public_key(uint8_t *publicKeyArray) {
     cx_ecfp_private_key_t privateKey;
     cx_ecfp_public_key_t publicKey;
