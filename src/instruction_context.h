@@ -395,6 +395,8 @@ typedef struct {
     char displayAmount[40];  /* e.g. "1.500000 UPEU" */
     char displayAddress[56]; /* base58check, 55 chars + NUL */
     char displayMemo[30];    /* ASCII (truncated) or "0x<hex>" fallback */
+    char displayFee[30];     /* formatted µCCD fee, e.g. "0.001 CCD"; empty if not provided */
+    bool hasFeeDisplay;      /* true if host sent a fee suffix in the INIT APDU */
 } signPltContext_t;
 
 typedef struct trustedNameMultiHashCtx_s {

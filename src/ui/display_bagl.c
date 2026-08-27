@@ -1006,8 +1006,11 @@ UX_STEP_NOCB(ux_plt_target_step,
              bnnn_paging,
              {.title = "Target", .text = global.signPlt.displayAddress});
 UX_STEP_NOCB(ux_plt_memo_step, bnnn_paging, {.title = "Memo", .text = global.signPlt.displayMemo});
+UX_STEP_NOCB(ux_plt_fee_step,
+             bnnn_paging,
+             {.title = "Max fees", .text = global.signPlt.displayFee});
 
-static const ux_flow_step_t *ux_sign_plt[11];
+static const ux_flow_step_t *ux_sign_plt[12];
 
 void startPltDisplay(volatile unsigned int *flags) {
     PRINTF("DBG: startPltDisplay entry\n");
@@ -1032,6 +1035,10 @@ void startPltDisplay(volatile unsigned int *flags) {
     } else if (plt->opType == PLT_OP_ADD_ALLOW_LIST || plt->opType == PLT_OP_REM_ALLOW_LIST ||
                plt->opType == PLT_OP_ADD_DENY_LIST || plt->opType == PLT_OP_REM_DENY_LIST) {
         ux_sign_plt[idx++] = &ux_plt_target_step;
+    }
+
+    if (plt->hasFeeDisplay) {
+        ux_sign_plt[idx++] = &ux_plt_fee_step;
     }
 
     ux_sign_plt[idx++] = &ux_sign_flow_shared_sign;

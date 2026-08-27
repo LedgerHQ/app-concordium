@@ -1357,6 +1357,12 @@ void startPltDisplay(volatile unsigned int *flags) {
         n++;
     }
 
+    if (plt->hasFeeDisplay) {
+        pairs[n].item = "Max fees";
+        pairs[n].value = plt->displayFee;
+        n++;
+    }
+
     static nbgl_contentTagValueList_t content;
     content.nbPairs = n;
     content.pairs = pairs;

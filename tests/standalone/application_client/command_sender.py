@@ -1319,17 +1319,28 @@ class CommandSender:
         token_id: bytes,
         cbor_total_length: int,
         kind: int = 0x1B,
+        display_fee_microccd: Optional[int] = None,
     ) -> RAPDU:
-        """Send PLT INIT frame (P1=0x00). Returns raw RAPDU (caller checks status)."""
+        """Send PLT INIT frame (P1=0x00).
+
+        If display_fee_microccd is given, P2=0x01 is used and the fee is appended as an
+        8-byte big-endian uint64 suffix (not hashed). Pass FEE_OMIT (0xFFFFFFFFFFFFFFFF)
+        to suppress the fee line while still using P2=0x01.
+        Returns raw RAPDU (caller checks status).
+        """
         data = pack_derivation_path(path)
         data += header_60
         data += bytes([kind])
         data += len(token_id).to_bytes(1, byteorder="big")
         data += token_id
         data += cbor_total_length.to_bytes(4, byteorder="big")
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
         try:
             return self.backend.exchange(
-                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=p2, data=data
             )
         except ExceptionRAPDU as e:
             return RAPDU(e.status, e.data)
@@ -1349,13 +1360,17 @@ class CommandSender:
         header_60: bytes,
         token_id: bytes,
         cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
     ) -> RAPDU:
         """Full PLT signing flow: INIT + one or more CONT frames.
 
         Returns the RAPDU from the last CONT frame, which carries the 64-byte signature.
         Raises ExceptionRAPDU if any intermediate frame returns a non-success status.
         """
-        resp = self.sign_plt_init(path, header_60, token_id, len(cbor_payload))
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
         if resp.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(resp.status)
         chunks = split_message(cbor_payload, MAX_APDU_LEN)
@@ -1372,10 +1387,14 @@ class CommandSender:
         header_60: bytes,
         token_id: bytes,
         cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
     ) -> Generator[None, None, None]:
         """PLT signing flow for UI tests: INIT + intermediate CONTs synchronous,
         final CONT via exchange_async (caller navigates inside the with-block)."""
-        resp = self.sign_plt_init(path, header_60, token_id, len(cbor_payload))
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
         if resp.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(resp.status)
         chunks = split_message(cbor_payload, MAX_APDU_LEN)
