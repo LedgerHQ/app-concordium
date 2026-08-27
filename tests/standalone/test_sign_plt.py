@@ -7,8 +7,9 @@ buffer management, CIS-7 rejection) using synchronous backend.exchange() calls.
 Tests that require user approval / signature output live in test_sign_plt_ui.py.
 
 APDU wire format:
-  INIT (P1=0x00): path + account_tx_header[60] + kind[1]=0x1B + token_id_length[1]
-                  + token_id[1..128] + cbor_total_length[4 BE]
+  INIT (P1=0x00, P2=0x00): path + account_tx_header[60] + kind[1]=0x1B + token_id_length[1]
+                            + token_id[1..128] + cbor_total_length[4 BE]
+  INIT (P1=0x00, P2=0x01): same as above + fee[8 BE µCCD]  (fee display mode; not hashed)
   CONT (P1=0x01): raw CBOR chunk[1..255]
 
 Error status words (all in 0x6Bxx range):
@@ -310,26 +311,47 @@ def test_sign_plt_trailing_byte_in_init(backend):
 
 @pytest.mark.active_test_scope
 def test_sign_plt_wrong_p2(backend):
-    """Any P2 != 0x00 must return SWO_WRONG_P1_P2 (0x6B00)."""
-    from application_client.command_sender import CLA, InsType
+    """INIT P2 outside {0x00, 0x01} must return SWO_WRONG_P1_P2 (0x6B00). Tests P2=0x02."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
     from ragger.error import ExceptionRAPDU
 
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
     try:
-        resp = backend.exchange(
-            cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01,
-            data=(
-                b"\x08"                     # path depth 8
-                + b"\x00\x00\x04\x51"       # 1105
-                + b"\x00\x00\x00\x00" * 6
-                + b"\x00\x00\x00\x02"
-                + b"\x00\x00\x00\x00"
-                + _HEADER_60
-                + b"\x1b"                   # kind PLT
-                + b"\x01\x54"               # token_id_length=1, token_id=b"T"
-                + b"\x00\x00\x00\x04"       # cbor_total=4
-            ),
-        )
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x02, data=data)
     except ExceptionRAPDU as e:
         assert e.status == 0x6B00  # SWO_WRONG_P1_P2
     else:
         assert resp.status == 0x6B00  # SWO_WRONG_P1_P2
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_accepted(backend):
+    """INIT with P2=0x01 and an 8-byte µCCD fee suffix must succeed (0x9000)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(
+        _PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL),
+        display_fee_microccd=726_675,
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_wrong_length(backend):
+    """INIT with P2=0x01 but wrong fee length (4 bytes instead of 8) → SWO_INCORRECT_DATA."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
+
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
+    data += b"\x00\x00\x00\x04"  # only 4 bytes, need exactly 8
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6A80  # SWO_INCORRECT_DATA
+    else:
+        assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
