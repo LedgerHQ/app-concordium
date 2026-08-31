@@ -391,12 +391,12 @@ typedef struct {
     bool hasMemo;               /* transfer only */
 
     /* Formatted display strings (NUL-terminated, filled by format_plt_display): */
-    char displayOp[24];      /* e.g. "Transfer", "Add to allow list" */
-    char displayAmount[40];  /* e.g. "1.500000 UPEU" */
-    char displayAddress[56]; /* base58check, 55 chars + NUL */
-    char displayMemo[30];    /* ASCII (truncated) or "0x<hex>" fallback */
-    char displayFee[30];     /* formatted µCCD fee, e.g. "0.001 CCD"; empty if not provided */
-    bool hasFeeDisplay;      /* true if host sent a fee suffix in the INIT APDU */
+    char displayOp[24];                          /* e.g. "Transfer", "Add to allow list" */
+    char displayAmount[PLT_AMOUNT_DISPLAY_SIZE]; /* e.g. "1.500000 UPEU" */
+    char displayAddress[56];                     /* base58check, 55 chars + NUL */
+    char displayMemo[30];                        /* ASCII (truncated) or "0x<hex>" fallback */
+    char displayFee[30]; /* formatted µCCD fee, e.g. "0.001 CCD"; empty if not provided */
+    bool hasFeeDisplay;  /* true if host sent a fee suffix in the INIT APDU */
 } signPltContext_t;
 
 typedef struct trustedNameMultiHashCtx_s {
