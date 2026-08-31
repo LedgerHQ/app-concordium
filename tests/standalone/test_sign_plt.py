@@ -7,8 +7,9 @@ buffer management, CIS-7 rejection) using synchronous backend.exchange() calls.
 Tests that require user approval / signature output live in test_sign_plt_ui.py.
 
 APDU wire format:
-  INIT (P1=0x00): path + account_tx_header[60] + kind[1]=0x1B + token_id_length[1]
-                  + token_id[1..128] + cbor_total_length[4 BE]
+  INIT (P1=0x00, P2=0x00): path + account_tx_header[60] + kind[1]=0x1B + token_id_length[1]
+                            + token_id[1..128] + cbor_total_length[4 BE]
+  INIT (P1=0x00, P2=0x01): same as above + fee[8 BE µCCD]  (fee display mode; not hashed)
   CONT (P1=0x01): raw CBOR chunk[1..255]
 
 Error status words (all in 0x6Bxx range):
@@ -18,6 +19,7 @@ Error status words (all in 0x6Bxx range):
   0x6B0E  ERROR_PLT_BUFFER_ERROR    — cbor_total_length is 0 or > APP_PLT_CBOR_MAX (512)
   0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128]
   0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
+  0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent magnitude > 18
 """
 
 import pytest
@@ -56,8 +58,39 @@ def _map(pairs) -> bytes:
     return _cbor_encode_len(5, len(pairs)) + b"".join(k + v for k, v in pairs)
 
 
+def _uint(n: int) -> bytes:
+    return _cbor_encode_len(0, n)
+
+
+def _negint(n: int) -> bytes:
+    """Encode a negative integer n (n must be < 0)."""
+    return _cbor_encode_len(1, -n - 1)
+
+
+def _bstr(b: bytes) -> bytes:
+    return _cbor_encode_len(2, len(b)) + b
+
+
+def _tag(t: int, v: bytes) -> bytes:
+    return _cbor_encode_len(6, t) + v
+
+
 def _plt_pause() -> bytes:
     return _array([_map([(_tstr("pause"), _map([]))])])
+
+
+def _cis7_amount(exponent: int, significand: int) -> bytes:
+    """tag 4([exponent, significand])"""
+    exp_enc = _negint(exponent) if exponent < 0 else _uint(exponent)
+    return _tag(4, _array([exp_enc, _uint(significand)]))
+
+
+def _cis7_addr(addr: bytes = None) -> bytes:
+    """Minimal tag 40307({3: bstr[32]}) — no coininfo."""
+    if addr is None:
+        addr = bytes(32)
+    assert len(addr) == 32
+    return _tag(40307, _map([(_uint(3), _bstr(addr))]))
 
 
 # ------------------------------------------------------------------ #
@@ -310,26 +343,144 @@ def test_sign_plt_trailing_byte_in_init(backend):
 
 @pytest.mark.active_test_scope
 def test_sign_plt_wrong_p2(backend):
-    """Any P2 != 0x00 must return SWO_WRONG_P1_P2 (0x6B00)."""
-    from application_client.command_sender import CLA, InsType
+    """INIT P2 outside {0x00, 0x01} must return SWO_WRONG_P1_P2 (0x6B00). Tests P2=0x02."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
     from ragger.error import ExceptionRAPDU
 
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
     try:
-        resp = backend.exchange(
-            cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01,
-            data=(
-                b"\x08"                     # path depth 8
-                + b"\x00\x00\x04\x51"       # 1105
-                + b"\x00\x00\x00\x00" * 6
-                + b"\x00\x00\x00\x02"
-                + b"\x00\x00\x00\x00"
-                + _HEADER_60
-                + b"\x1b"                   # kind PLT
-                + b"\x01\x54"               # token_id_length=1, token_id=b"T"
-                + b"\x00\x00\x00\x04"       # cbor_total=4
-            ),
-        )
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x02, data=data)
     except ExceptionRAPDU as e:
         assert e.status == 0x6B00  # SWO_WRONG_P1_P2
     else:
         assert resp.status == 0x6B00  # SWO_WRONG_P1_P2
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_accepted(backend):
+    """INIT with P2=0x01 and an 8-byte µCCD fee suffix must succeed (0x9000)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(
+        _PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL),
+        display_fee_microccd=726_675,
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_wrong_length(backend):
+    """INIT with P2=0x01 but wrong fee length (4 bytes instead of 8) → SWO_INCORRECT_DATA."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
+
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
+    data += b"\x00\x00\x00\x04"  # only 4 bytes, need exactly 8
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6A80  # SWO_INCORRECT_DATA
+    else:
+        assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
+
+
+# ------------------------------------------------------------------ #
+# Token-ID length boundary                                            #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_max_length_accepted(backend):
+    """128-byte token ID (PLT_TOKEN_ID_MAX) fits in the INIT APDU and is accepted."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, bytes(128), len(_CBOR_SMALL))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+# ------------------------------------------------------------------ #
+# Required-field validation (security: prevents stale-display attack) #
+# ------------------------------------------------------------------ #
+
+
+def _plt_cont(backend, token_id: bytes, cbor: bytes) -> int:
+    """INIT + single CONT; returns the CONT status word."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, token_id, len(cbor))
+    assert resp.status == StatusWords.SWO_SUCCESS, f"INIT failed: {resp.status:#06x}"
+    resp = client.sign_plt_cont(cbor)
+    return resp.status
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_transfer_missing_amount(backend):
+    """transfer without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_transfer_missing_recipient(backend):
+    """transfer without 'recipient' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_mint_missing_amount(backend):
+    """mint without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("mint"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_burn_missing_amount(backend):
+    """burn without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("burn"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_add_allow_list_missing_target(backend):
+    """addAllowList without 'target' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("addAllowList"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
+# Decimal-count enforcement (app limit: exponent magnitude ≤ 18)     #
+# ------------------------------------------------------------------ #
+
+
+def _transfer_with_exponent(exp: int) -> bytes:
+    """transfer CBOR with the given tag-4 exponent and significand=1."""
+    exp_enc = _negint(exp) if exp < 0 else _uint(exp)
+    amount = _tag(4, _array([exp_enc, _uint(1)]))
+    return _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_19_decimals_rejected(backend):
+    """Exponent -19 (19 decimals) must return ERROR_PLT_UNSUPPORTED_DECIMALS (0x6B11).
+
+    The chain permits 0-255 decimals; the app caps at 18.  The check must happen at
+    parse time so the host gets a dedicated SW rather than the generic 0x6B04.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-19)) == 0x6B11
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_255_decimals_rejected(backend):
+    """Exponent -127 (maximum int8_t magnitude, chain-legal) is also rejected (0x6B11)."""
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-127)) == 0x6B11

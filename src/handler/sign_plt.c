@@ -17,22 +17,28 @@
 #include "display.h"
 #include "helpers/base58check.h"
 #include "helpers/derivation_path.h"
+#include "helpers/fee_display.h"
 #include "helpers/numberHelpers.h"
 #include "helpers/tx_hash.h"
 
 #include "sign_plt.h"
 
 /*
- * Worst-case single PLT transfer CBOR with a 256-byte memo is ~347 bytes.
- * APP_PLT_CBOR_MAX = 512 provides ~47% headroom for future op types without
+ * Worst-case single PLT transfer CBOR with a 256-byte memo is ~355 bytes.
+ * APP_PLT_CBOR_MAX = 512 provides ~44% headroom for future op types without
  * exceeding BSS budgets on constrained targets.  If you reduce this constant,
  * re-derive the bound: sum CBOR overhead for every field of the largest op.
  */
 _Static_assert(APP_PLT_CBOR_MAX >= 512,
-               "PLT CBOR buffer too small — worst-case transfer+memo needs ~347 B; "
+               "PLT CBOR buffer too small — worst-case transfer+memo needs ~355 B; "
                "do not go below 512 without recalculating");
 _Static_assert(sizeof(signPltContext_t) <= 1400,
                "signPltContext_t exceeds BSS budget — check cborBuf / address / display fields");
+/* displayAmount must hold "<number> <tokenId>\0".
+ * 40 = FPU64_TMP_LEN (max formatted uint64 with up to 18 decimal places).
+ * If PLT_TOKEN_ID_MAX or FPU64_TMP_LEN changes, update PLT_AMOUNT_DISPLAY_SIZE in app_sizes.h. */
+_Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_TOKEN_ID_MAX + 1,
+               "displayAmount too small — must fit FPU64_TMP_LEN + space + PLT_TOKEN_ID_MAX + NUL");
 
 /* P1 values for the PLT multi-step flow. */
 #define PLT_P1_INIT 0x00
@@ -40,7 +46,21 @@ _Static_assert(sizeof(signPltContext_t) <= 1400,
 
 /* CBOR tag numbers used by CIS-7. */
 #define CBOR_TAG_DECIMAL_FRACTION 4u
-#define CBOR_TAG_ACCOUNT_ADDRESS  40307u
+#define CBOR_TAG_ACCOUNT_ADDRESS  40307u /* BCR-2020-009 crypto-address */
+#define CBOR_TAG_COININFO         40305u /* BCR-2020-007 coin-info     */
+
+/*
+ * Map keys inside a tag-40307 address (BCR-2020-009):
+ *   1 = info (optional coininfo), 2 = address type (unused by CIS-7), 3 = data.
+ * Map key inside a tag-40305 coininfo: 1 = SLIP-44 coin type
+ * (2 = network, which CIS-7 declares unsupported).
+ */
+#define ADDRESS_KEY_INFO  1u
+#define ADDRESS_KEY_DATA  3u
+#define COININFO_KEY_TYPE 1u
+
+/* SLIP-44 coin type for CCD; the only value CIS-7 permits in coininfo. */
+#define CCD_COIN_TYPE 919u
 
 /* Longest op-name key in the CIS-7 spec: "removeAllowList" = 15 chars. */
 #define PLT_OP_NAME_MAX 16u
@@ -126,7 +146,56 @@ static bool parse_amount_value(CborValue *it) {
 }
 
 /*
- * Parse a CIS-7 tagged account address: CBOR tag 40307 wrapping a 32-byte bstr.
+ * Parse a CIS-7 coininfo: CBOR tag 40305 wrapping { 1: 919 }.
+ * Advances *it past the value.  A coin type other than CCD means the payload
+ * carries another chain's address, so it is rejected rather than displayed.
+ */
+static bool parse_coininfo_value(CborValue *it) {
+    if (!cbor_value_is_tag(it)) return false;
+    CborTag tag = 0;
+    cbor_value_get_tag(it, &tag);
+    if (tag != CBOR_TAG_COININFO) return false;
+
+    /* Skip the tag header (same reasoning as parse_amount_value above). */
+    if (cbor_value_advance_fixed(it) != CborNoError) return false;
+
+    if (!cbor_value_is_map(it)) return false;
+
+    CborValue info;
+    if (cbor_value_enter_container(it, &info) != CborNoError) return false;
+
+    bool typeSeen = false;
+    while (!cbor_value_at_end(&info)) {
+        if (!cbor_value_is_unsigned_integer(&info)) return false;
+        uint64_t key = 0;
+        cbor_value_get_uint64(&info, &key);
+        if (cbor_value_advance(&info) != CborNoError) return false;
+
+        /* Only the coin type is defined; anything else (e.g. BCR key 2 =
+         * network) is not part of CIS-7 and must not be signed blindly. */
+        if (key != COININFO_KEY_TYPE || typeSeen) return false;
+
+        if (!cbor_value_is_unsigned_integer(&info)) return false;
+        uint64_t coinType = 0;
+        cbor_value_get_uint64(&info, &coinType);
+        if (coinType != CCD_COIN_TYPE) return false;
+        typeSeen = true;
+
+        if (cbor_value_advance(&info) != CborNoError) return false;
+    }
+
+    if (cbor_value_leave_container(it, &info) != CborNoError) return false;
+    return typeSeen;
+}
+
+/*
+ * Parse a CIS-7 tagged account address:
+ *
+ *   #6.40307({ ? 1: #6.40305({1: 919}), 3: bstr .size 32 })
+ *
+ * The info field (key 1) is optional per CIS-7 — an address with no info is
+ * assumed to be a Concordium address.  Key 3 is mandatory.  Keys are iterated
+ * rather than read positionally, so either serialization order is accepted.
  * On success advances *it past the tag and stores raw bytes in ctx->address.
  */
 static bool parse_address_value(CborValue *it) {
@@ -138,15 +207,38 @@ static bool parse_address_value(CborValue *it) {
     /* Skip the tag header (same reasoning as parse_amount_value above). */
     if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_byte_string(it)) return false;
+    if (!cbor_value_is_map(it)) return false;
 
-    size_t addrLen = ADDRESS_LENGTH;
-    if (cbor_value_copy_byte_string(it, ctx->address, &addrLen, it) != CborNoError ||
-        addrLen != ADDRESS_LENGTH) {
-        return false;
+    CborValue addr;
+    if (cbor_value_enter_container(it, &addr) != CborNoError) return false;
+
+    bool dataSeen = false;
+    while (!cbor_value_at_end(&addr)) {
+        if (!cbor_value_is_unsigned_integer(&addr)) return false;
+        uint64_t key = 0;
+        cbor_value_get_uint64(&addr, &key);
+        if (cbor_value_advance(&addr) != CborNoError) return false;
+
+        if (key == ADDRESS_KEY_INFO) {
+            if (!parse_coininfo_value(&addr)) return false;
+        } else if (key == ADDRESS_KEY_DATA) {
+            if (dataSeen) return false; /* duplicate key */
+            if (!cbor_value_is_byte_string(&addr)) return false;
+            size_t addrLen = ADDRESS_LENGTH;
+            if (cbor_value_copy_byte_string(&addr, ctx->address, &addrLen, &addr) != CborNoError ||
+                addrLen != ADDRESS_LENGTH) {
+                return false;
+            }
+            dataSeen = true;
+        } else {
+            /* Includes BCR key 2 (address type), unused by CIS-7.  An unknown
+             * key could change what the address means — reject, do not skip. */
+            return false;
+        }
     }
 
-    return true;
+    if (cbor_value_leave_container(it, &addr) != CborNoError) return false;
+    return dataSeen;
 }
 
 /*
@@ -311,6 +403,7 @@ static uint16_t parse_plt_cbor(void) {
     if (cbor_value_enter_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     ctx->hasMemo = false;
+    bool amountSeen = false, addressSeen = false;
 
     while (!cbor_value_at_end(&inner)) {
         if (!cbor_value_is_text_string(&inner)) return ERROR_PLT_CBOR_ERROR;
@@ -327,8 +420,13 @@ static uint16_t parse_plt_cbor(void) {
 
         if (strcmp(fieldName, "amount") == 0) {
             if (!parse_amount_value(&inner)) return ERROR_PLT_CBOR_ERROR;
+            amountSeen = true;
+            /* The app renders at most 18 decimal places; see doc/ins_sign_plt.md.
+             * Reject early so the host gets a dedicated SW instead of ERROR_INVALID_TRANSACTION. */
+            if (ctx->amountExponent < -18) return ERROR_PLT_UNSUPPORTED_DECIMALS;
         } else if (strcmp(fieldName, "recipient") == 0 || strcmp(fieldName, "target") == 0) {
             if (!parse_address_value(&inner)) return ERROR_PLT_CBOR_ERROR;
+            addressSeen = true;
         } else if (strcmp(fieldName, "memo") == 0) {
             if (!parse_memo_value(&inner)) return ERROR_PLT_CBOR_ERROR;
         } else {
@@ -339,6 +437,26 @@ static uint16_t parse_plt_cbor(void) {
 
     if (cbor_value_leave_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
     if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+
+    /* Validate required fields per operation type. Missing fields would cause the display
+     * to show stale or zero values, violating the clear-signing guarantee. */
+    switch (ctx->opType) {
+        case PLT_OP_TRANSFER:
+            if (!amountSeen || !addressSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        case PLT_OP_MINT:
+        case PLT_OP_BURN:
+            if (!amountSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        case PLT_OP_ADD_ALLOW_LIST:
+        case PLT_OP_REM_ALLOW_LIST:
+        case PLT_OP_ADD_DENY_LIST:
+        case PLT_OP_REM_DENY_LIST:
+            if (!addressSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        default:
+            break; /* pause / unpause have no required fields */
+    }
 
     /* Multi-op guard: outer array must be exhausted after the first op. */
     PRINTF("DBG: parse_plt: arr.remaining=%u at_end=%d\n",
@@ -419,9 +537,8 @@ static void format_plt_display(void) {
         PRINTF("DBG: amount=%s\n", ctx->displayAmount);
     }
 
-    /* Address — for transfer/mint/burn (recipient/target) and allow/deny list ops. */
-    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
-        ctx->opType == PLT_OP_BURN || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
+    /* Address — for transfer (recipient) and allow/deny list ops (target). */
+    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
         ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
         ctx->opType == PLT_OP_REM_DENY_LIST) {
         PRINTF("DBG: calling base58check_encode addr[0]=%02x\n", ctx->address[0]);
@@ -458,7 +575,8 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
     /* ---- P1=0x00 INIT ---- */
     if (p1 == PLT_P1_INIT) {
         if (ctx->state != TX_PLT_INITIAL) THROW(ERROR_INVALID_STATE);
-        if (cmd->p2 != 0x00) THROW(SWO_WRONG_P1_P2);
+        if (cmd->p2 != P2_SIGN_TX_DEFAULT && cmd->p2 != P2_SIGN_TX_FEE_DISPLAY)
+            THROW(SWO_WRONG_P1_P2);
 
         size_t pathLen = parse_derivation_path(cdata, lc);
         cdata += pathLen;
@@ -491,9 +609,22 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
         uint32_t cborTotal = U4BE(cdata, 0);
         if (cborTotal == 0u || cborTotal > APP_PLT_CBOR_MAX) THROW(ERROR_PLT_BUFFER_ERROR);
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 4u);
+        cdata += 4u;
         remaining -= 4u;
 
-        if (remaining != 0u) THROW(SWO_INCORRECT_DATA);
+        ctx->hasFeeDisplay = false;
+        explicit_bzero(ctx->displayFee, sizeof(ctx->displayFee));
+        if (cmd->p2 == P2_SIGN_TX_FEE_DISPLAY) {
+            if (remaining != FEE_DISPLAY_U64_SIZE) THROW(SWO_INCORRECT_DATA);
+            /* displayFee is char[] so the UI layers can use it without casting;
+             * fee_display_apply_u64 writes bytes, hence the cast here. */
+            fee_display_apply_u64((uint8_t *) ctx->displayFee,
+                                  sizeof(ctx->displayFee),
+                                  &ctx->hasFeeDisplay,
+                                  cdata);
+        } else {
+            if (remaining != 0u) THROW(SWO_INCORRECT_DATA);
+        }
 
         ctx->cborTotalLength = cborTotal;
         ctx->cborReceived = 0;

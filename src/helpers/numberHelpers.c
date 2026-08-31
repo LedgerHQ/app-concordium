@@ -110,9 +110,6 @@ void plt_amount_to_display(char *dst,
                            const char *tokenId,
                            uint8_t tokenIdLen) {
     uint8_t decimals = (exponent < 0) ? (uint8_t) (-exponent) : 0;
-    if (decimals > 18) {
-        THROW(ERROR_INVALID_TRANSACTION);
-    }
     FPU64_TMP_ZERO_INIT;
     if (!format_fpu64_trimmed(tmp, sizeof(tmp), significand, decimals)) {
         THROW(ERROR_BUFFER_OVERFLOW);

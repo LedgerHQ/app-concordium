@@ -39,5 +39,7 @@ extern tx_state_t global_tx_state;
 #define ERROR_PLT_DATA_ERROR   0x6B0F
 #define ERROR_PLT_MULTI_OP \
     0x6B10 /* payload has > 1 operation; rejected to prevent confirmation-blindness */
+#define ERROR_PLT_UNSUPPORTED_DECIMALS \
+    0x6B11 /* amount exponent magnitude exceeds the app's 18-decimal display limit */
 
 #define ERROR_DEVICE_LOCKED 0x530C

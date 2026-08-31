@@ -12,7 +12,7 @@ test_sign_plt.py file and belong logically with the CBOR parsing group.
 CBOR wire format (CIS-7):
   Outer:  array(1) [ map(1) { "opName": map({fields}) } ]
   Amount: tag 4 ( array(2) [exponent, significand] )
-  Addr:   tag 40307 ( bstr(32) )
+  Addr:   tag 40307 ( { ?1: tag 40305({1: 919}), 3: bstr(32) } )
 """
 
 import pytest
@@ -103,10 +103,24 @@ def _cis7_amount(exponent: int, significand: int) -> bytes:
     return _tag(4, _array([exp_enc, _uint(significand)]))
 
 
-def _cis7_addr(addr: bytes = _ADDR_32) -> bytes:
-    """tag 40307(bstr[32])"""
+def _cis7_coininfo(coin_type: int = 919) -> bytes:
+    """tag 40305({1: coin_type}) — 919 is the SLIP-44 code for CCD."""
+    return _tag(40305, _map([(_uint(1), _uint(coin_type))]))
+
+
+def _cis7_addr(addr: bytes = _ADDR_32, coininfo: bytes = None) -> bytes:
+    """tag 40307({?1: coininfo, 3: bstr[32]}).
+
+    CIS-7 makes the info field (key 1) optional; by default this builds the
+    shorter form, which decoders must treat as a Concordium address.  Pass
+    coininfo=_cis7_coininfo() for the full form emitted by the JS SDK.
+    """
     assert len(addr) == 32
-    return _tag(40307, _bstr(addr))
+    pairs = []
+    if coininfo is not None:
+        pairs.append((_uint(1), coininfo))
+    pairs.append((_uint(3), _bstr(addr)))
+    return _tag(40307, _map(pairs))
 
 
 # ------------------------------------------------------------------ #
@@ -114,10 +128,11 @@ def _cis7_addr(addr: bytes = _ADDR_32) -> bytes:
 # ------------------------------------------------------------------ #
 
 
-def _plt_transfer(exp: int, sig: int, recipient: bytes = _ADDR_32, memo: bytes = None) -> bytes:
+def _plt_transfer(exp: int, sig: int, recipient: bytes = _ADDR_32, memo: bytes = None,
+                  coininfo: bytes = None) -> bytes:
     fields = [
         (_tstr("amount"), _cis7_amount(exp, sig)),
-        (_tstr("recipient"), _cis7_addr(recipient)),
+        (_tstr("recipient"), _cis7_addr(recipient, coininfo)),
     ]
     if memo is not None:
         fields.append((_tstr("memo"), _bstr(memo)))
@@ -136,9 +151,9 @@ def _plt_burn(exp: int, sig: int) -> bytes:
     ]))])])
 
 
-def _plt_list_op(op_name: str, target: bytes = _ADDR_32) -> bytes:
+def _plt_list_op(op_name: str, target: bytes = _ADDR_32, coininfo: bytes = None) -> bytes:
     return _array([_map([(_tstr(op_name), _map([
-        (_tstr("target"), _cis7_addr(target)),
+        (_tstr("target"), _cis7_addr(target, coininfo)),
     ]))])])
 
 
@@ -182,9 +197,12 @@ def _navigate_reject(backend, navigator, default_screenshot_path, test_name):
 
 @pytest.mark.active_test_scope
 def test_plt_transfer_approve(backend, navigator, default_screenshot_path, test_name):
-    """Transfer + amount + recipient — user approves — 64-byte signature returned."""
+    """Transfer + amount + recipient — user approves — 64-byte signature returned.
+
+    Recipient carries the coininfo field, i.e. the exact form the JS SDK emits.
+    """
     client = CommandSender(backend)
-    cbor = _plt_transfer(-6, 1_000_000)
+    cbor = _plt_transfer(-6, 1_000_000, coininfo=_cis7_coininfo())
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -307,9 +325,9 @@ def test_plt_burn(backend, navigator, default_screenshot_path, test_name):
 
 @pytest.mark.active_test_scope
 def test_plt_add_allow_list(backend, navigator, default_screenshot_path, test_name):
-    """addAllowList operation — target address displayed."""
+    """addAllowList operation — target address displayed (coininfo form)."""
     client = CommandSender(backend)
-    cbor = _plt_list_op("addAllowList")
+    cbor = _plt_list_op("addAllowList", coininfo=_cis7_coininfo())
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -459,6 +477,43 @@ def test_plt_multi_op_rejected(backend):
         assert resp.status == 0x6B10  # ERROR_PLT_MULTI_OP
 
 
+# ================================================================== #
+# Tests 19–20: Fee display (P2=0x01)                                  #
+# ================================================================== #
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_fee_display(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with P2=0x01 fee suffix — 'Max fees' screen appears before Sign."""
+    client = CommandSender(backend)
+    cbor = _plt_transfer(-6, 1_000_000)
+    # 726_675 µCCD ≈ 0.000727 CCD (typical PLT transfer fee on testnet)
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor,
+                                 display_fee_microccd=726_675):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_fee_omit(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with P2=0x01 and FEE_OMIT sentinel — fee line suppressed, flow identical to P2=0x00."""
+    client = CommandSender(backend)
+    cbor = _plt_transfer(-6, 1_000_000)
+    # 0xFFFFFFFFFFFFFFFF is the FEE_DISPLAY_VALUE_OMIT sentinel — no fee line on screen.
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor,
+                                 display_fee_microccd=0xFFFF_FFFF_FFFF_FFFF):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
+
+
 @pytest.mark.active_test_scope
 def test_plt_malformed_cbor(backend):
     """Indefinite array without break byte — rejected with ERROR_PLT_CBOR_ERROR (0x6B0D)."""
@@ -476,3 +531,116 @@ def test_plt_malformed_cbor(backend):
         assert e.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
     else:
         assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+# ================================================================== #
+# Tests 21+: Address encoding rejections (no UI needed)                #
+# ================================================================== #
+
+
+def _exchange_plt_cbor(backend, cbor: bytes) -> int:
+    """Send INIT + a single CONT frame and return the CONT status word."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+
+    init_data = (pack_derivation_path(_PATH) + _HEADER_60
+                 + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+                 + len(cbor).to_bytes(4, "big"))
+    resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    try:
+        return backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor).status
+    except ExceptionRAPDU as e:
+        return e.status
+
+
+def _plt_transfer_raw_addr(addr_value: bytes) -> bytes:
+    """transfer payload whose recipient is the given (possibly invalid) CBOR value."""
+    return _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), addr_value),
+    ]))])])
+
+
+# Each entry is a tag-40307 value that CIS-7 does not permit.
+_BAD_ADDRESSES = {
+    # Pre-CIS-7 shape this app used to accept: bare bstr instead of a map.
+    "bare_bstr": _tag(40307, _bstr(_ADDR_32)),
+    # Address bytes placed under key 1 (the info slot) with no key 3 at all.
+    "addr_under_info_key": _tag(40307, _map([(_uint(1), _bstr(_ADDR_32))])),
+    # coininfo present but the mandatory data field is missing.
+    "no_data_key": _tag(40307, _map([(_uint(1), _cis7_coininfo())])),
+    # data is not 32 bytes.
+    "short_data": _tag(40307, _map([(_uint(3), _bstr(bytes(31)))])),
+    "long_data": _tag(40307, _map([(_uint(3), _bstr(bytes(33)))])),
+    # coin type is not CCD (0 = BTC) — an address for another chain.
+    "foreign_coin_type": _tag(40307, _map([
+        (_uint(1), _cis7_coininfo(0)),
+        (_uint(3), _bstr(_ADDR_32)),
+    ])),
+    # coininfo map not wrapped in tag 40305.
+    "untagged_coininfo": _tag(40307, _map([
+        (_uint(1), _map([(_uint(1), _uint(919))])),
+        (_uint(3), _bstr(_ADDR_32)),
+    ])),
+    # BCR key 2 (address type) is not part of CIS-7.
+    "unknown_map_key": _tag(40307, _map([
+        (_uint(2), _uint(0)),
+        (_uint(3), _bstr(_ADDR_32)),
+    ])),
+    # Wrong tag number entirely (40305 instead of 40307).
+    "wrong_tag": _tag(40305, _map([(_uint(3), _bstr(_ADDR_32))])),
+}
+
+
+@pytest.mark.active_test_scope
+@pytest.mark.parametrize("case", sorted(_BAD_ADDRESSES))
+def test_plt_invalid_address_encoding(backend, case):
+    """Non-conformant tag-40307 values are rejected with ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _plt_transfer_raw_addr(_BAD_ADDRESSES[case])
+    assert _exchange_plt_cbor(backend, cbor) == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+# ================================================================== #
+# Test 21: 128-byte token ID (PLT_TOKEN_ID_MAX) display buffer fix   #
+# ================================================================== #
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_18_decimals(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with exponent -18 (app limit) must succeed and return a signature.
+
+    Boundary test: -18 is the last accepted exponent; -19 returns ERROR_PLT_UNSUPPORTED_DECIMALS.
+    """
+    client = CommandSender(backend)
+    # significand 1, exponent -18 → "0.000000000000000001 T"
+    cbor = _plt_transfer(-18, 1)
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_max_token_id(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with a 128-byte token ID (PLT_TOKEN_ID_MAX) and UINT64_MAX significand.
+
+    Regression test for the displayAmount buffer: before the fix, plt_amount_to_display
+    threw ERROR_BUFFER_OVERFLOW (0x6B06) for token IDs ≥ 18 bytes on large amounts.
+    With PLT_AMOUNT_DISPLAY_SIZE = 170 the buffer fits any valid token ID + any valid
+    formatted number without overflow.
+    """
+    client = CommandSender(backend)
+    token_id = b"A" * 128  # max allowed length per PLT_TOKEN_ID_MAX
+    # UINT64_MAX with exponent 0 → "18446744073709551615" (20 chars): worst-case numLen.
+    cbor = _plt_transfer(0, 0xFFFF_FFFF_FFFF_FFFF)
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, token_id, cbor):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
