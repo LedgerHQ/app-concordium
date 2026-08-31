@@ -38,3 +38,11 @@
 
 /* Maximum token-id byte length (1..PLT_TOKEN_ID_MAX per CIS-7 §3). */
 #define PLT_TOKEN_ID_MAX 128
+
+/* Display buffer for "<number> <tokenId>\0".
+ * 40 = FPU64_TMP_LEN (max formatted number incl. decimal point and 18 dp).
+ * 1  = space separator.
+ * PLT_TOKEN_ID_MAX = max token-id bytes.
+ * 1  = NUL terminator.
+ * Keep in sync with FPU64_TMP_LEN in numberHelpers.c. */
+#define PLT_AMOUNT_DISPLAY_SIZE (40 + 1 + PLT_TOKEN_ID_MAX + 1)

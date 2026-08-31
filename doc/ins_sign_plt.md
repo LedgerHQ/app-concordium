@@ -55,10 +55,11 @@ More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP`
 | `0x6B03` | `ERROR_INVALID_PARAM`      | P1 is neither `0x00` nor `0x01`                                                                        |
 | `0x6B04` | `ERROR_INVALID_TRANSACTION`| `transaction_kind` ≠ `0x1B`                                                                            |
 | `0x6A80` | `SWO_INCORRECT_DATA`       | INIT: trailing bytes when P2=`0x00`, or byte count after `cbor_total_length` ≠ 8 when P2=`0x01`       |
-| `0x6B0D` | `ERROR_PLT_CBOR_ERROR`     | CONT chunk is empty, or its length would exceed the declared `cbor_total_length`                       |
+| `0x6B0D` | `ERROR_PLT_CBOR_ERROR`     | CONT chunk is empty, or its length would exceed the declared `cbor_total_length`; or the final CONT carries CBOR that is structurally invalid or is missing a required field for the declared operation type |
 | `0x6B0E` | `ERROR_PLT_BUFFER_ERROR`   | `cbor_total_length` is 0 or exceeds `APP_PLT_CBOR_MAX` (512)                                          |
 | `0x6B0F` | `ERROR_PLT_DATA_ERROR`     | `token_id_length` is 0 or > 128                                                                        |
 | `0x6B10` | `ERROR_PLT_MULTI_OP`       | CBOR outer array contains more than one operation                                                      |
+| `0x6B11` | `ERROR_PLT_UNSUPPORTED_DECIMALS` | Amount exponent magnitude exceeds 18 (app display limit; the chain allows 0–255 decimals)    |
 
 ## Display
 
@@ -79,7 +80,7 @@ The app performs **clear signing**: each field is shown in human-readable form b
 Fields in brackets `[…]` appear only when the host provides the corresponding data.
 
 **Formatting details:**
-- **Amount** — displayed as `"<value> <tokenId>"` with the number of decimal places determined by the CBOR tag-4 exponent (e.g. `"1.500000 UPEU"`). Raw smallest units are never shown without decimal context.
+- **Amount** — displayed as `"<value> <tokenId>"` with the number of decimal places determined by the CBOR tag-4 exponent (e.g. `"1.500000 UPEU"`). Raw smallest units are never shown without decimal context. **App limit: the exponent magnitude must not exceed 18** (i.e. exponent ∈ [−18, 0]); tokens registered with more than 18 decimals are rejected with `ERROR_PLT_UNSUPPORTED_DECIMALS` (`0x6B11`). The chain permits 0–255 decimals; no mainnet or testnet token currently exceeds 18.
 - **Recipient / Target** — base58check-encoded 55-character Concordium address.
 - **Memo** — up to 14 bytes; shown as ASCII if all sampled characters are printable, otherwise as `"0x<hex>"` prefix. Truncation indicated by displayed byte count.
 - **Max fees** — only shown when the host sends the fee suffix (P2=`0x01` on INIT); formatted as CCD with 6 decimal places (e.g. `"0.000727 CCD"`). If the host sends `0xFFFFFFFFFFFFFFFF`, the fee line is suppressed.

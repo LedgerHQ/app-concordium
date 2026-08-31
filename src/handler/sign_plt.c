@@ -34,6 +34,11 @@ _Static_assert(APP_PLT_CBOR_MAX >= 512,
                "do not go below 512 without recalculating");
 _Static_assert(sizeof(signPltContext_t) <= 1400,
                "signPltContext_t exceeds BSS budget — check cborBuf / address / display fields");
+/* displayAmount must hold "<number> <tokenId>\0".
+ * 40 = FPU64_TMP_LEN (max formatted uint64 with up to 18 decimal places).
+ * If PLT_TOKEN_ID_MAX or FPU64_TMP_LEN changes, update PLT_AMOUNT_DISPLAY_SIZE in app_sizes.h. */
+_Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_TOKEN_ID_MAX + 1,
+               "displayAmount too small — must fit FPU64_TMP_LEN + space + PLT_TOKEN_ID_MAX + NUL");
 
 /* P1 values for the PLT multi-step flow. */
 #define PLT_P1_INIT 0x00
@@ -398,6 +403,7 @@ static uint16_t parse_plt_cbor(void) {
     if (cbor_value_enter_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     ctx->hasMemo = false;
+    bool amountSeen = false, addressSeen = false;
 
     while (!cbor_value_at_end(&inner)) {
         if (!cbor_value_is_text_string(&inner)) return ERROR_PLT_CBOR_ERROR;
@@ -414,8 +420,13 @@ static uint16_t parse_plt_cbor(void) {
 
         if (strcmp(fieldName, "amount") == 0) {
             if (!parse_amount_value(&inner)) return ERROR_PLT_CBOR_ERROR;
+            amountSeen = true;
+            /* The app renders at most 18 decimal places; see doc/ins_sign_plt.md.
+             * Reject early so the host gets a dedicated SW instead of ERROR_INVALID_TRANSACTION. */
+            if (ctx->amountExponent < -18) return ERROR_PLT_UNSUPPORTED_DECIMALS;
         } else if (strcmp(fieldName, "recipient") == 0 || strcmp(fieldName, "target") == 0) {
             if (!parse_address_value(&inner)) return ERROR_PLT_CBOR_ERROR;
+            addressSeen = true;
         } else if (strcmp(fieldName, "memo") == 0) {
             if (!parse_memo_value(&inner)) return ERROR_PLT_CBOR_ERROR;
         } else {
@@ -426,6 +437,26 @@ static uint16_t parse_plt_cbor(void) {
 
     if (cbor_value_leave_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
     if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+
+    /* Validate required fields per operation type. Missing fields would cause the display
+     * to show stale or zero values, violating the clear-signing guarantee. */
+    switch (ctx->opType) {
+        case PLT_OP_TRANSFER:
+            if (!amountSeen || !addressSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        case PLT_OP_MINT:
+        case PLT_OP_BURN:
+            if (!amountSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        case PLT_OP_ADD_ALLOW_LIST:
+        case PLT_OP_REM_ALLOW_LIST:
+        case PLT_OP_ADD_DENY_LIST:
+        case PLT_OP_REM_DENY_LIST:
+            if (!addressSeen) return ERROR_PLT_CBOR_ERROR;
+            break;
+        default:
+            break; /* pause / unpause have no required fields */
+    }
 
     /* Multi-op guard: outer array must be exhausted after the first op. */
     PRINTF("DBG: parse_plt: arr.remaining=%u at_end=%d\n",
@@ -506,9 +537,8 @@ static void format_plt_display(void) {
         PRINTF("DBG: amount=%s\n", ctx->displayAmount);
     }
 
-    /* Address — for transfer/mint/burn (recipient/target) and allow/deny list ops. */
-    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
-        ctx->opType == PLT_OP_BURN || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
+    /* Address — for transfer (recipient) and allow/deny list ops (target). */
+    if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
         ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
         ctx->opType == PLT_OP_REM_DENY_LIST) {
         PRINTF("DBG: calling base58check_encode addr[0]=%02x\n", ctx->address[0]);

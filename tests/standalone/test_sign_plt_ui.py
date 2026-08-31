@@ -599,3 +599,48 @@ def test_plt_invalid_address_encoding(backend, case):
     """Non-conformant tag-40307 values are rejected with ERROR_PLT_CBOR_ERROR (0x6B0D)."""
     cbor = _plt_transfer_raw_addr(_BAD_ADDRESSES[case])
     assert _exchange_plt_cbor(backend, cbor) == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+# ================================================================== #
+# Test 21: 128-byte token ID (PLT_TOKEN_ID_MAX) display buffer fix   #
+# ================================================================== #
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_18_decimals(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with exponent -18 (app limit) must succeed and return a signature.
+
+    Boundary test: -18 is the last accepted exponent; -19 returns ERROR_PLT_UNSUPPORTED_DECIMALS.
+    """
+    client = CommandSender(backend)
+    # significand 1, exponent -18 → "0.000000000000000001 T"
+    cbor = _plt_transfer(-18, 1)
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
+
+
+@pytest.mark.active_test_scope
+def test_plt_transfer_max_token_id(backend, navigator, default_screenshot_path, test_name):
+    """Transfer with a 128-byte token ID (PLT_TOKEN_ID_MAX) and UINT64_MAX significand.
+
+    Regression test for the displayAmount buffer: before the fix, plt_amount_to_display
+    threw ERROR_BUFFER_OVERFLOW (0x6B06) for token IDs ≥ 18 bytes on large amounts.
+    With PLT_AMOUNT_DISPLAY_SIZE = 170 the buffer fits any valid token ID + any valid
+    formatted number without overflow.
+    """
+    client = CommandSender(backend)
+    token_id = b"A" * 128  # max allowed length per PLT_TOKEN_ID_MAX
+    # UINT64_MAX with exponent 0 → "18446744073709551615" (20 chars): worst-case numLen.
+    cbor = _plt_transfer(0, 0xFFFF_FFFF_FFFF_FFFF)
+    with client.sign_plt_with_ui(_PATH, _HEADER_60, token_id, cbor):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+    resp = client.get_async_response()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 64
