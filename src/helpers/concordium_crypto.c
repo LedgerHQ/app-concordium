@@ -43,6 +43,9 @@ static void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size
     do {
         error = cx_hash_sha256(salt, saltSize, salt, sizeof(salt));
         if (error == 0) {
+            explicit_bzero(sk, sizeof(sk));
+            explicit_bzero(prk, sizeof(prk));
+            explicit_bzero(ikm, sizeof(ikm));
             THROW(ERROR_FAILED_CX_OPERATION);
         }
         saltSize = sizeof(salt);
@@ -59,6 +62,10 @@ static void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size
     } while (cx_math_is_zero(sk, sizeof(sk)));
 
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
+
+    explicit_bzero(sk, sizeof(sk));
+    explicit_bzero(prk, sizeof(prk));
+    explicit_bzero(ikm, sizeof(ikm));
 }
 
 void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *privateKey) {

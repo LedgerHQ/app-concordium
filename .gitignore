@@ -52,3 +52,5 @@ diff
 
 # folder to store local helper scripts
 scripts_local/
+tmp/
+.claude/
