@@ -320,14 +320,23 @@ void handle_sign_configure_baker(const command_t *cmd,
         }
     } else if (P1_URL == p1 && ctx_conf_baker->state == CONFIGURE_BAKER_URL) {
         if (ctx_conf_baker->url.urlLength > dataLength) {
+            if (dataLength >= sizeof(ctx_conf_baker->url.urlDisplay)) {
+                THROW(SWO_INCORRECT_DATA);
+            }
             update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
             ctx_conf_baker->url.urlLength -= dataLength;
+            explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, dataLength);
+            ctx_conf_baker->url.urlDisplay[dataLength] = '\0';
             startConfigureBakerUrlDisplay(false);
             *flags |= IO_ASYNCH_REPLY;
         } else if (ctx_conf_baker->url.urlLength == dataLength) {
+            if (dataLength >= sizeof(ctx_conf_baker->url.urlDisplay)) {
+                THROW(SWO_INCORRECT_DATA);
+            }
+            explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, ctx_conf_baker->url.urlLength);
-            memmove(ctx_conf_baker->url.urlDisplay + ctx_conf_baker->url.urlLength, "\0", 1);
+            ctx_conf_baker->url.urlDisplay[ctx_conf_baker->url.urlLength] = '\0';
             update_hash((cx_hash_t *) &tx_state->hash, cdata, ctx_conf_baker->url.urlLength);
 
             if (hasCommissionRate()) {
