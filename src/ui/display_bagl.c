@@ -873,7 +873,7 @@ UX_STEP_NOCB(ux_scheduled_transfer_initial_flow_1_step,
               .text = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr});
 UX_STEP_VALID(ux_scheduled_transfer_initial_flow_2_step,
               nn,
-              send_success_no_idle(),
+              confirmInitialScheduledTransfer(),
               {"Continue", "with transaction"});
 
 // UI definitions for displaying a timestamp and an amount of a scheduled transfer.
