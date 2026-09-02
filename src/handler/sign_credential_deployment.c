@@ -32,26 +32,22 @@ void processNextVerificationKey(void) {
 }
 
 static void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
-    // Hash key index
-    if (dataLength < 1) {
+    // Validate packet size before any hashing: 1 (key index) + 1 (schemeId) + KEY_LENGTH (key)
+    if (dataLength < 1 + 1 + KEY_LENGTH) {
         THROW(SWO_INCORRECT_DATA);
     }
+
+    // Hash key index
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
     dataLength -= 1;
     buffer += 1;
 
     // Hash schemeId
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
-    if (dataLength < 1) {
-        THROW(SWO_INCORRECT_DATA);
-    }
     dataLength -= 1;
     buffer += 1;
 
     uint8_t verificationKey[KEY_LENGTH];
-    if (dataLength < KEY_LENGTH) {
-        THROW(SWO_INCORRECT_DATA);
-    }
     memmove(verificationKey, buffer, KEY_LENGTH);
     update_hash((cx_hash_t *) &tx_state->hash, verificationKey, KEY_LENGTH);
 
