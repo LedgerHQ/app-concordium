@@ -86,6 +86,13 @@ static void keep_going_with_transaction(bool confirm) {
         send_user_rejection();
     }
 }
+static void confirm_initial_scheduled_transfer_callback(bool confirm) {
+    if (confirm) {
+        confirmInitialScheduledTransfer();
+    } else {
+        send_user_rejection();
+    }
+}
 static void sendSuccessNoIdleCallback(bool confirm) {
     (void) confirm;  // Suppress unused parameter warning
     send_success_no_idle();
@@ -1231,7 +1238,7 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
                             "Review Transfer with schedule",
                             NULL,  // No subtitle
                             "Continue with transfer",
-                            keep_going_with_transaction);
+                            confirm_initial_scheduled_transfer_callback);
 }
 
 void uiDeployModuleDisplay(void) {
