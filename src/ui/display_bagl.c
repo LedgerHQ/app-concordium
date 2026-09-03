@@ -131,6 +131,19 @@ UX_STEP_NOCB(ux_export_private_key_credid_step,
              bnnn_paging,
              {.title = (char *) global.exportPrivateKeyContext.display_credid_title,
               .text = (char *) global.exportPrivateKeyContext.display_credid});
+// Shared by both export flows: the secrets released, the P2-selected detail, and an explicit
+// warning that this is not a one-time signature.
+UX_STEP_NOCB(ux_export_private_key_detail_step,
+             bnnn_paging,
+             {.title = (char *) global.exportPrivateKeyContext.display_detail_title,
+              .text = (char *) global.exportPrivateKeyContext.display_detail});
+UX_STEP_NOCB(ux_export_private_key_types_step,
+             bnnn_paging,
+             {.title = "Keys released",
+              .text = (char *) global.exportPrivateKeyContext.display_key_types});
+UX_STEP_NOCB(ux_export_private_key_warning_step,
+             pnn,
+             {&C_icon_crossmark, "Secrets leave", "this Ledger"});
 UX_STEP_CB(ux_export_private_key_accept_step,
            pb,
            exportPrivateKey(),
@@ -142,6 +155,9 @@ UX_STEP_CB(ux_export_private_key_decline_step,
 UX_FLOW(ux_export_private_key,
         &ux_export_private_key_purpose_step,
         &ux_export_private_key_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_accept_step,
         &ux_export_private_key_decline_step);
 
@@ -180,6 +196,9 @@ UX_STEP_CB(ux_export_private_key_new_path_reject_step,
 UX_FLOW(ux_export_private_key_new_path,
         &ux_export_private_key_new_path_purpose_step,
         &ux_export_private_key_new_path_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_new_path_approve_step,
         &ux_export_private_key_new_path_reject_step);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {

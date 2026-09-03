@@ -21,6 +21,12 @@
 #define ATTRIBUTE_NAME_SIZE  24
 #define ATTRIBUTE_VALUE_SIZE 256
 
+// Private-key export approval screens: the P2-selected detail (network for INS 0x37, key format
+// for INS 0x05) and the list of key types the selected purpose releases.
+#define EXPORT_DETAIL_TITLE_SIZE 16
+#define EXPORT_DETAIL_SIZE       24
+#define EXPORT_KEY_TYPES_SIZE    40
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 

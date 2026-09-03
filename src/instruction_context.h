@@ -43,7 +43,9 @@
 #define P2_MAINNET 0x00
 #define P2_TESTNET 0x01
 
-#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       41
+// Holds "<operation> <verb>" / "<action>\n<verb>" composed at display time, so it must fit the
+// longest operation string plus a separator plus the longest verb plus a terminator.
+#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       48
 #define EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN 17
 #define EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN   15
 #define EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN     15
@@ -190,6 +192,12 @@ typedef struct {
     uint8_t display_credid_title[EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN];
     uint8_t display_credid[EXPORT_PRIVATE_KEY_CREDID_LEN];
     uint8_t display_sign[EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN];
+    /** The P2-selected detail the user must see before secrets leave the device: the network for
+     * INS 0x37, the key format for INS 0x05. */
+    uint8_t display_detail_title[EXPORT_DETAIL_TITLE_SIZE];
+    uint8_t display_detail[EXPORT_DETAIL_SIZE];
+    /** Which key types the selected purpose releases, so consent is informed. */
+    uint8_t display_key_types[EXPORT_KEY_TYPES_SIZE];
     bool exportBoth;
     bool exportSeed;
     bool isNewPath;
