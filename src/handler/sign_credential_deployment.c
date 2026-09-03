@@ -31,6 +31,21 @@ void processNextVerificationKey(void) {
     }
 }
 
+void confirmAddedCredential(void) {
+    if (ctx->credentialDeploymentCount == 0) {
+        THROW(ERROR_INVALID_STATE);
+    }
+    ctx->credentialDeploymentCount -= 1;
+    if (ctx->credentialDeploymentCount == 0) {
+        ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_ID_COUNT;
+        ctx->state = 0;
+    } else {
+        ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL_INDEX;
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
+    }
+    send_success_no_idle();
+}
+
 static void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
     // Validate packet size before any hashing: 1 (key index) + 1 (schemeId) + KEY_LENGTH (key)
     if (dataLength < 1 + 1 + KEY_LENGTH) {
@@ -343,21 +358,20 @@ void handle_sign_credential_deployment(const command_t *cmd,
             }
             update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->proofLength);
 
-            // If an update credential transaction, then update state to next step.
+            // An added credential in an update-credential transaction is only reviewable here:
+            // the shared parser defers the final/sole verification key and the credential details
+            // to the standalone deployment's final UI, which this flow never reaches. Require an
+            // explicit confirmation instead of acknowledging straight away, otherwise the added
+            // credential is signed without ever being displayed.
             if (p2 == P2_CREDENTIAL_CREDENTIAL &&
                 ctx->updateCredentialState == TX_UPDATE_CREDENTIAL_CREDENTIAL &&
                 ctx->credentialDeploymentCount > 0) {
-                ctx->credentialDeploymentCount -= 1;
-                if (ctx->credentialDeploymentCount == 0) {
-                    ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_ID_COUNT;
-                    ctx->state = 0;
-                } else {
-                    ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL_INDEX;
-                    ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
-                }
-            } else {
-                ctx->state = TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING;
+                // State advance and acknowledgement happen in confirmAddedCredential().
+                uiSignUpdateCredentialAddedCredentialDisplay(flags);
+                return;
             }
+
+            ctx->state = TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING;
             send_success_no_idle();
         }
     } else if (p1 == P1_NEW_OR_EXISTING && ctx->state == TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING) {

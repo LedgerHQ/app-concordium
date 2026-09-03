@@ -898,7 +898,7 @@ class CommandSender:
             yield response
 
     @contextmanager
-    def sign_update_credential_part_3(
+    def sign_update_credential_credential_details(
         self,
         signature_threshold: bytes,
         ar_identity: bytes,
@@ -907,8 +907,14 @@ class CommandSender:
         attribute_value: bytes,
         proof_length: bytes,
         proofs: bytes,
-        credential_id_list: List[bytes],
     ) -> Generator[None, None, None]:
+        """Send one added credential's details, up to and including its proofs.
+
+        Yields on the final proofs packet, which is where the device opens the mandatory
+        added-credential review. The caller must navigate that review (confirming or rejecting)
+        before the credential-ID packets are sent via
+        :meth:`sign_update_credential_credential_ids`.
+        """
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_UPDATE_CREDENTIAL,
@@ -966,8 +972,16 @@ class CommandSender:
                 p1=P1.P1_PROOFS,
                 p2=P2.P2_CREDENTIAL_CREDENTIAL,
                 data=chunk,
-            ):
-                pass
+            ) as response:
+                if i == len(proof_chunks) - 1:
+                    yield response
+
+    @contextmanager
+    def sign_update_credential_credential_ids(
+        self,
+        credential_id_list: List[bytes],
+    ) -> Generator[None, None, None]:
+        """Send the credential-ID count and each credential ID of an update-credential tx."""
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_UPDATE_CREDENTIAL,

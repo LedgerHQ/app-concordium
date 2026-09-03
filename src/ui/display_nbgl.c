@@ -96,6 +96,14 @@ static void processNextVerificationKeyNoIdleCallback(bool confirm) {
     processNextVerificationKey();
 }
 
+static void review_added_credential(bool confirm) {
+    if (confirm) {
+        confirmAddedCredential();
+    } else {
+        send_user_rejection();
+    }
+}
+
 void uiComparePubkey(void) {
     pairs[0].item = "Identity";
     pairs[0].value = (char *) global.exportPublicKeyContext.display;
@@ -561,6 +569,52 @@ void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
                        NULL,  // No subtitle
                        "Sign transaction",
                        review_choice_sign);
+
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) {
+    signCredentialDeploymentContext_t *cred = &global.signCredentialDeploymentContext;
+    uint8_t pairIndex = 0;
+
+    pairs[pairIndex].item = "Public key";
+    pairs[pairIndex].value = (char *) cred->accountVerificationKey;
+    pairIndex++;
+    pairs[pairIndex].item = "Signature threshold";
+    pairs[pairIndex].value = (char *) cred->signatureThreshold;
+    pairIndex++;
+    pairs[pairIndex].item = "AR threshold";
+    pairs[pairIndex].value = (char *) cred->anonymityRevocationThreshold;
+    pairIndex++;
+    pairs[pairIndex].item = "RegIdCred";
+    pairs[pairIndex].value = (char *) cred->regIdCred;
+    pairIndex++;
+    pairs[pairIndex].item = "Identity provider";
+    pairs[pairIndex].value = (char *) cred->identityProviderIndex;
+    pairIndex++;
+    pairs[pairIndex].item = "AR identity";
+    pairs[pairIndex].value = (char *) cred->arIdentity;
+    pairIndex++;
+    pairs[pairIndex].item = "EncryptedShare";
+    pairs[pairIndex].value = (char *) cred->encIdCredPubShare;
+    pairIndex++;
+
+    nbgl_contentTagValueList_t content;
+    content.nbPairs = pairIndex;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+
+    // Mid-flow confirmation: the transaction is signed on a later screen, so this is a
+    // continuation review rather than the final signing review.
+    nbgl_useCaseReviewLight(TYPE_TRANSACTION,
+                            &content,
+                            &ICON_APP_HOME,
+                            "Review added credential",
+                            NULL,  // No subtitle
+                            "Confirm added credential",
+                            review_added_credential);
 
     *flags |= IO_ASYNCH_REPLY;
 }

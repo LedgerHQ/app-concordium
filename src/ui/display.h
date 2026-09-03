@@ -47,6 +47,8 @@ void startConfigureDelegationDisplay(void);
 void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags);
+/** Mandatory review of one added credential in an update-credential transaction. */
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentNewIntroDisplay(void);
