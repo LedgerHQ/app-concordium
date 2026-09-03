@@ -104,6 +104,14 @@ static void review_added_credential(bool confirm) {
     }
 }
 
+static void review_credential_attribute(bool confirm) {
+    if (confirm) {
+        confirmAttribute();
+    } else {
+        send_user_rejection();
+    }
+}
+
 void uiComparePubkey(void) {
     pairs[0].item = "Identity";
     pairs[0].value = (char *) global.exportPublicKeyContext.display;
@@ -569,6 +577,31 @@ void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
                        NULL,  // No subtitle
                        "Sign transaction",
                        review_choice_sign);
+
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags) {
+    signCredentialDeploymentContext_t *cred = &global.signCredentialDeploymentContext;
+
+    pairs[0].item = (char *) cred->attributeName;
+    pairs[0].value = (char *) cred->attributeValue;
+
+    nbgl_contentTagValueList_t content;
+    content.nbPairs = 1;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+
+    // Mid-flow confirmation: further attributes and the signature come on later screens.
+    nbgl_useCaseReviewLight(TYPE_TRANSACTION,
+                            &content,
+                            &ICON_APP_HOME,
+                            "Review revealed attribute",
+                            NULL,  // No subtitle
+                            "Continue with transaction",
+                            review_credential_attribute);
 
     *flags |= IO_ASYNCH_REPLY;
 }

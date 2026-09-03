@@ -280,6 +280,11 @@ typedef struct {
 
     cx_sha256_t attributeHash;
     uint8_t attributeValueLength;
+    /** Revealed identity attribute currently under review. The value length is host-supplied as a
+     * uint8, so the buffer holds the largest possible value plus a NUL terminator and never
+     * truncates. */
+    char attributeName[ATTRIBUTE_NAME_SIZE];
+    char attributeValue[ATTRIBUTE_VALUE_SIZE];
 
     uint32_t proofLength;
     uint8_t accountAddress[57];
