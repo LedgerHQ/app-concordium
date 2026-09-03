@@ -62,9 +62,7 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
     memmove(ctx->display_credid_title, "Credentials ID", EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN);
     // The operation releases reusable private key material to the host, so the review must say
     // so rather than describing it as signing.
-    memmove(ctx->display_review_operation,
-            "Export private keys",
-            sizeof("Export private keys"));
+    memmove(ctx->display_review_operation, "Export private keys", sizeof("Export private keys"));
     memmove(ctx->display_sign, "Approve export", sizeof("Approve export"));
 
     // P2 selects how the key material is represented on the wire. The raw seed is the more
@@ -84,9 +82,7 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
             memmove(ctx->display_review_verb,
                     "to create credentials",
                     sizeof("to create credentials"));
-            memmove(ctx->display_key_types,
-                    "PRF key, IdCredSec",
-                    sizeof("PRF key, IdCredSec"));
+            memmove(ctx->display_key_types, "PRF key, IdCredSec", sizeof("PRF key, IdCredSec"));
             break;
         case P1_LEGACY_PRF_KEY_RECOVERY:
             memmove(ctx->display_sign_verb,
