@@ -79,13 +79,6 @@ static void review_choice_sign(bool confirm) {
     }
 }
 
-static void keep_going_with_transaction(bool confirm) {
-    if (confirm) {
-        send_success_no_idle();
-    } else {
-        send_user_rejection();
-    }
-}
 static void confirm_initial_scheduled_transfer_callback(bool confirm) {
     if (confirm) {
         confirmInitialScheduledTransfer();
