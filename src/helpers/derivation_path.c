@@ -51,8 +51,14 @@ void parse_derivation_path_new(uint8_t lc,
     size_t offset = 0;
     uint32_t identity_provider = 0;
     offset = read_u32_be(cdata, offset, &identity_provider);
+    if ((identity_provider & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     uint32_t identity = 0;
     offset = read_u32_be(cdata, offset, &identity);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset = read_u32_be(cdata, offset, cred_counter_out);
     check_lc(lc, offset);
 
@@ -77,6 +83,9 @@ void parse_derivation_path_legacy(uint8_t lc,
     size_t offset = 0;
     uint32_t identity;
     offset = read_u32_be(cdata, offset, &identity);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset = read_u32_be(cdata, offset, cred_counter_out);
     check_lc(lc, offset);
 
