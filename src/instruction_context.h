@@ -193,6 +193,13 @@ typedef struct {
     bool exportBoth;
     bool exportSeed;
     bool isNewPath;
+    /** Non-secret INS 0x37 request parameters, retained so that the private material is only
+     * derived in the approval callback and never exists in RAM during the review. */
+    uint8_t newPathPurpose;
+    uint8_t newPathNetwork;
+    uint32_t newPathIdentityProvider;
+    uint32_t newPathIdentity;
+    uint32_t newPathAccount;
     uint8_t outputPrivateKeys[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     uint8_t privateKeysLength;
 } exportPrivateKeyContext_t;
