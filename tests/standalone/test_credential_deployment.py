@@ -286,7 +286,9 @@ def test_credential_update(backend, navigator, test_name, default_screenshot_pat
 
         number_of_screens_until_confirm = 1
 
-        with client.sign_update_credential_part_3(
+        # The added credential must be reviewed before the device acknowledges the final proofs
+        # packet, so that it can never be signed without having been displayed.
+        with client.sign_update_credential_credential_details(
             signature_threshold=signature_threshold,
             ar_identity=ar_identity,
             credential_dates=credential_dates,
@@ -294,6 +296,32 @@ def test_credential_update(backend, navigator, test_name, default_screenshot_pat
             attribute_value=attribute_value,
             proof_length=proof_length,
             proofs=proofs,
+        ):
+            # On touch devices the review title wraps ("Confirm added" / "credential"), so the
+            # navigation target is the "Approve" button instead, as elsewhere in this file.
+            if backend.device.is_nano:
+                navigate_until_text_and_compare(
+                    backend,
+                    navigator,
+                    "Confirm added",
+                    default_screenshot_path,
+                    test_name + "/2_added_credential_review",
+                    False,
+                    False,
+                )
+            else:
+                navigate_until_text_and_compare(
+                    backend,
+                    navigator,
+                    "Approve",
+                    default_screenshot_path,
+                    test_name + "/2_added_credential_review",
+                    True,
+                    False,
+                    NavInsID.USE_CASE_CHOICE_CONFIRM,
+                )
+
+        with client.sign_update_credential_credential_ids(
             credential_id_list=credential_id_list,
         ):
             if backend.device.is_nano:
@@ -351,3 +379,107 @@ def test_credential_update(backend, navigator, test_name, default_screenshot_pat
         response_hex
         == "04974271c62c687aa5b14ff7e250eafd56b0e288c8be837a8d6fcfae4f1d77f4f1fd9e4621b7a2616cb8326e936f44cb358cc66c9ee3ca87906fa4eba698fe04"
     )
+
+
+@pytest.mark.active_test_scope
+def test_credential_update_added_credential_refused(
+    backend, navigator, test_name, default_screenshot_path
+):
+    """Rejecting the added-credential review must abort the update-credential transaction.
+
+    The added credential is only ever displayed on this review, so refusing it has to fail
+    closed: the device must return a refusal and never a signature.
+    """
+    client = CommandSender(backend)
+
+    key = bytes.fromhex(
+        "0100f78929ec8a9819f6ae2e10e79522b6b311949635fecc3d924d9d1e23f8e9e1c3"
+    )
+    signature_threshold = bytes.fromhex(
+        "ff85d8a7aa296c162e4e2f0d6bfbdc562db240e28942f7f3ddef6979a1133b5c719ec3581869aaf88388824b0f6755e63c0000f013010001"
+    )
+    ar_identity = bytes.fromhex(
+        "000f0301aca024ce6083d4956edad825c3721da9b61e5b3712606ba1465f7818a43849121bdb3e4d99624e9a74b9436cc8948d178b9b144122aa070372e3fadee4998e1cc21161186a3d19698ad245e10912810df1aaddda16a27f654716108e27758099"
+    )
+    credential_dates = bytes.fromhex("07e40b07e10c0001")
+    attribute_tag = bytes.fromhex("010000000000000004")
+    attribute_value = bytes.fromhex("4a6f686e")
+    # The device only hashes proof bytes, it never validates them, so a minimal blob is enough
+    # to reach the added-credential review that this test rejects.
+    proofs = bytes.fromhex("deadbeef")
+    proof_length = len(proofs).to_bytes(4, byteorder="big")
+
+    with client.credential_update_part_1(
+        data=bytes.fromhex(
+            "08000004510000000000000000000000000000000000000002000000000000000020a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da71401"
+        ),
+    ):
+        if backend.device.is_nano:
+            navigate_until_text_and_compare(
+                backend,
+                navigator,
+                "Continue",
+                default_screenshot_path,
+                test_name + "/1_sender",
+                False,
+                False,
+            )
+        else:
+            navigate_until_text_and_compare(
+                backend,
+                navigator,
+                "Approve",
+                default_screenshot_path,
+                test_name + "/1_sender",
+                True,
+                False,
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+            )
+
+    with client.sign_update_credential_part_2(
+        key_index=bytes.fromhex("00"),
+        number_of_keys=1,
+        key=key,
+    ):
+        pass
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        with client.sign_update_credential_credential_details(
+            signature_threshold=signature_threshold,
+            ar_identity=ar_identity,
+            credential_dates=credential_dates,
+            attribute_tag=attribute_tag,
+            attribute_value=attribute_value,
+            proof_length=proof_length,
+            proofs=proofs,
+        ):
+            if backend.device.is_nano:
+                navigate_until_text_and_compare(
+                    backend,
+                    navigator,
+                    "Decline to",
+                    default_screenshot_path,
+                    test_name + "/2_added_credential_refused",
+                    False,
+                    False,
+                )
+            else:
+                # Rejecting takes two taps: the footer "Reject" only opens the rejection
+                # confirmation modal, and the app's callback runs only once that is confirmed.
+                navigate_until_text_and_compare(
+                    backend,
+                    navigator,
+                    "Approve",
+                    default_screenshot_path,
+                    test_name + "/2_added_credential_refused",
+                    True,
+                    False,
+                    [
+                        NavInsID.USE_CASE_REVIEW_REJECT,
+                        NavInsID.USE_CASE_CHOICE_CONFIRM,
+                    ],
+                )
+
+    # The transaction must fail closed, with no signature returned.
+    assert e.value.status == StatusWords.SWO_CONDITIONS_NOT_SATISFIED
+    assert len(e.value.data) == 0
