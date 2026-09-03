@@ -52,7 +52,9 @@ static const char ATTRIBUTE_NAMES[][ATTRIBUTE_NAME_SIZE] = {
 
 static void attribute_name_for_tag(uint8_t tag, char *dst, size_t dstSize) {
     explicit_bzero(dst, dstSize);
-    if (tag < ARRAYLEN(ATTRIBUTE_NAMES)) {
+    // Sized from the table itself rather than the SDK's ARRAYLEN, which the fuzzing build does
+    // not have: there it became an implicit function call and failed only at link time.
+    if (tag < sizeof(ATTRIBUTE_NAMES) / sizeof(ATTRIBUTE_NAMES[0])) {
         size_t nameLength = strlen(ATTRIBUTE_NAMES[tag]);
         if (nameLength >= dstSize) {
             THROW(ERROR_BUFFER_OVERFLOW);
