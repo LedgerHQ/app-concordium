@@ -119,7 +119,14 @@ def navigate_until_text_and_compare(
         confirm_instructions = [NavInsID.BOTH_CLICK]
     else:
         go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
-        confirm_instructions = [nav_ins_confirm_instruction]
+        # A sequence is accepted so that flows needing more than one tap can be expressed.
+        # Rejecting an NBGL review is the main case: USE_CASE_REVIEW_REJECT only opens the
+        # rejection confirmation modal, which must then be confirmed for the app's callback
+        # to run at all (see bundleNavReviewChoice in the SDK's nbgl_use_case.c).
+        if isinstance(nav_ins_confirm_instruction, (list, tuple)):
+            confirm_instructions = list(nav_ins_confirm_instruction)
+        else:
+            confirm_instructions = [nav_ins_confirm_instruction]
 
     navigator.navigate_until_text_and_compare(
         go_right_instruction,
