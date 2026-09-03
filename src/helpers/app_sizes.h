@@ -16,6 +16,11 @@
 #define COMMON_TIMESTAMP_SIZE      8
 #define COMMON_COMMISSION_SIZE     8
 
+// Revealed identity attributes. The longest registry name is "Country of residence"; the value
+// length is a host-supplied uint8, so UINT8_MAX + 1 always fits the value plus its terminator.
+#define ATTRIBUTE_NAME_SIZE  24
+#define ATTRIBUTE_VALUE_SIZE 256
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 
