@@ -116,6 +116,27 @@ void detect_derivation_path_variant(derivation_path_t *derivation_path) {
     }
 }
 
+/**
+ * Reject the one path shape whose raw Ed25519 private key is exportable to the host.
+ *
+ * INS_EXPORT_PRIVATE_KEY_NEW returns the raw extended Ed25519 key for commitment randomness at
+ * m/44'/coin'/idp'/identity'/5'/account'. Signing with that same path would make the exported key
+ * a usable signing key, so this shape must never reach a signing or public-key sink.
+ *
+ * Deliberately narrow: node 4 of a five-node new-format path is the account index, not a key role,
+ * so accounts 2-5 are legitimate signing paths and are not rejected here. The other export roles
+ * (2/3/4) are exported as BLS keys derived one-way from the Ed25519 key, which does not disclose
+ * the signing key.
+ */
+static void reject_exportable_signing_path(const derivation_path_t *dp) {
+    if (dp->variant != DERIVATION_PATH_VARIANT_NEW || dp->len != DERIVATION_PATH_NEW_LEN + 1) {
+        return;
+    }
+    if ((dp->nodes[PATH_INDEX_ACCOUNT_NEW] & ~HARDENED_BIT) == NEW_COMMITMENT_RANDOMNESS) {
+        THROW(ERROR_INVALID_PATH);
+    }
+}
+
 size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength) {
     derivation_path_t *dp = &global_derivation_path;
     init_derivation_path(dp);
@@ -126,6 +147,7 @@ size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength) {
     /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first.
      */
     harden_derivation_path(dp);
+    reject_exportable_signing_path(dp);
     return consumed;
 }
 
