@@ -26,6 +26,8 @@ void uiExportPrivateKey(volatile unsigned int *flags);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags);
 void exportPrivateKey(void);
 void sendPrivateKeysNewPath(void);
+/** Wipes any derived key material before rejecting, so a rejected export leaves nothing in RAM. */
+void rejectPrivateKeysNewPath(void);
 
 #ifdef HAVE_BAGL
 // Define the dynamic UI elements. These are required as the majority of

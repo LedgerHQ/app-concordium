@@ -172,7 +172,7 @@ UX_STEP_CB(ux_export_private_key_new_path_approve_step,
            });
 UX_STEP_CB(ux_export_private_key_new_path_reject_step,
            pb,
-           send_user_rejection(),
+           rejectPrivateKeysNewPath(),
            {
                &C_icon_crossmark,
                "Reject operation",

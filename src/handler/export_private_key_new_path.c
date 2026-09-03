@@ -239,14 +239,16 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         }
     }
 
-    ctx->privateKeysLength =
-        (uint8_t) exportNewPathPrivateKeysForPurpose(p1,
-                                                     p2,
-                                                     identityProvider,
-                                                     identity,
-                                                     account,
-                                                     ctx->outputPrivateKeys,
-                                                     sizeof(ctx->outputPrivateKeys));
+    // Retain only the non-secret request parameters. The keys themselves are derived in
+    // sendPrivateKeysNewPath(), i.e. after the user approves, so that no exportable private
+    // material exists in RAM while the review screen is displayed or if the user rejects.
+    ctx->newPathPurpose = p1;
+    ctx->newPathNetwork = p2;
+    ctx->newPathIdentityProvider = identityProvider;
+    ctx->newPathIdentity = identity;
+    ctx->newPathAccount = account;
+    explicit_bzero(ctx->outputPrivateKeys, sizeof(ctx->outputPrivateKeys));
+    ctx->privateKeysLength = 0;
 
     ////// Set up the display //////
     const bool need_account_suffix = (p1 == P1_ACCOUNT_CREATION || p1 == P1_CREATION_OF_ZK_PROOF);
@@ -312,8 +314,24 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
 }
 
 void sendPrivateKeysNewPath(void) {
+    // Derivation happens here, not in the handler: the user has now approved the export.
+    ctx->privateKeysLength =
+        (uint8_t) exportNewPathPrivateKeysForPurpose(ctx->newPathPurpose,
+                                                     ctx->newPathNetwork,
+                                                     ctx->newPathIdentityProvider,
+                                                     ctx->newPathIdentity,
+                                                     ctx->newPathAccount,
+                                                     ctx->outputPrivateKeys,
+                                                     sizeof(ctx->outputPrivateKeys));
+
     memmove(G_io_apdu_buffer, ctx->outputPrivateKeys, ctx->privateKeysLength);
     send_success(ctx->privateKeysLength);
     explicit_bzero(ctx->outputPrivateKeys, sizeof(ctx->outputPrivateKeys));
     ctx->privateKeysLength = 0;
+}
+
+void rejectPrivateKeysNewPath(void) {
+    explicit_bzero(ctx->outputPrivateKeys, sizeof(ctx->outputPrivateKeys));
+    ctx->privateKeysLength = 0;
+    send_user_rejection();
 }
