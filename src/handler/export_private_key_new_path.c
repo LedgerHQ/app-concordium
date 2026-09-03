@@ -210,6 +210,9 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         THROW(ERROR_INVALID_PATH);
     }
     uint32_t identityProvider = U4BE(dataBuffer, offset);
+    if ((identityProvider & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset += 4;
     remainingDataLength -= 4;
 
@@ -218,6 +221,9 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         THROW(ERROR_INVALID_PATH);
     }
     uint32_t identity = U4BE(dataBuffer, offset);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset += 4;
     remainingDataLength -= 4;
 
@@ -228,6 +234,9 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
             THROW(ERROR_INVALID_PATH);
         }
         account = U4BE(dataBuffer, offset);
+        if ((account & HARDENED_BIT) != 0) {
+            THROW(ERROR_INVALID_PATH);
+        }
     }
 
     ctx->privateKeysLength =

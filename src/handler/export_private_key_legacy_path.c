@@ -37,6 +37,9 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
         THROW(ERROR_INVALID_PATH);
     }
     identity = U4BE(dataBuffer, 0);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
 
     derivation_path_t *dp = &global_derivation_path;
     init_derivation_path(dp);
