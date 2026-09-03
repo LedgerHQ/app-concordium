@@ -268,20 +268,36 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
                         identity,
                         need_account_suffix);
 
+    // The operation releases reusable private key material to the host, so the review must say
+    // so rather than describing it as signing.
     memmove(ctx->display_review_operation,
-            "Review operation",
-            EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN);
+            "Export private keys",
+            sizeof("Export private keys"));
 
     memmove(ctx->display_credid_title, "Credentials ID", EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN);
 
-    memmove(ctx->display_sign, "Sign operation", EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN);
+    memmove(ctx->display_sign, "Approve export", sizeof("Approve export"));
+
+    // P2 selects the network, which changes the coin type and therefore which keys are derived.
+    memmove(ctx->display_detail_title, "Network", sizeof("Network"));
+    if (p2 == P2_MAINNET) {
+        memmove(ctx->display_detail, "Mainnet", sizeof("Mainnet"));
+    } else {
+        memmove(ctx->display_detail, "Testnet", sizeof("Testnet"));
+    }
 
     if (p1 == P1_IDENTITY_CREDENTIAL_CREATION) {
         memmove(ctx->display_review_verb, "to create credentials", sizeof("to create credentials"));
         memmove(ctx->display_sign_verb, "to create credentials?", sizeof("to create credentials?"));
+        memmove(ctx->display_key_types,
+                "IdCredSec, PRF key, blinding",
+                sizeof("IdCredSec, PRF key, blinding"));
     } else if (p1 == P1_ACCOUNT_CREATION) {
         memmove(ctx->display_review_verb, "to create account", sizeof("to create account"));
         memmove(ctx->display_sign_verb, "to create account?", sizeof("to create account?"));
+        memmove(ctx->display_key_types,
+                "PRF key, IdCredSec, commitment",
+                sizeof("PRF key, IdCredSec, commitment"));
     } else if (p1 == P1_ID_RECOVERY) {
         memmove(ctx->display_review_verb,
                 "to recover credentials",
@@ -289,6 +305,9 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         memmove(ctx->display_sign_verb,
                 "to recover credentials?",
                 sizeof("to recover credentials?"));
+        memmove(ctx->display_key_types,
+                "IdCredSec, blinding",
+                sizeof("IdCredSec, blinding"));
     } else if (p1 == P1_ACCOUNT_CREDENTIAL_DISCOVERY) {
         memmove(ctx->display_review_verb,
                 "to discover credentials",
@@ -296,9 +315,13 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         memmove(ctx->display_sign_verb,
                 "to discover credentials?",
                 sizeof("to discover credentials?"));
+        memmove(ctx->display_key_types, "PRF key", sizeof("PRF key"));
     } else if (p1 == P1_CREATION_OF_ZK_PROOF) {
         memmove(ctx->display_review_verb, "to create ZK proof", sizeof("to create ZK proof"));
         memmove(ctx->display_sign_verb, "to create ZK proof?", sizeof("to create ZK proof?"));
+        memmove(ctx->display_key_types,
+                "Commitment randomness",
+                sizeof("Commitment randomness"));
     }
 
     if (need_account_suffix) {

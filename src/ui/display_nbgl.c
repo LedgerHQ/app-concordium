@@ -157,25 +157,57 @@ void uiGeneratePubkey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+/**
+ * Compose the export review title as "<operation> <verb>" and the finish title as
+ * "<action>\n<verb>", in place.
+ *
+ * The offsets are derived from the strings themselves: keying them to fixed length macros
+ * silently corrupted the text whenever the wording changed length.
+ */
+static void compose_export_private_key_titles(void) {
+    exportPrivateKeyContext_t *exportCtx = &global.exportPrivateKeyContext;
+
+    size_t operationLength = strlen((char *) exportCtx->display_review_operation);
+    size_t reviewVerbLength = strlen((char *) exportCtx->display_review_verb);
+    if (operationLength + 1 + reviewVerbLength + 1 > sizeof(exportCtx->display_review_operation)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    exportCtx->display_review_operation[operationLength] = ' ';
+    memmove(exportCtx->display_review_operation + operationLength + 1,
+            exportCtx->display_review_verb,
+            reviewVerbLength + 1);
+
+    size_t actionLength = strlen((char *) exportCtx->display_sign);
+    size_t signVerbLength = strlen((char *) exportCtx->display_sign_verb);
+    if (actionLength + 1 + signVerbLength + 1 > sizeof(exportCtx->display_sign)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    exportCtx->display_sign[actionLength] = '\n';
+    memmove(exportCtx->display_sign + actionLength + 1,
+            exportCtx->display_sign_verb,
+            signVerbLength + 1);
+}
+
 void uiExportPrivateKey(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
-    global.exportPrivateKeyContext
-        .display_review_operation[EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN - 1] = ' ';
-    memcpy(global.exportPrivateKeyContext.display_review_operation +
-               EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-
-    global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
-
-    memcpy(global.exportPrivateKeyContext.display_sign + EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_sign_verb,
-           EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
+    compose_export_private_key_titles();
 
     pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
     pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
+    pairIndex++;
+
+    // The P2-selected detail and the key types released: without these the user cannot tell
+    // which network or which reusable secrets they are approving.
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_detail_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_detail;
+    pairIndex++;
+    pairs[pairIndex].item = "Keys released";
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_key_types;
+    pairIndex++;
+    pairs[pairIndex].item = "Warning";
+    pairs[pairIndex].value = "These secrets leave this Ledger and can be reused";
     pairIndex++;
 
     // Create the page content
@@ -201,21 +233,22 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
-    global.exportPrivateKeyContext
-        .display_review_operation[EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN - 1] = ' ';
-    memcpy(global.exportPrivateKeyContext.display_review_operation +
-               EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-
-    global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
-
-    memcpy(global.exportPrivateKeyContext.display_sign + EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_sign_verb,
-           EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
+    compose_export_private_key_titles();
 
     pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
     pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
+    pairIndex++;
+
+    // The P2-selected detail and the key types released: without these the user cannot tell
+    // which network or which reusable secrets they are approving.
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_detail_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_detail;
+    pairIndex++;
+    pairs[pairIndex].item = "Keys released";
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_key_types;
+    pairIndex++;
+    pairs[pairIndex].item = "Warning";
+    pairs[pairIndex].value = "These secrets leave this Ledger and can be reused";
     pairIndex++;
 
     // Create the page content
