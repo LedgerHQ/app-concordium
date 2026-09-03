@@ -15,7 +15,7 @@ unit-tests/coverage/
 unit-tests/coverage.info
 
 # Fuzzing
-fuzzing/build/
+fuzzing/build*/
 fuzzing/corpus/
 fuzzing/crashes/
 fuzzing/out/
@@ -54,3 +54,7 @@ diff
 scripts_local/
 tmp/
 .claude/
+
+# Local checkout, not a submodule. Committing it as a gitlink without a matching .gitmodules
+# entry breaks every CI job that clones with --recursive.
+deps/
