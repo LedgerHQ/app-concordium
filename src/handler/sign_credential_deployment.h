@@ -11,6 +11,11 @@ void processNextVerificationKey(void);
  * the APDU, so an added credential can never be signed without having been displayed. */
 void confirmAddedCredential(void);
 
+/** UI continuation after the user reviews one revealed identity attribute. Decrements the
+ * declared attribute count and acknowledges the APDU, so signing stays unreachable until every
+ * declared attribute has been displayed. */
+void confirmAttribute(void);
+
 void handle_sign_credential_deployment(const command_t *cmd,
                                        volatile unsigned int *flags,
                                        bool isInitialCall);

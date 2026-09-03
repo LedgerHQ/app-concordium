@@ -555,6 +555,20 @@ UX_STEP_CB(ux_sign_credential_deployment_reject_step,
            send_user_rejection(),
            {&C_icon_crossmark, "Decline to", "sign details"});
 
+// Revealed identity attribute review. Personal data that will become public on chain, so the
+// tag name and the exact value are both shown before the attribute is accepted.
+UX_STEP_NOCB(ux_credential_attribute_step,
+             bnnn_paging,
+             {.title = (char *) global.signCredentialDeploymentContext.attributeName,
+              .text = (char *) global.signCredentialDeploymentContext.attributeValue});
+UX_STEP_CB(ux_credential_attribute_confirm_step,
+           nn,
+           confirmAttribute(),
+           {"Continue", "with transaction"});
+UX_FLOW(ux_credential_attribute,
+        &ux_credential_attribute_step,
+        &ux_credential_attribute_confirm_step);
+
 // Added-credential review for update-credential transactions. The AR threshold needs a
 // display-only step here because ux_credential_deployment_threshold_flow_1_step acknowledges
 // the APDU, which must not happen until the whole credential has been reviewed.
@@ -667,6 +681,11 @@ void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
 
 void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) {
     ux_flow_init(0, ux_sign_update_credential_added_credential, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_credential_attribute, NULL);
     *flags |= IO_ASYNCH_REPLY;
 }
 

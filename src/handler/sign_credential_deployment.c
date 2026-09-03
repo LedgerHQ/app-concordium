@@ -31,6 +31,61 @@ void processNextVerificationKey(void) {
     }
 }
 
+// Concordium revealed-attribute registry; the tag values are protocol-defined.
+// Declared as a 2D array rather than an array of pointers on purpose: a pointer table in rodata
+// holds unrelocated link-time addresses and would need PIC() to dereference on device.
+static const char ATTRIBUTE_NAMES[][ATTRIBUTE_NAME_SIZE] = {
+    "First name",            // 0
+    "Last name",             // 1
+    "Sex",                   // 2
+    "Date of birth",         // 3
+    "Country of residence",  // 4
+    "Nationality",           // 5
+    "ID doc type",           // 6
+    "ID doc number",         // 7
+    "ID doc issuer",         // 8
+    "ID doc issued at",      // 9
+    "ID doc expires at",     // 10
+    "National ID number",    // 11
+    "Tax ID number",         // 12
+};
+
+static void attribute_name_for_tag(uint8_t tag, char *dst, size_t dstSize) {
+    explicit_bzero(dst, dstSize);
+    if (tag < ARRAYLEN(ATTRIBUTE_NAMES)) {
+        size_t nameLength = strlen(ATTRIBUTE_NAMES[tag]);
+        if (nameLength >= dstSize) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
+        memmove(dst, ATTRIBUTE_NAMES[tag], nameLength);
+        return;
+    }
+
+    // A tag outside the known registry is still labelled by its number, so the user sees that
+    // an unrecognised attribute is being revealed rather than seeing nothing at all.
+    static const char UNKNOWN_PREFIX[] = "Attribute #";
+    size_t prefixLength = sizeof(UNKNOWN_PREFIX) - 1;
+    if (prefixLength + 4 > dstSize) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    memmove(dst, UNKNOWN_PREFIX, prefixLength);
+    bin_to_dec((uint8_t *) dst + prefixLength, dstSize - prefixLength, tag);
+}
+
+void confirmAttribute(void) {
+    if (ctx->attributeListLength == 0) {
+        THROW(ERROR_INVALID_STATE);
+    }
+    ctx->attributeListLength -= 1;
+    if (ctx->attributeListLength == 0) {
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS;
+    } else {
+        // There are additional attributes to be read, so ask for more.
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_TAG;
+    }
+    send_success_no_idle();
+}
+
 void confirmAddedCredential(void) {
     if (ctx->credentialDeploymentCount == 0) {
         THROW(ERROR_INVALID_STATE);
@@ -303,6 +358,7 @@ void handle_sign_credential_deployment(const command_t *cmd,
         dataBuffer += 1;
         remainingDataLength -= 1;
         update_hash((cx_hash_t *) &tx_state->hash, attributeTag, 1);
+        attribute_name_for_tag(attributeTag[0], ctx->attributeName, sizeof(ctx->attributeName));
 
         // Parse attribute length, so we know how much to parse in next packet.
         uint8_t attributeValueLength[1];
@@ -322,17 +378,24 @@ void handle_sign_credential_deployment(const command_t *cmd,
             THROW(SWO_INCORRECT_DATA);
         }
         update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->attributeValueLength);
-        ctx->attributeListLength -= 1;
 
-        // We have processed all attributes
-        if (ctx->attributeListLength == 0) {
-            ctx->state = TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS;
-            send_success_no_idle();
-        } else {
-            // There are additional attributes to be read, so ask for more.
-            ctx->state = TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_TAG;
-            send_success_no_idle();
+        // Revealed attributes are personal data that becomes public on chain, so retain the
+        // exact value and require the user to review it before it is accepted into the hash-
+        // covered transaction. Control bytes are rejected rather than escaped: they would let a
+        // host truncate or spoof what the trusted display shows.
+        for (uint8_t i = 0; i < ctx->attributeValueLength; i++) {
+            if (dataBuffer[i] < 0x20 || dataBuffer[i] == 0x7f) {
+                THROW(ERROR_INVALID_TRANSACTION);
+            }
         }
+        explicit_bzero(ctx->attributeValue, sizeof(ctx->attributeValue));
+        memmove(ctx->attributeValue, dataBuffer, ctx->attributeValueLength);
+        ctx->attributeValue[ctx->attributeValueLength] = '\0';
+
+        // The list counter is decremented and the APDU acknowledged in confirmAttribute(), so
+        // that signing stays unreachable until every declared attribute has been reviewed.
+        uiSignCredentialDeploymentAttributeDisplay(flags);
+        return;
     } else if (p1 == P1_LENGTH_OF_PROOFS &&
                ctx->state == TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS) {
         if (remainingDataLength < 4) {
