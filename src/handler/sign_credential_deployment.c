@@ -109,14 +109,14 @@ static void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
         THROW(SWO_INCORRECT_DATA);
     }
 
+    // The whole packet was validated above, so only the read cursor advances from here.
+
     // Hash key index
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
-    dataLength -= 1;
     buffer += 1;
 
     // Hash schemeId
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
-    dataLength -= 1;
     buffer += 1;
 
     uint8_t verificationKey[KEY_LENGTH];
