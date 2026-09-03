@@ -1,5 +1,7 @@
 #include "globals.h"
 
+#include <assert.h>  // _Static_assert
+#include <stdint.h>  // UINT8_MAX
 #include <string.h>
 
 #include <os.h>
@@ -319,10 +321,11 @@ void handle_sign_configure_baker(const command_t *cmd,
             send_success_no_idle();
         }
     } else if (P1_URL == p1 && ctx_conf_baker->state == CONFIGURE_BAKER_URL) {
+        // dataLength is a uint8_t, so the display buffer must be able to hold the largest
+        // possible chunk plus the NUL terminator appended below.
+        _Static_assert(COMMON_URL_DISPLAY_SIZE >= (size_t) UINT8_MAX + 1,
+                       "urlDisplay must hold a max-length URL chunk plus a NUL terminator");
         if (ctx_conf_baker->url.urlLength > dataLength) {
-            if (dataLength >= sizeof(ctx_conf_baker->url.urlDisplay)) {
-                THROW(SWO_INCORRECT_DATA);
-            }
             update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
             ctx_conf_baker->url.urlLength -= dataLength;
             explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
@@ -331,9 +334,6 @@ void handle_sign_configure_baker(const command_t *cmd,
             startConfigureBakerUrlDisplay(false);
             *flags |= IO_ASYNCH_REPLY;
         } else if (ctx_conf_baker->url.urlLength == dataLength) {
-            if (dataLength >= sizeof(ctx_conf_baker->url.urlDisplay)) {
-                THROW(SWO_INCORRECT_DATA);
-            }
             explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, ctx_conf_baker->url.urlLength);
             ctx_conf_baker->url.urlDisplay[ctx_conf_baker->url.urlLength] = '\0';
