@@ -270,9 +270,7 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
 
     // The operation releases reusable private key material to the host, so the review must say
     // so rather than describing it as signing.
-    memmove(ctx->display_review_operation,
-            "Export private keys",
-            sizeof("Export private keys"));
+    memmove(ctx->display_review_operation, "Export private keys", sizeof("Export private keys"));
 
     memmove(ctx->display_credid_title, "Credentials ID", EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN);
 
@@ -305,9 +303,7 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
         memmove(ctx->display_sign_verb,
                 "to recover credentials?",
                 sizeof("to recover credentials?"));
-        memmove(ctx->display_key_types,
-                "IdCredSec, blinding",
-                sizeof("IdCredSec, blinding"));
+        memmove(ctx->display_key_types, "IdCredSec, blinding", sizeof("IdCredSec, blinding"));
     } else if (p1 == P1_ACCOUNT_CREDENTIAL_DISCOVERY) {
         memmove(ctx->display_review_verb,
                 "to discover credentials",
@@ -319,9 +315,7 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
     } else if (p1 == P1_CREATION_OF_ZK_PROOF) {
         memmove(ctx->display_review_verb, "to create ZK proof", sizeof("to create ZK proof"));
         memmove(ctx->display_sign_verb, "to create ZK proof?", sizeof("to create ZK proof?"));
-        memmove(ctx->display_key_types,
-                "Commitment randomness",
-                sizeof("Commitment randomness"));
+        memmove(ctx->display_key_types, "Commitment randomness", sizeof("Commitment randomness"));
     }
 
     if (need_account_suffix) {
