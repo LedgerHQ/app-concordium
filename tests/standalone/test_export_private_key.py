@@ -21,7 +21,7 @@ def test_export_standard_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -42,7 +42,7 @@ def test_export_recovery_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -65,7 +65,7 @@ def test_export_prfkey_and_idcredsed_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -91,7 +91,7 @@ def test_export_identity_credential_creation_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -115,7 +115,7 @@ def test_export_identity_credential_creation_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -139,7 +139,7 @@ def test_export_account_creation_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -163,7 +163,7 @@ def test_export_account_creation_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -187,7 +187,7 @@ def test_export_id_recovery_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -211,7 +211,7 @@ def test_export_id_recovery_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -235,7 +235,7 @@ def test_export_account_credential_discovery_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -259,7 +259,7 @@ def test_export_account_credential_discovery_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -287,7 +287,7 @@ def test_export_creation_of_zk_proof_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -315,7 +315,7 @@ def test_export_creation_of_zk_proof_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,

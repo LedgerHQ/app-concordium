@@ -60,10 +60,21 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
     bin_to_dec(ctx->display_credid + offset, sizeof(ctx->display_credid) - offset, identity);
 
     memmove(ctx->display_credid_title, "Credentials ID", EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN);
+    // The operation releases reusable private key material to the host, so the review must say
+    // so rather than describing it as signing.
     memmove(ctx->display_review_operation,
-            "Review operation",
-            EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN);
-    memmove(ctx->display_sign, "Sign operation", EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN);
+            "Export private keys",
+            sizeof("Export private keys"));
+    memmove(ctx->display_sign, "Approve export", sizeof("Approve export"));
+
+    // P2 selects how the key material is represented on the wire. The raw seed is the more
+    // sensitive of the two, so the user has to be able to tell them apart.
+    memmove(ctx->display_detail_title, "Key format", sizeof("Key format"));
+    if (ctx->exportSeed) {
+        memmove(ctx->display_detail, "Raw seed", sizeof("Raw seed"));
+    } else {
+        memmove(ctx->display_detail, "BLS key", sizeof("BLS key"));
+    }
 
     switch (p1) {
         case P1_LEGACY_PRF_KEY_AND_ID_CRED_SEC:
@@ -73,6 +84,9 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
             memmove(ctx->display_review_verb,
                     "to create credentials",
                     sizeof("to create credentials"));
+            memmove(ctx->display_key_types,
+                    "PRF key, IdCredSec",
+                    sizeof("PRF key, IdCredSec"));
             break;
         case P1_LEGACY_PRF_KEY_RECOVERY:
             memmove(ctx->display_sign_verb,
@@ -81,6 +95,7 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
             memmove(ctx->display_review_verb,
                     "to recover credentials",
                     sizeof("to recover credentials"));
+            memmove(ctx->display_key_types, "PRF key", sizeof("PRF key"));
             break;
         case P1_LEGACY_PRF_KEY:
             memmove(ctx->display_sign_verb,
@@ -89,6 +104,7 @@ void handle_export_private_key_legacy_path(const command_t *cmd, volatile unsign
             memmove(ctx->display_review_verb,
                     "to decrypt credentials",
                     sizeof("to decrypt credentials"));
+            memmove(ctx->display_key_types, "PRF key", sizeof("PRF key"));
             break;
         default:
             THROW(SWO_INCORRECT_P1_P2);
