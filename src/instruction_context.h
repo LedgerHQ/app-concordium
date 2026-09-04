@@ -43,7 +43,9 @@
 #define P2_MAINNET 0x00
 #define P2_TESTNET 0x01
 
-#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       41
+// Holds "<operation> <verb>" / "<action>\n<verb>" composed at display time, so it must fit the
+// longest operation string plus a separator plus the longest verb plus a terminator.
+#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       48
 #define EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN 17
 #define EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN   15
 #define EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN     15
@@ -89,6 +91,7 @@ typedef struct {
 
 typedef enum {
     TX_TRANSFER_WITH_SCHEDULE_INITIAL = 28,
+    TX_TRANSFER_WITH_SCHEDULE_AWAITING_INITIAL_CONFIRM = 30,
     TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS = 29,
     TX_TRANSFER_WITH_SCHEDULE_MEMO_START = 55,
     TX_TRANSFER_WITH_SCHEDULE_MEMO = 56,
@@ -189,9 +192,22 @@ typedef struct {
     uint8_t display_credid_title[EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN];
     uint8_t display_credid[EXPORT_PRIVATE_KEY_CREDID_LEN];
     uint8_t display_sign[EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN];
+    /** The P2-selected detail the user must see before secrets leave the device: the network for
+     * INS 0x37, the key format for INS 0x05. */
+    uint8_t display_detail_title[EXPORT_DETAIL_TITLE_SIZE];
+    uint8_t display_detail[EXPORT_DETAIL_SIZE];
+    /** Which key types the selected purpose releases, so consent is informed. */
+    uint8_t display_key_types[EXPORT_KEY_TYPES_SIZE];
     bool exportBoth;
     bool exportSeed;
     bool isNewPath;
+    /** Non-secret INS 0x37 request parameters, retained so that the private material is only
+     * derived in the approval callback and never exists in RAM during the review. */
+    uint8_t newPathPurpose;
+    uint8_t newPathNetwork;
+    uint32_t newPathIdentityProvider;
+    uint32_t newPathIdentity;
+    uint32_t newPathAccount;
     uint8_t outputPrivateKeys[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     uint8_t privateKeysLength;
 } exportPrivateKeyContext_t;
@@ -272,6 +288,11 @@ typedef struct {
 
     cx_sha256_t attributeHash;
     uint8_t attributeValueLength;
+    /** Revealed identity attribute currently under review. The value length is host-supplied as a
+     * uint8, so the buffer holds the largest possible value plus a NUL terminator and never
+     * truncates. */
+    char attributeName[ATTRIBUTE_NAME_SIZE];
+    char attributeValue[ATTRIBUTE_VALUE_SIZE];
 
     uint32_t proofLength;
     uint8_t accountAddress[57];

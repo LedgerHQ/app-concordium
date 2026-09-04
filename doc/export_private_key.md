@@ -55,6 +55,9 @@ The new path supports more diverse key export scenarios for different use cases 
 If P2 = 0x00 then keys are exported for MainNet use with Coin Type `919'` derivation paths.
 
 If P2 = 0x01 then keys are exported for TestNet use with Coin Type `1'` derivation paths.
+
+The `identity_provider`, `identity` and `account_index` fields are transmitted as plain, unhardened indices; the app applies the hardened bit (shown below as `'`) itself. Values with bit 31 already set are rejected with `ERROR_INVALID_PATH`, since `n` and `n | 0x80000000` would otherwise derive the same key while displaying different indices.
+
 #### Identity Credential Creation (P1=0x00)
 
 - IDCredSec: `m/44'/{Coin Type}'/{identity_provider}'/{identity}'/2'` (BLS field element)

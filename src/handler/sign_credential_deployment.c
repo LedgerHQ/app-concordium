@@ -31,27 +31,95 @@ void processNextVerificationKey(void) {
     }
 }
 
+// Concordium revealed-attribute registry; the tag values are protocol-defined.
+// Declared as a 2D array rather than an array of pointers on purpose: a pointer table in rodata
+// holds unrelocated link-time addresses and would need PIC() to dereference on device.
+static const char ATTRIBUTE_NAMES[][ATTRIBUTE_NAME_SIZE] = {
+    "First name",            // 0
+    "Last name",             // 1
+    "Sex",                   // 2
+    "Date of birth",         // 3
+    "Country of residence",  // 4
+    "Nationality",           // 5
+    "ID doc type",           // 6
+    "ID doc number",         // 7
+    "ID doc issuer",         // 8
+    "ID doc issued at",      // 9
+    "ID doc expires at",     // 10
+    "National ID number",    // 11
+    "Tax ID number",         // 12
+};
+
+static void attribute_name_for_tag(uint8_t tag, char *dst, size_t dstSize) {
+    explicit_bzero(dst, dstSize);
+    // Sized from the table itself rather than the SDK's ARRAYLEN, which the fuzzing build does
+    // not have: there it became an implicit function call and failed only at link time.
+    if (tag < sizeof(ATTRIBUTE_NAMES) / sizeof(ATTRIBUTE_NAMES[0])) {
+        size_t nameLength = strlen(ATTRIBUTE_NAMES[tag]);
+        if (nameLength >= dstSize) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
+        memmove(dst, ATTRIBUTE_NAMES[tag], nameLength);
+        return;
+    }
+
+    // A tag outside the known registry is still labelled by its number, so the user sees that
+    // an unrecognised attribute is being revealed rather than seeing nothing at all.
+    static const char UNKNOWN_PREFIX[] = "Attribute #";
+    size_t prefixLength = sizeof(UNKNOWN_PREFIX) - 1;
+    if (prefixLength + 4 > dstSize) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    memmove(dst, UNKNOWN_PREFIX, prefixLength);
+    bin_to_dec((uint8_t *) dst + prefixLength, dstSize - prefixLength, tag);
+}
+
+void confirmAttribute(void) {
+    if (ctx->attributeListLength == 0) {
+        THROW(ERROR_INVALID_STATE);
+    }
+    ctx->attributeListLength -= 1;
+    if (ctx->attributeListLength == 0) {
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS;
+    } else {
+        // There are additional attributes to be read, so ask for more.
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_TAG;
+    }
+    send_success_no_idle();
+}
+
+void confirmAddedCredential(void) {
+    if (ctx->credentialDeploymentCount == 0) {
+        THROW(ERROR_INVALID_STATE);
+    }
+    ctx->credentialDeploymentCount -= 1;
+    if (ctx->credentialDeploymentCount == 0) {
+        ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_ID_COUNT;
+        ctx->state = 0;
+    } else {
+        ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL_INDEX;
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
+    }
+    send_success_no_idle();
+}
+
 static void parseVerificationKey(uint8_t *buffer, uint8_t dataLength) {
-    // Hash key index
-    if (dataLength < 1) {
+    // Validate packet size before any hashing: 1 (key index) + 1 (schemeId) + KEY_LENGTH (key)
+    if (dataLength < 1 + 1 + KEY_LENGTH) {
         THROW(SWO_INCORRECT_DATA);
     }
+
+    // The whole packet was validated above, so only the read cursor advances from here.
+
+    // Hash key index
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
-    dataLength -= 1;
     buffer += 1;
 
     // Hash schemeId
     update_hash((cx_hash_t *) &tx_state->hash, buffer, 1);
-    if (dataLength < 1) {
-        THROW(SWO_INCORRECT_DATA);
-    }
-    dataLength -= 1;
     buffer += 1;
 
     uint8_t verificationKey[KEY_LENGTH];
-    if (dataLength < KEY_LENGTH) {
-        THROW(SWO_INCORRECT_DATA);
-    }
     memmove(verificationKey, buffer, KEY_LENGTH);
     update_hash((cx_hash_t *) &tx_state->hash, verificationKey, KEY_LENGTH);
 
@@ -292,6 +360,7 @@ void handle_sign_credential_deployment(const command_t *cmd,
         dataBuffer += 1;
         remainingDataLength -= 1;
         update_hash((cx_hash_t *) &tx_state->hash, attributeTag, 1);
+        attribute_name_for_tag(attributeTag[0], ctx->attributeName, sizeof(ctx->attributeName));
 
         // Parse attribute length, so we know how much to parse in next packet.
         uint8_t attributeValueLength[1];
@@ -311,17 +380,24 @@ void handle_sign_credential_deployment(const command_t *cmd,
             THROW(SWO_INCORRECT_DATA);
         }
         update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->attributeValueLength);
-        ctx->attributeListLength -= 1;
 
-        // We have processed all attributes
-        if (ctx->attributeListLength == 0) {
-            ctx->state = TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS;
-            send_success_no_idle();
-        } else {
-            // There are additional attributes to be read, so ask for more.
-            ctx->state = TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_TAG;
-            send_success_no_idle();
+        // Revealed attributes are personal data that becomes public on chain, so retain the
+        // exact value and require the user to review it before it is accepted into the hash-
+        // covered transaction. Control bytes are rejected rather than escaped: they would let a
+        // host truncate or spoof what the trusted display shows.
+        for (uint8_t i = 0; i < ctx->attributeValueLength; i++) {
+            if (dataBuffer[i] < 0x20 || dataBuffer[i] == 0x7f) {
+                THROW(ERROR_INVALID_TRANSACTION);
+            }
         }
+        explicit_bzero(ctx->attributeValue, sizeof(ctx->attributeValue));
+        memmove(ctx->attributeValue, dataBuffer, ctx->attributeValueLength);
+        ctx->attributeValue[ctx->attributeValueLength] = '\0';
+
+        // The list counter is decremented and the APDU acknowledged in confirmAttribute(), so
+        // that signing stays unreachable until every declared attribute has been reviewed.
+        uiSignCredentialDeploymentAttributeDisplay(flags);
+        return;
     } else if (p1 == P1_LENGTH_OF_PROOFS &&
                ctx->state == TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS) {
         if (remainingDataLength < 4) {
@@ -347,21 +423,20 @@ void handle_sign_credential_deployment(const command_t *cmd,
             }
             update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, ctx->proofLength);
 
-            // If an update credential transaction, then update state to next step.
+            // An added credential in an update-credential transaction is only reviewable here:
+            // the shared parser defers the final/sole verification key and the credential details
+            // to the standalone deployment's final UI, which this flow never reaches. Require an
+            // explicit confirmation instead of acknowledging straight away, otherwise the added
+            // credential is signed without ever being displayed.
             if (p2 == P2_CREDENTIAL_CREDENTIAL &&
                 ctx->updateCredentialState == TX_UPDATE_CREDENTIAL_CREDENTIAL &&
                 ctx->credentialDeploymentCount > 0) {
-                ctx->credentialDeploymentCount -= 1;
-                if (ctx->credentialDeploymentCount == 0) {
-                    ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_ID_COUNT;
-                    ctx->state = 0;
-                } else {
-                    ctx->updateCredentialState = TX_UPDATE_CREDENTIAL_CREDENTIAL_INDEX;
-                    ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEYS_LENGTH;
-                }
-            } else {
-                ctx->state = TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING;
+                // State advance and acknowledgement happen in confirmAddedCredential().
+                uiSignUpdateCredentialAddedCredentialDisplay(flags);
+                return;
             }
+
+            ctx->state = TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING;
             send_success_no_idle();
         }
     } else if (p1 == P1_NEW_OR_EXISTING && ctx->state == TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING) {

@@ -131,6 +131,19 @@ UX_STEP_NOCB(ux_export_private_key_credid_step,
              bnnn_paging,
              {.title = (char *) global.exportPrivateKeyContext.display_credid_title,
               .text = (char *) global.exportPrivateKeyContext.display_credid});
+// Shared by both export flows: the secrets released, the P2-selected detail, and an explicit
+// warning that this is not a one-time signature.
+UX_STEP_NOCB(ux_export_private_key_detail_step,
+             bnnn_paging,
+             {.title = (char *) global.exportPrivateKeyContext.display_detail_title,
+              .text = (char *) global.exportPrivateKeyContext.display_detail});
+UX_STEP_NOCB(ux_export_private_key_types_step,
+             bnnn_paging,
+             {.title = "Keys released",
+              .text = (char *) global.exportPrivateKeyContext.display_key_types});
+UX_STEP_NOCB(ux_export_private_key_warning_step,
+             pnn,
+             {&C_icon_crossmark, "Secrets leave", "this Ledger"});
 UX_STEP_CB(ux_export_private_key_accept_step,
            pb,
            exportPrivateKey(),
@@ -142,6 +155,9 @@ UX_STEP_CB(ux_export_private_key_decline_step,
 UX_FLOW(ux_export_private_key,
         &ux_export_private_key_purpose_step,
         &ux_export_private_key_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_accept_step,
         &ux_export_private_key_decline_step);
 
@@ -172,7 +188,7 @@ UX_STEP_CB(ux_export_private_key_new_path_approve_step,
            });
 UX_STEP_CB(ux_export_private_key_new_path_reject_step,
            pb,
-           send_user_rejection(),
+           rejectPrivateKeysNewPath(),
            {
                &C_icon_crossmark,
                "Reject operation",
@@ -180,6 +196,9 @@ UX_STEP_CB(ux_export_private_key_new_path_reject_step,
 UX_FLOW(ux_export_private_key_new_path,
         &ux_export_private_key_new_path_purpose_step,
         &ux_export_private_key_new_path_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_new_path_approve_step,
         &ux_export_private_key_new_path_reject_step);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
@@ -555,6 +574,43 @@ UX_STEP_CB(ux_sign_credential_deployment_reject_step,
            send_user_rejection(),
            {&C_icon_crossmark, "Decline to", "sign details"});
 
+// Revealed identity attribute review. Personal data that will become public on chain, so the
+// tag name and the exact value are both shown before the attribute is accepted.
+UX_STEP_NOCB(ux_credential_attribute_step,
+             bnnn_paging,
+             {.title = (char *) global.signCredentialDeploymentContext.attributeName,
+              .text = (char *) global.signCredentialDeploymentContext.attributeValue});
+UX_STEP_CB(ux_credential_attribute_confirm_step,
+           nn,
+           confirmAttribute(),
+           {"Continue", "with transaction"});
+UX_FLOW(ux_credential_attribute,
+        &ux_credential_attribute_step,
+        &ux_credential_attribute_confirm_step);
+
+// Added-credential review for update-credential transactions. The AR threshold needs a
+// display-only step here because ux_credential_deployment_threshold_flow_1_step acknowledges
+// the APDU, which must not happen until the whole credential has been reviewed.
+UX_STEP_NOCB(ux_added_credential_ar_threshold_step,
+             bn,
+             {"AR threshold",
+              (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold});
+UX_STEP_CB(ux_added_credential_approve_step,
+           pnn,
+           confirmAddedCredential(),
+           {&C_icon_validate_14, "Confirm added", "credential"});
+
+UX_FLOW(ux_sign_update_credential_added_credential,
+        &ux_credential_deployment_verification_key_flow_0_step,
+        &ux_credential_deployment_threshold_flow_0_step,
+        &ux_added_credential_ar_threshold_step,
+        &ux_sign_credential_deployment_1_step,
+        &ux_sign_credential_deployment_2_step,
+        &ux_sign_credential_deployment_3_step,
+        &ux_sign_credential_deployment_4_step,
+        &ux_added_credential_approve_step,
+        &ux_sign_credential_deployment_reject_step);
+
 UX_FLOW(ux_sign_credential_deployment_existing_with_intro,
         &ux_credential_deployment_review_details,
         &ux_credential_deployment_verification_key_flow_0_step,
@@ -639,6 +695,16 @@ void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags) {
 
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
     ux_flow_init(0, ux_sign_credential_update_threshold, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_sign_update_credential_added_credential, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_credential_attribute, NULL);
     *flags |= IO_ASYNCH_REPLY;
 }
 
@@ -873,7 +939,7 @@ UX_STEP_NOCB(ux_scheduled_transfer_initial_flow_1_step,
               .text = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr});
 UX_STEP_VALID(ux_scheduled_transfer_initial_flow_2_step,
               nn,
-              send_success_no_idle(),
+              confirmInitialScheduledTransfer(),
               {"Continue", "with transaction"});
 
 // UI definitions for displaying a timestamp and an amount of a scheduled transfer.

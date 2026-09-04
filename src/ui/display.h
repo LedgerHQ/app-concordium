@@ -26,6 +26,8 @@ void uiExportPrivateKey(volatile unsigned int *flags);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags);
 void exportPrivateKey(void);
 void sendPrivateKeysNewPath(void);
+/** Wipes any derived key material before rejecting, so a rejected export leaves nothing in RAM. */
+void rejectPrivateKeysNewPath(void);
 
 #ifdef HAVE_BAGL
 // Define the dynamic UI elements. These are required as the majority of
@@ -45,6 +47,10 @@ void startConfigureDelegationDisplay(void);
 void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags);
+/** Mandatory review of one added credential in an update-credential transaction. */
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags);
+/** Mandatory review of one revealed identity attribute (name and value). */
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentNewIntroDisplay(void);

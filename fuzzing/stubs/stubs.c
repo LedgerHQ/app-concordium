@@ -310,6 +310,8 @@ void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags)              
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags)           { (void)flags; }
 void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags) { (void)flags; }
 void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags) { (void)flags; }
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags)     { (void)flags; }
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags)       { (void)flags; }
 void uiSignCredentialDeploymentNewIntroDisplay(void)                 {}
 void uiSignCredentialDeploymentNewDisplay(void)                      {}
 void uiSignCredentialDeploymentExistingIntroDisplay(void)            {}

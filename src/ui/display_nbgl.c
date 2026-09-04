@@ -66,7 +66,7 @@ static void review_export_private_key_new_path(bool confirm) {
     if (confirm) {
         sendPrivateKeysNewPath();
     } else {
-        send_user_rejection();
+        rejectPrivateKeysNewPath();
     }
 }
 
@@ -79,9 +79,9 @@ static void review_choice_sign(bool confirm) {
     }
 }
 
-static void keep_going_with_transaction(bool confirm) {
+static void confirm_initial_scheduled_transfer_callback(bool confirm) {
     if (confirm) {
-        send_success_no_idle();
+        confirmInitialScheduledTransfer();
     } else {
         send_user_rejection();
     }
@@ -94,6 +94,22 @@ static void sendSuccessNoIdleCallback(bool confirm) {
 static void processNextVerificationKeyNoIdleCallback(bool confirm) {
     (void) confirm;  // Suppress unused parameter warning
     processNextVerificationKey();
+}
+
+static void review_added_credential(bool confirm) {
+    if (confirm) {
+        confirmAddedCredential();
+    } else {
+        send_user_rejection();
+    }
+}
+
+static void review_credential_attribute(bool confirm) {
+    if (confirm) {
+        confirmAttribute();
+    } else {
+        send_user_rejection();
+    }
 }
 
 void uiComparePubkey(void) {
@@ -141,25 +157,57 @@ void uiGeneratePubkey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+/**
+ * Compose the export review title as "<operation> <verb>" and the finish title as
+ * "<action>\n<verb>", in place.
+ *
+ * The offsets are derived from the strings themselves: keying them to fixed length macros
+ * silently corrupted the text whenever the wording changed length.
+ */
+static void compose_export_private_key_titles(void) {
+    exportPrivateKeyContext_t *exportCtx = &global.exportPrivateKeyContext;
+
+    size_t operationLength = strlen((char *) exportCtx->display_review_operation);
+    size_t reviewVerbLength = strlen((char *) exportCtx->display_review_verb);
+    if (operationLength + 1 + reviewVerbLength + 1 > sizeof(exportCtx->display_review_operation)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    exportCtx->display_review_operation[operationLength] = ' ';
+    memmove(exportCtx->display_review_operation + operationLength + 1,
+            exportCtx->display_review_verb,
+            reviewVerbLength + 1);
+
+    size_t actionLength = strlen((char *) exportCtx->display_sign);
+    size_t signVerbLength = strlen((char *) exportCtx->display_sign_verb);
+    if (actionLength + 1 + signVerbLength + 1 > sizeof(exportCtx->display_sign)) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    exportCtx->display_sign[actionLength] = '\n';
+    memmove(exportCtx->display_sign + actionLength + 1,
+            exportCtx->display_sign_verb,
+            signVerbLength + 1);
+}
+
 void uiExportPrivateKey(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
-    global.exportPrivateKeyContext
-        .display_review_operation[EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN - 1] = ' ';
-    memcpy(global.exportPrivateKeyContext.display_review_operation +
-               EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-
-    global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
-
-    memcpy(global.exportPrivateKeyContext.display_sign + EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_sign_verb,
-           EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
+    compose_export_private_key_titles();
 
     pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
     pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
+    pairIndex++;
+
+    // The P2-selected detail and the key types released: without these the user cannot tell
+    // which network or which reusable secrets they are approving.
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_detail_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_detail;
+    pairIndex++;
+    pairs[pairIndex].item = "Keys released";
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_key_types;
+    pairIndex++;
+    pairs[pairIndex].item = "Warning";
+    pairs[pairIndex].value = "These secrets leave this Ledger and can be reused";
     pairIndex++;
 
     // Create the page content
@@ -185,21 +233,22 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
 
-    global.exportPrivateKeyContext
-        .display_review_operation[EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN - 1] = ' ';
-    memcpy(global.exportPrivateKeyContext.display_review_operation +
-               EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_review_verb,
-           EXPORT_PRIVATE_KEY_REVIEW_VERB_LEN);
-
-    global.exportPrivateKeyContext.display_sign[EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN - 1] = '\n';
-
-    memcpy(global.exportPrivateKeyContext.display_sign + EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN,
-           global.exportPrivateKeyContext.display_sign_verb,
-           EXPORT_PRIVATE_KEY_SIGN_VERB_LEN - 1);
+    compose_export_private_key_titles();
 
     pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_credid_title;
     pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_credid;
+    pairIndex++;
+
+    // The P2-selected detail and the key types released: without these the user cannot tell
+    // which network or which reusable secrets they are approving.
+    pairs[pairIndex].item = (char *) global.exportPrivateKeyContext.display_detail_title;
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_detail;
+    pairIndex++;
+    pairs[pairIndex].item = "Keys released";
+    pairs[pairIndex].value = (char *) global.exportPrivateKeyContext.display_key_types;
+    pairIndex++;
+    pairs[pairIndex].item = "Warning";
+    pairs[pairIndex].value = "These secrets leave this Ledger and can be reused";
     pairIndex++;
 
     // Create the page content
@@ -561,6 +610,77 @@ void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
                        NULL,  // No subtitle
                        "Sign transaction",
                        review_choice_sign);
+
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags) {
+    signCredentialDeploymentContext_t *cred = &global.signCredentialDeploymentContext;
+
+    pairs[0].item = (char *) cred->attributeName;
+    pairs[0].value = (char *) cred->attributeValue;
+
+    nbgl_contentTagValueList_t content;
+    content.nbPairs = 1;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+
+    // Mid-flow confirmation: further attributes and the signature come on later screens.
+    nbgl_useCaseReviewLight(TYPE_TRANSACTION,
+                            &content,
+                            &ICON_APP_HOME,
+                            "Review revealed attribute",
+                            NULL,  // No subtitle
+                            "Continue with transaction",
+                            review_credential_attribute);
+
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) {
+    signCredentialDeploymentContext_t *cred = &global.signCredentialDeploymentContext;
+    uint8_t pairIndex = 0;
+
+    pairs[pairIndex].item = "Public key";
+    pairs[pairIndex].value = (char *) cred->accountVerificationKey;
+    pairIndex++;
+    pairs[pairIndex].item = "Signature threshold";
+    pairs[pairIndex].value = (char *) cred->signatureThreshold;
+    pairIndex++;
+    pairs[pairIndex].item = "AR threshold";
+    pairs[pairIndex].value = (char *) cred->anonymityRevocationThreshold;
+    pairIndex++;
+    pairs[pairIndex].item = "RegIdCred";
+    pairs[pairIndex].value = (char *) cred->regIdCred;
+    pairIndex++;
+    pairs[pairIndex].item = "Identity provider";
+    pairs[pairIndex].value = (char *) cred->identityProviderIndex;
+    pairIndex++;
+    pairs[pairIndex].item = "AR identity";
+    pairs[pairIndex].value = (char *) cred->arIdentity;
+    pairIndex++;
+    pairs[pairIndex].item = "EncryptedShare";
+    pairs[pairIndex].value = (char *) cred->encIdCredPubShare;
+    pairIndex++;
+
+    nbgl_contentTagValueList_t content;
+    content.nbPairs = pairIndex;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+
+    // Mid-flow confirmation: the transaction is signed on a later screen, so this is a
+    // continuation review rather than the final signing review.
+    nbgl_useCaseReviewLight(TYPE_TRANSACTION,
+                            &content,
+                            &ICON_APP_HOME,
+                            "Review added credential",
+                            NULL,  // No subtitle
+                            "Confirm added credential",
+                            review_added_credential);
 
     *flags |= IO_ASYNCH_REPLY;
 }
@@ -1231,7 +1351,7 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
                             "Review Transfer with schedule",
                             NULL,  // No subtitle
                             "Continue with transfer",
-                            keep_going_with_transaction);
+                            confirm_initial_scheduled_transfer_callback);
 }
 
 void uiDeployModuleDisplay(void) {
