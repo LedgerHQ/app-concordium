@@ -27,6 +27,13 @@
 #define EXPORT_DETAIL_SIZE       24
 #define EXPORT_KEY_TYPES_SIZE    40
 
+// Contract init/receive names shown on the signing screens, plus room for a NUL. The protocol
+// length field is a uint16, so a name can exceed any buffer; one that does not fit is replaced
+// wholesale by a marker rather than truncated, and the digest still covers its exact bytes.
+#define CONTRACT_NAME_SIZE 256
+// Hex digest of a hashed payload (module source, contract name + parameters), plus a NUL.
+#define HASH_DISPLAY_SIZE (COMMON_HASH_SIZE * 2 + 1)
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 

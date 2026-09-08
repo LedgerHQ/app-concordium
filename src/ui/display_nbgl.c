@@ -1359,10 +1359,13 @@ void uiDeployModuleDisplay(void) {
     pairs[0].value = (char *) global_account_sender.sender;
     pairs[1].item = "Version";
     pairs[1].value = (char *) global.deployModule.versionDisplay;
+    // Digest of the module source: without it the screen shows nothing about the code deployed.
+    pairs[2].item = "Module hash";
+    pairs[2].value = (char *) global.deployModule.sourceHashDisplay;
 
     // Create the page content
     nbgl_contentTagValueList_t content;
-    content.nbPairs = 2;
+    content.nbPairs = 3;
     content.pairs = pairs;
     content.smallCaseForValue = false;
     content.nbMaxLinesForValue = 0;
@@ -1391,6 +1394,13 @@ void uiUpdateContractDisplay(void) {
     pairs[pairIndex].item = "Sub index";
     pairs[pairIndex].value = (char *) global.updateContract.subIndexDisplay;
     pairIndex++;
+    // Receive name and parameter digest are both hashed into the signed transaction.
+    pairs[pairIndex].item = "Receive name";
+    pairs[pairIndex].value = (char *) global.updateContract.nameDisplay;
+    pairIndex++;
+    pairs[pairIndex].item = "Payload hash";
+    pairs[pairIndex].value = (char *) global.updateContract.paramsHashDisplay;
+    pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;
     content.nbPairs = pairIndex;
@@ -1418,6 +1428,13 @@ void uiInitContractDisplay(void) {
     pairIndex++;
     pairs[pairIndex].item = "Module ref";
     pairs[pairIndex].value = (char *) global.initContract.moduleRefDisplay;
+    pairIndex++;
+    // Contract name and parameter digest are both hashed into the signed transaction.
+    pairs[pairIndex].item = "Contract name";
+    pairs[pairIndex].value = (char *) global.initContract.nameDisplay;
+    pairIndex++;
+    pairs[pairIndex].item = "Payload hash";
+    pairs[pairIndex].value = (char *) global.initContract.paramsHashDisplay;
     pairIndex++;
     // Create the page content
     nbgl_contentTagValueList_t content;
