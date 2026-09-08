@@ -140,6 +140,30 @@ def navigate_until_text_and_compare(
     )
 
 
+def screenshots_taken_so_far(backend, screenshot_path, test_name) -> int:
+    """Count the snapshots the preceding navigation already wrote for this test.
+
+    Ragger numbers a test's snapshots continuously across navigation calls, so a later
+    ``navigate_and_compare`` has to be told which index to resume from. Hardcoding that index
+    per device is silently destructive: when a review gains or loses a screen, the second
+    navigation starts writing over the tail of the first, and because ``--golden_run`` only
+    writes and never compares, it regenerates the damaged set without ever failing. Deriving
+    the index from what was actually written keeps the two navigations in step on every device.
+
+    Args:
+        backend: Ragger backend, used for the device name in the snapshot path
+        screenshot_path: The ``default_screenshot_path`` fixture value
+        test_name: The ``test_name`` fixture value
+
+    Returns:
+        Number of snapshots written so far, i.e. the next free snapshot index.
+    """
+    # Ragger saves every screenshot here before comparing or writing the golden, in both
+    # normal and golden-run mode (see SpeculosBackend.compare_screen_with_snapshot).
+    snaps_dir = Path(screenshot_path) / "snapshots-tmp" / backend.device.name / test_name
+    return len(list(snaps_dir.glob("[0-9]*.png")))
+
+
 def _read_makefile() -> List[str]:
     """Read lines from the app Makefile at repository root (next to this file: ``tests/standalone/utils.py``)."""
 
