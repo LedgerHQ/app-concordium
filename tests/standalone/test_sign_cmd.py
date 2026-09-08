@@ -5,10 +5,14 @@ from application_client.response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
-from ledgered.devices import DeviceType
 from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID
-from utils import navigate_until_text_and_compare, instructions_builder, split_message
+from utils import (
+    navigate_until_text_and_compare,
+    instructions_builder,
+    screenshots_taken_so_far,
+    split_message,
+)
 
 MAX_SCHEDULE_PAIRS_IN_ONE_APDU: int = (250 // 16) * 16
 MAX_APDU_LEN: int = 255
@@ -259,11 +263,12 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
         )
 
     # Process each chunk of pairs
-    screenshots_so_far = 3
-    if backend.device.is_nano:
-        screenshots_so_far = 6
-    #    elif backend.device.type == DeviceType.APEX_P:
-    #        screenshots_so_far = 4
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -342,10 +347,12 @@ def test_sign_tx_transfer_with_schedule_legacy_path_with_display_fee(
             NavInsID.USE_CASE_CHOICE_CONFIRM,
         )
 
-    screenshots_so_far = 4
-    if backend.device.is_nano:
-        screenshots_so_far = 8
-
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -436,11 +443,12 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
             )
 
     # Process each chunk of pairs
-    screenshots_so_far = 3
-    if backend.device.is_nano:
-        screenshots_so_far = 7
-    elif backend.device.type == DeviceType.APEX_P:
-        screenshots_so_far = 4
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -526,9 +534,12 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
 
-    screenshots_so_far = 4
-    if backend.device.is_nano:
-        screenshots_so_far = 8
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
