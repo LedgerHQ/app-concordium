@@ -109,6 +109,13 @@ static void sendSuccessNoIdleCallback(bool confirm) {
     send_success_no_idle();
 }
 
+// Baker reviews must release the stage parked while the screen was up, rather than just
+// replying; see confirmConfigureBakerStage.
+static void confirmConfigureBakerStageCallback(bool confirm) {
+    (void) confirm;  // Suppress unused parameter warning
+    confirmConfigureBakerStage();
+}
+
 static void processNextVerificationKeyNoIdleCallback(bool confirm) {
     (void) confirm;  // Suppress unused parameter warning
     processNextVerificationKey();
@@ -345,7 +352,7 @@ void startConfigureBakerCommissionDisplay(void) {
                                 "Review Transaction",
                                 NULL,  // No subtitle
                                 "Continue with transaction",
-                                sendSuccessNoIdleCallback);
+                                confirmConfigureBakerStageCallback);
     } else {
         // Setup the review screen
         nbgl_useCaseReview(TYPE_TRANSACTION,
@@ -458,7 +465,7 @@ void startConfigureBakerDisplay(void) {
                                 "Review Transaction",
                                 NULL,  // No subtitle
                                 "Continue with transaction",
-                                sendSuccessNoIdleCallback);
+                                confirmConfigureBakerStageCallback);
     } else {
         // Create the page content
         nbgl_contentTagValueList_t content;
@@ -524,7 +531,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
                                 "Review Transaction",
                                 NULL,  // No subtitle
                                 "Continue with transaction",
-                                sendSuccessNoIdleCallback);
+                                confirmConfigureBakerStageCallback);
     } else {
         // Create the page content
         nbgl_contentTagValueList_t content;

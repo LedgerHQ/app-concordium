@@ -37,6 +37,27 @@ bool hasCommissionRate(void) {
            ctx_conf_baker->hasFinalizationRewardCommission;
 }
 
+/**
+ * Park the flow while a review is on screen: remember the stage to resume at, then move to a
+ * state no packet matches.
+ *
+ * Each stage of this instruction used to advance the state before opening its review, so a host
+ * could push the following stages in while the user was still looking at an earlier screen. The
+ * transaction hash covers those fields either way, so the signature ended up over fields whose
+ * screens were skipped or replaced. Parking makes the review, not the packet, drive the flow.
+ */
+static void awaitConfigureBakerConfirm(configureBakerState_t next) {
+    ctx_conf_baker->pendingState = next;
+    ctx_conf_baker->state = CONFIGURE_BAKER_AWAITING_CONFIRM;
+}
+
+void confirmConfigureBakerStage(void) {
+    // Only path out of CONFIGURE_BAKER_AWAITING_CONFIRM: the user accepted the screen, so the
+    // stage that was parked may now be received.
+    ctx_conf_baker->state = ctx_conf_baker->pendingState;
+    send_success_no_idle();
+}
+
 static void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
     if (ctx_conf_baker->hasTransactionFeeCommission) {
         if (dataLength < 4) {
@@ -80,12 +101,12 @@ static void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
     }
 
     if (ctx_conf_baker->hasSuspended) {
-        ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
     } else {
         if (dataLength != 0) {
             THROW(SWO_INCORRECT_DATA);
         }
-        ctx_conf_baker->state = CONFIGURE_BAKER_END;
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
     }
 
     startConfigureBakerCommissionDisplay();
@@ -264,13 +285,13 @@ void handle_sign_configure_baker(const command_t *cmd,
             }
 
             if (ctx_conf_baker->hasMetadataUrl) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_URL_LENGTH;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL_LENGTH);
             } else if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerDisplay();
@@ -306,13 +327,13 @@ void handle_sign_configure_baker(const command_t *cmd,
         }
 
         if (ctx_conf_baker->hasMetadataUrl) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_URL_LENGTH;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL_LENGTH);
         } else if (hasCommissionRate()) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
         } else if (ctx_conf_baker->hasSuspended) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
         } else {
-            ctx_conf_baker->state = CONFIGURE_BAKER_END;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
         }
 
         startConfigureBakerDisplay();
@@ -334,11 +355,11 @@ void handle_sign_configure_baker(const command_t *cmd,
         if (ctx_conf_baker->url.urlLength == 0) {
             // If the url has length zero, we don't wait for the url bytes.
             if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerUrlDisplay(true);
@@ -358,6 +379,8 @@ void handle_sign_configure_baker(const command_t *cmd,
             explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, dataLength);
             ctx_conf_baker->url.urlDisplay[dataLength] = '\0';
+            // More URL bytes are still expected, so the stage to resume at is this same one.
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL);
             startConfigureBakerUrlDisplay(false);
             *flags |= IO_ASYNCH_REPLY;
         } else if (ctx_conf_baker->url.urlLength == dataLength) {
@@ -367,11 +390,11 @@ void handle_sign_configure_baker(const command_t *cmd,
             update_hash((cx_hash_t *) &tx_state->hash, cdata, ctx_conf_baker->url.urlLength);
 
             if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerUrlDisplay(true);
@@ -402,6 +425,9 @@ void handle_sign_configure_baker(const command_t *cmd,
         } else {
             THROW(ERROR_INVALID_TRANSACTION);
         }
+        // Last stage: nothing further is accepted, so a repeated suspended packet cannot hash a
+        // second byte into the transaction while this review is up.
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
         startConfigureBakerSuspendedDisplay();
         *flags |= IO_ASYNCH_REPLY;
     } else {

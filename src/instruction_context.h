@@ -343,7 +343,14 @@ typedef enum {
     CONFIGURE_BAKER_URL = 64,
     CONFIGURE_BAKER_COMMISSION_RATES = 65,
     CONFIGURE_BAKER_SUSPENDED = 66,
-    CONFIGURE_BAKER_END = 67
+    CONFIGURE_BAKER_END = 67,
+    /**
+     * A stage of this transaction is on screen and the user has not accepted it yet. No packet
+     * matches this state, so a host cannot push a later stage into the transaction while an
+     * earlier one is still being reviewed; only the approval callback leaves it, resuming at
+     * `pendingState`.
+     */
+    CONFIGURE_BAKER_AWAITING_CONFIRM = 68
 } configureBakerState_t;
 
 typedef struct {
@@ -396,6 +403,8 @@ typedef struct {
     cx_sha256_t keysHashCtx;
 
     configureBakerState_t state;
+    /** Stage to resume at once the review parked by CONFIGURE_BAKER_AWAITING_CONFIRM is taken. */
+    configureBakerState_t pendingState;
 } signConfigureBaker_t;
 
 typedef struct {
