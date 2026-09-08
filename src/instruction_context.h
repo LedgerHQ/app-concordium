@@ -263,7 +263,13 @@ typedef enum {
     TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_VALUE = 11,
     TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS = 12,
     TX_CREDENTIAL_DEPLOYMENT_PROOFS = 13,
-    TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING = 14
+    TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING = 14,
+    /**
+     * A verification key is on screen and the user has not accepted it yet. No key packet is
+     * accepted in this state, so a further key cannot overwrite the one being reviewed; only
+     * the approval callback leaves it.
+     */
+    TX_CREDENTIAL_DEPLOYMENT_AWAITING_VERIFICATION_KEY_CONFIRM = 15
 } protocolState_t;
 
 typedef enum {

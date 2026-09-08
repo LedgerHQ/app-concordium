@@ -27,6 +27,9 @@ void processNextVerificationKey(void) {
         ctx->state = TX_CREDENTIAL_DEPLOYMENT_SIGNATURE_THRESHOLD;
         send_success_no_idle();
     } else {
+        // The user accepted the key that was on screen, so the next one may now be received.
+        // This is the only path out of TX_CREDENTIAL_DEPLOYMENT_AWAITING_VERIFICATION_KEY_CONFIRM.
+        ctx->state = TX_CREDENTIAL_DEPLOYMENT_VERIFICATION_KEY;
         send_success_no_idle();  // Request more data from the computer.
     }
 }
@@ -199,6 +202,11 @@ void handle_sign_credential_deployment(const command_t *cmd,
         }
 
         if (ctx->numberOfVerificationKeys > 0) {
+            // The key now on screen lives in a display buffer shared by every key, so accepting
+            // another key packet before this one is confirmed would let a host replace the
+            // reviewed key with a different one. Park the state until the approval callback
+            // releases it; a key packet arriving meanwhile is rejected above.
+            ctx->state = TX_CREDENTIAL_DEPLOYMENT_AWAITING_VERIFICATION_KEY_CONFIRM;
             if (ctx->showIntro) {
                 // For the first key we also display the initial view.
                 ctx->showIntro = false;
