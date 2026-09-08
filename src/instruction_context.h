@@ -377,6 +377,18 @@ typedef struct {
         uint8_t suspended[18];
     };
 
+    /**
+     * Digest of the three validator verification keys, which are hashed into the signed
+     * transaction but are 160 bytes in total and so cannot be compared on-device as raw hex.
+     * Kept outside the union above: it is shown on the same screen as the capital fields.
+     *
+     * Covers only the keys, not their proofs. The proofs carry fresh randomness per
+     * transaction, so including them would change the digest on every attempt and leave the
+     * user nothing stable to compare against their validator credentials.
+     */
+    char keysHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t keysHashCtx;
+
     configureBakerState_t state;
 } signConfigureBaker_t;
 

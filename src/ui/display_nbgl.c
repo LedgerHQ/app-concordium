@@ -433,6 +433,12 @@ void startConfigureBakerDisplay(void) {
         pairs[pairIndex].item = "Update baker";
         pairs[pairIndex].value = "keys";
         pairIndex++;
+        // Digest of the three validator verification keys being installed. The keys themselves
+        // are signed but far too long to compare on screen, so without this the rotation is
+        // blind.
+        pairs[pairIndex].item = "Baker keys hash";
+        pairs[pairIndex].value = (char *) global.signConfigureBaker.keysHashDisplay;
+        pairIndex++;
     }
 
     // If there are additional steps, then show continue screen. If this is the
