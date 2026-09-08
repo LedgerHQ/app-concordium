@@ -255,7 +255,7 @@ UX_STEP_NOCB(ux_sign_configure_baker_keys_hash_step,
 
 UX_STEP_CB(ux_sign_configure_baker_url_cb_step,
            bnnn_paging,
-           send_success_no_idle(),
+           confirmConfigureBakerStage(),
            {.title = "URL", .text = (char *) global.signConfigureBaker.url.urlDisplay});
 
 UX_STEP_NOCB(ux_sign_configure_baker_url_step,
@@ -264,7 +264,7 @@ UX_STEP_NOCB(ux_sign_configure_baker_url_step,
 
 UX_STEP_CB(ux_sign_configure_baker_continue,
            nn,
-           send_success_no_idle(),
+           confirmConfigureBakerStage(),
            {"Continue", "with transaction"});
 
 UX_STEP_NOCB(ux_sign_configure_baker_empty_url_step, bn, {"Empty URL", ""});
