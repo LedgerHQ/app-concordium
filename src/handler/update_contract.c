@@ -90,7 +90,8 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
         // The receive name and parameters are hashed into the signed transaction, so both have
         // to reach the approval screen. Parameters are arbitrary binary, so they are digested.
         explicit_bzero(ctx_update_contract->nameDisplay, sizeof(ctx_update_contract->nameDisplay));
-        explicit_bzero(ctx_update_contract->paramsHashDisplay, sizeof(ctx_update_contract->paramsHashDisplay));
+        explicit_bzero(ctx_update_contract->paramsHashDisplay,
+                       sizeof(ctx_update_contract->paramsHashDisplay));
         if (cx_sha256_init(&ctx_update_contract->paramsHashCtx) != CX_SHA256) {
             THROW(ERROR_FAILED_CX_OPERATION);
         }
@@ -173,7 +174,9 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
         if (lc > paramsOffset) {
-            update_hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx, cdata + paramsOffset, lc - paramsOffset);
+            update_hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx,
+                        cdata + paramsOffset,
+                        lc - paramsOffset);
         }
         // subtract the length of the chunk from the remaining params length
         ctx_update_contract->remainingParamsLength -= lc;
@@ -181,7 +184,11 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
             send_success_no_idle();
         } else if (ctx_update_contract->remainingParamsLength == 0) {
             uint8_t paramsHash[COMMON_HASH_SIZE];
-            hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx, CX_LAST, NULL, 0, paramsHash,
+            hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx,
+                 CX_LAST,
+                 NULL,
+                 0,
+                 paramsHash,
                  sizeof(paramsHash));
             if (format_hex(paramsHash,
                            sizeof(paramsHash),

@@ -11,9 +11,14 @@ typedef struct {
     int currentInstruction;
 } tx_state_t;
 
-/** Account sender from parsed transaction header (UI). */
+/** Account fields from parsed transaction header (UI). */
 typedef struct {
     uint8_t sender[COMMON_ADDRESS_SIZE];
+    /**
+     * Signed `energy_amount` as decimal text. This cost ceiling is covered by the transaction
+     * hash, unlike the host-supplied fee estimate, so every account-transaction review shows it.
+     */
+    uint8_t energyDisplay[ENERGY_DISPLAY_SIZE];
 } accountSender_t;
 
 extern accountSender_t global_account_sender;

@@ -35,9 +35,16 @@ UX_STEP_NOCB(ux_sign_flow_account_sender_view,
              bnnn_paging,
              {.title = "From", .text = (char *) global_account_sender.sender});
 
+// The signed energy ceiling from the transaction header. Shown in every account-transaction
+// flow: any "Max fees" line is a host estimate outside the hash, so this is the only cost
+// bound the signature commits to.
+UX_STEP_NOCB(ux_sign_flow_max_energy_view,
+             bnnn_paging,
+             {.title = "Max energy", .text = (char *) global_account_sender.energyDisplay});
+
 UX_STEP_NOCB(ux_sign_flow_fees_view,
              bnnn_paging,
-             {.title = "Max fees",
+             {.title = "Max fees (est.)",
               .text = (char *) global.withDataBlob.signTransferContext.fee_display_str});
 
 // UI definitions for comparison of public-key on the device
@@ -209,10 +216,16 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
 
 static signConfigureBaker_t *ctx_conf_baker = &global.signConfigureBaker;
 
+// Worst case 10 steps: review, sender, energy, capital, restake, open status, keys,
+// sign, decline, FLOW_END.
 const ux_flow_step_t *ux_sign_configure_baker_first[10];
-const ux_flow_step_t *ux_sign_configure_baker_url[6];
-const ux_flow_step_t *ux_sign_configure_baker_commission[9];
-const ux_flow_step_t *ux_sign_configure_baker_suspended[6];
+// Worst case 7 steps: review, sender, energy, URL, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_url[7];
+// Worst case 10 steps: review, sender, energy, rates, the 3 commission rates, sign, decline,
+// FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_commission[10];
+// Worst case 7 steps: review, sender, energy, suspended, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_suspended[7];
 
 UX_STEP_NOCB(ux_sign_configure_baker_stop_baking_step, nn, {"Stop", "baking"});
 
@@ -285,6 +298,7 @@ void startConfigureBakerDisplay(void) {
 
     ux_sign_configure_baker_first[index++] = &ux_sign_flow_shared_review;
     ux_sign_configure_baker_first[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_configure_baker_first[index++] = &ux_sign_flow_max_energy_view;
     ctx_conf_baker->firstDisplay = false;
 
     if (ctx_conf_baker->hasCapital) {
@@ -339,6 +353,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
     if (ctx_conf_baker->firstDisplay) {
         ux_sign_configure_baker_url[index++] = &ux_sign_flow_shared_review;
         ux_sign_configure_baker_url[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_url[index++] = &ux_sign_flow_max_energy_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -379,6 +394,7 @@ void startConfigureBakerCommissionDisplay(void) {
     if (ctx_conf_baker->firstDisplay) {
         ux_sign_configure_baker_commission[index++] = &ux_sign_flow_shared_review;
         ux_sign_configure_baker_commission[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_commission[index++] = &ux_sign_flow_max_energy_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -428,6 +444,7 @@ void startConfigureBakerSuspendedDisplay(void) {
     if (ctx_conf_baker->firstDisplay) {
         ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_shared_review;
         ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_max_energy_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -444,8 +461,9 @@ void startConfigureBakerSuspendedDisplay(void) {
 
 static signConfigureDelegationContext_t *ctx_conf_delegation = &global.signConfigureDelegation;
 
-// There will at most be 8 UI steps when all 3 optional fields are available.
-const ux_flow_step_t *ux_sign_configure_delegation[8];
+// Worst case 9 steps when all 3 optional fields are available: review, sender, energy,
+// capital, restake, delegation target, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_delegation[9];
 
 UX_STEP_NOCB(ux_sign_configure_delegation_capital_step,
              bnnn_paging,
@@ -469,6 +487,7 @@ void startConfigureDelegationDisplay(void) {
 
     ux_sign_configure_delegation[index++] = &ux_sign_flow_shared_review;
     ux_sign_configure_delegation[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_configure_delegation[index++] = &ux_sign_flow_max_energy_view;
 
     if (ctx_conf_delegation->hasCapital) {
         if (ctx_conf_delegation->stopDelegation) {
@@ -510,6 +529,7 @@ UX_STEP_CB(ux_update_credentials_initial_flow_1_step,
 UX_FLOW(ux_update_credentials_initial_flow,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_update_credentials_initial_flow_1_step);
 
 UX_STEP_NOCB(ux_credential_deployment_verification_key_flow_0_step,
@@ -847,6 +867,7 @@ UX_STEP_VALID(ux_register_data_display_data_step,
 UX_FLOW(ux_register_data_initial,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_register_data_initial_flow_step);
 
 UX_FLOW(ux_register_data_payload, &ux_register_data_display_data_step);
@@ -866,6 +887,8 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 }
 
 // Sign Transfer
+// Worst case 10 steps: review, sender, energy, amount, recipient, memo, fee estimate, sign,
+// decline, FLOW_END.
 const ux_flow_step_t *ux_sign_amount_transfer[10];
 
 UX_STEP_NOCB(ux_sign_flow_1_step,
@@ -881,6 +904,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
 
     ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_review;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_max_energy_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_1_step;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_2_step;
 
@@ -909,6 +933,7 @@ UX_STEP_NOCB(ux_sign_transfer_to_public_2_step,
 UX_FLOW(ux_sign_transfer_to_public,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_sign_transfer_to_public_1_step,
         &ux_sign_transfer_to_public_2_step,
         &ux_sign_flow_shared_sign,
@@ -922,7 +947,7 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
 UX_STEP_NOCB(
     ux_scheduled_flow_max_fees_step,
     bnnn_paging,
-    {.title = "Max fees",
+    {.title = "Max fees (est.)",
      .text = (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str});
 
 // Sign Transfer with Schedule
@@ -971,6 +996,7 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
 
     ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_shared_review;
     ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_max_energy_view;
     ux_sign_scheduled_amount_transfer[index++] = &ux_scheduled_transfer_initial_flow_1_step;
 
     if (displayMemo) {
@@ -1007,6 +1033,7 @@ UX_STEP_NOCB(ux_deploy_module_2_step,
 UX_FLOW(ux_deploy_module,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_deploy_module_1_step,
         &ux_deploy_module_2_step,
         &ux_sign_flow_shared_sign,
@@ -1034,6 +1061,7 @@ UX_STEP_NOCB(ux_init_contract_4_step,
 UX_FLOW(ux_init_contract,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_init_contract_1_step,
         &ux_init_contract_2_step,
         &ux_init_contract_3_step,
@@ -1064,6 +1092,7 @@ UX_STEP_NOCB(ux_update_contract_5_step,
 UX_FLOW(ux_update_contract,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
         &ux_update_contract_1_step,
         &ux_update_contract_2_step,
         &ux_update_contract_3_step,

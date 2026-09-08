@@ -32,9 +32,10 @@ void rejectPrivateKeysNewPath(void);
 #ifdef HAVE_BAGL
 // Define the dynamic UI elements. These are required as the majority of
 // the transaction elements are optional, so the UI has to be dynamically set.
+// Sizes must match the definitions in display_bagl.c, which document each worst case.
 extern const ux_flow_step_t *ux_sign_configure_baker_first[10];
-extern const ux_flow_step_t *ux_sign_configure_baker_url[6];
-extern const ux_flow_step_t *ux_sign_configure_baker_commission[9];
+extern const ux_flow_step_t *ux_sign_configure_baker_url[7];
+extern const ux_flow_step_t *ux_sign_configure_baker_commission[10];
 #endif
 
 void startConfigureBakerCommissionDisplay(void);

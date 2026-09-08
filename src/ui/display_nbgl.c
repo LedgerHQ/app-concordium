@@ -24,6 +24,24 @@ static nbgl_contentTagValue_t pairs[MAX_REVIEW_PAIRS];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
+/**
+ * Writes the account header pairs that open every account-transaction review: the paying sender
+ * and the signed energy ceiling. Any "Max fees" line is a host estimate outside the transaction
+ * hash, so the energy figure is the only cost bound the signature commits to.
+ * @param pairIndex next free slot in `pairs`
+ * @param senderItem tag name for the sender row, which differs per flow ("Sender", "From")
+ * @return next free slot in `pairs`
+ */
+static uint8_t addAccountHeaderPairs(uint8_t pairIndex, const char *senderItem) {
+    pairs[pairIndex].item = senderItem;
+    pairs[pairIndex].value = (char *) global_account_sender.sender;
+    pairIndex++;
+    pairs[pairIndex].item = "Max energy";
+    pairs[pairIndex].value = (char *) global_account_sender.energyDisplay;
+    pairIndex++;
+    return pairIndex;
+}
+
 static void review_choice(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
@@ -278,9 +296,7 @@ void startConfigureBakerCommissionDisplay(void) {
 
     if (ctx->firstDisplay) {
         // Add sender address
-        pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char *) global_account_sender.sender;
-        pairIndex++;
+        pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
         ctx->firstDisplay = false;
     }
 
@@ -350,9 +366,7 @@ void startConfigureBakerSuspendedDisplay(void) {
 
     if (ctx->firstDisplay) {
         // Add sender address
-        pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char *) global_account_sender.sender;
-        pairIndex++;
+        pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
         ctx->firstDisplay = false;
     }
 
@@ -385,9 +399,7 @@ void startConfigureBakerDisplay(void) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
     // Add sender address
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
 
     ctx->firstDisplay = false;
 
@@ -470,9 +482,7 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
 
     if (ctx->firstDisplay) {
         // Add sender address
-        pairs[pairIndex].item = "Sender";
-        pairs[pairIndex].value = (char *) global_account_sender.sender;
-        pairIndex++;
+        pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
         ctx->firstDisplay = false;
     }
 
@@ -536,9 +546,7 @@ void startConfigureDelegationDisplay(void) {
     // Create tag-value pairs for the content
     uint8_t pairIndex = 0;
     // Add sender address
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
 
     // Add capital amount if present
     if (ctx->hasCapital) {
@@ -690,9 +698,7 @@ void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags) {
     uint8_t pairIndex = 0;
 
     // Add sender address
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
 
     // Create the page content
     nbgl_contentTagValueList_t content;
@@ -1097,9 +1103,7 @@ void uiSignPublicInformationForIpPublicKeyDisplay(void) {
 
 void uiRegisterDataInitialDisplay(volatile unsigned int *flags) {
     uint8_t pairIndex = 0;
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
     // Create the page content
     nbgl_contentTagValueList_t content;
     content.nbPairs = pairIndex;
@@ -1158,9 +1162,7 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
-    pairs[index].item = "From";
-    pairs[index].value = (char *) global_account_sender.sender;
-    index++;
+    index = addAccountHeaderPairs(index, "From");
     pairs[index].item = "Amount";
     pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayAmount;
     index++;
@@ -1173,7 +1175,9 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
         index++;
     }
     if (global.withDataBlob.signTransferContext.has_fee_display) {
-        pairs[index].item = "Max fees";
+        // Host-supplied and outside the transaction hash, so it is labelled an estimate; the
+        // signed bound is the "Max energy" row above.
+        pairs[index].item = "Max fees (est.)";
         pairs[index].value = (char *) global.withDataBlob.signTransferContext.fee_display_str;
         index++;
     }
@@ -1200,9 +1204,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
 void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
     // Setup data to display
     uint8_t pairIndex = 0;
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
     pairs[pairIndex].item = "Unshield amount";
     pairs[pairIndex].value = (char *) global.signTransferToPublic.amount;
     pairIndex++;
@@ -1320,9 +1322,7 @@ void uiVerifyAddress(volatile unsigned int *flags) {
 
 void startInitialScheduledTransferDisplay(bool displayMemo) {
     uint8_t index = 0;
-    pairs[index].item = "Sender";
-    pairs[index].value = (char *) global_account_sender.sender;
-    index++;
+    index = addAccountHeaderPairs(index, "Sender");
     pairs[index].item = "Recipient";
     pairs[index].value = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
     index++;
@@ -1332,7 +1332,9 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
         index++;
     }
     if (global.withDataBlob.signTransferWithScheduleContext.has_fee_display) {
-        pairs[index].item = "Max fees";
+        // Host-supplied and outside the transaction hash, so it is labelled an estimate; the
+        // signed bound is the "Max energy" row above.
+        pairs[index].item = "Max fees (est.)";
         pairs[index].value =
             (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str;
         index++;
@@ -1355,17 +1357,18 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
 }
 
 void uiDeployModuleDisplay(void) {
-    pairs[0].item = "Sender";
-    pairs[0].value = (char *) global_account_sender.sender;
-    pairs[1].item = "Version";
-    pairs[1].value = (char *) global.deployModule.versionDisplay;
+    uint8_t pairIndex = addAccountHeaderPairs(0, "Sender");
+    pairs[pairIndex].item = "Version";
+    pairs[pairIndex].value = (char *) global.deployModule.versionDisplay;
+    pairIndex++;
     // Digest of the module source: without it the screen shows nothing about the code deployed.
-    pairs[2].item = "Module hash";
-    pairs[2].value = (char *) global.deployModule.sourceHashDisplay;
+    pairs[pairIndex].item = "Module hash";
+    pairs[pairIndex].value = (char *) global.deployModule.sourceHashDisplay;
+    pairIndex++;
 
     // Create the page content
     nbgl_contentTagValueList_t content;
-    content.nbPairs = 3;
+    content.nbPairs = pairIndex;
     content.pairs = pairs;
     content.smallCaseForValue = false;
     content.nbMaxLinesForValue = 0;
@@ -1382,9 +1385,7 @@ void uiDeployModuleDisplay(void) {
 
 void uiUpdateContractDisplay(void) {
     uint8_t pairIndex = 0;
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value = (char *) global.updateContract.amountDisplay;
     pairIndex++;
@@ -1420,9 +1421,7 @@ void uiUpdateContractDisplay(void) {
 
 void uiInitContractDisplay(void) {
     uint8_t pairIndex = 0;
-    pairs[pairIndex].item = "Sender";
-    pairs[pairIndex].value = (char *) global_account_sender.sender;
-    pairIndex++;
+    pairIndex = addAccountHeaderPairs(pairIndex, "Sender");
     pairs[pairIndex].item = "Amount";
     pairs[pairIndex].value = (char *) global.initContract.amountDisplay;
     pairIndex++;
