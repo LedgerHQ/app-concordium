@@ -216,9 +216,9 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
 
 static signConfigureBaker_t *ctx_conf_baker = &global.signConfigureBaker;
 
-// Worst case 10 steps: review, sender, energy, capital, restake, open status, keys,
-// sign, decline, FLOW_END.
-const ux_flow_step_t *ux_sign_configure_baker_first[10];
+// Worst case 11 steps: review, sender, energy, capital, restake, open status, keys,
+// keys hash, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_first[11];
 // Worst case 7 steps: review, sender, energy, URL, sign, decline, FLOW_END.
 const ux_flow_step_t *ux_sign_configure_baker_url[7];
 // Worst case 10 steps: review, sender, energy, rates, the 3 commission rates, sign, decline,
@@ -246,6 +246,12 @@ UX_STEP_NOCB(
      (char *) global.signConfigureBaker.capitalRestakeDelegation.displayOpenForDelegation});
 
 UX_STEP_NOCB(ux_sign_configure_baker_keys_step, nn, {"Update baker", "keys"});
+// Digest of the three validator verification keys being installed. The keys themselves are
+// signed but far too long to compare on screen, so without this the rotation is blind.
+UX_STEP_NOCB(ux_sign_configure_baker_keys_hash_step,
+             bnnn_paging,
+             {.title = "Baker keys hash",
+              .text = (char *) global.signConfigureBaker.keysHashDisplay});
 
 UX_STEP_CB(ux_sign_configure_baker_url_cb_step,
            bnnn_paging,
@@ -319,6 +325,7 @@ void startConfigureBakerDisplay(void) {
 
     if (ctx_conf_baker->hasKeys) {
         ux_sign_configure_baker_first[index++] = &ux_sign_configure_baker_keys_step;
+        ux_sign_configure_baker_first[index++] = &ux_sign_configure_baker_keys_hash_step;
     }
 
     // If there are additional steps, then show continue screen. If this is the last

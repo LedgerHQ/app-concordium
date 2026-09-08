@@ -9,6 +9,7 @@
 #include <io.h>
 #include <parser.h>
 #include <status_words.h>
+#include <format.h>
 
 #include "apdu/apdu_response.h"
 #include "concordium_crypto.h"
@@ -142,6 +143,13 @@ void handle_sign_configure_baker(const command_t *cmd,
         ctx_conf_baker->hasFinalizationRewardCommission = (bitmap >> 7) & 1;
         ctx_conf_baker->hasSuspended = (bitmap >> 8) & 1;
 
+        explicit_bzero(ctx_conf_baker->keysHashDisplay, sizeof(ctx_conf_baker->keysHashDisplay));
+        if (ctx_conf_baker->hasKeys) {
+            if (cx_sha256_init(&ctx_conf_baker->keysHashCtx) != CX_SHA256) {
+                THROW(ERROR_FAILED_CX_OPERATION);
+            }
+        }
+
         if (ctx_conf_baker->hasCapital || ctx_conf_baker->hasRestakeEarnings ||
             ctx_conf_baker->hasOpenForDelegation || ctx_conf_baker->hasKeys) {
             ctx_conf_baker->state = CONFIGURE_BAKER_FIRST;
@@ -226,11 +234,13 @@ void handle_sign_configure_baker(const command_t *cmd,
                 THROW(SWO_INCORRECT_DATA);
             }
 
-            // We do not display the verification keys to the user, as they are difficult
-            // for the user to verify. If need be, we can start showing them by parsing
-            // the values into hex strings here.
+            // The raw keys are too long to compare on a device screen, so each is also folded
+            // into keysHashCtx and the resulting digest is shown before signing. The proofs are
+            // hashed into the transaction but deliberately left out of that digest, as their
+            // per-transaction randomness would make the displayed value unreproducible.
             // Election verify key
             update_hash((cx_hash_t *) &tx_state->hash, cdata, 32);
+            update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 32);
             cdata += 32;
 
             // Election Proof
@@ -239,6 +249,7 @@ void handle_sign_configure_baker(const command_t *cmd,
 
             // Signature verify key
             update_hash((cx_hash_t *) &tx_state->hash, cdata, 32);
+            update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 32);
             cdata += 32;
 
             // Signature Proof
@@ -273,10 +284,26 @@ void handle_sign_configure_baker(const command_t *cmd,
 
         // Aggregation verify key
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 96);
+        update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 96);
         cdata += 96;
 
-        // Election Proof
+        // Aggregation Proof
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 64);
+
+        // All three verification keys are in: turn them into the digest shown before signing.
+        uint8_t keysHash[COMMON_HASH_SIZE];
+        hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx,
+             CX_LAST,
+             NULL,
+             0,
+             keysHash,
+             sizeof(keysHash));
+        if (format_hex(keysHash,
+                       sizeof(keysHash),
+                       ctx_conf_baker->keysHashDisplay,
+                       sizeof(ctx_conf_baker->keysHashDisplay)) == -1) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
 
         if (ctx_conf_baker->hasMetadataUrl) {
             ctx_conf_baker->state = CONFIGURE_BAKER_URL_LENGTH;

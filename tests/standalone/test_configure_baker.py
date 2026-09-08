@@ -1,3 +1,5 @@
+from hashlib import sha256
+
 import pytest
 
 from application_client.command_sender import CommandSender
@@ -6,17 +8,44 @@ from ragger.navigator import NavInsID
 
 url = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-signVerifyKey = "7873cd57848d7aea7be03fbb3f1e8b9e69987fc73f13e473356776a16f26c96b"
-signVerifyKeyProof = "a47cdf9133572e9ad5c02c3a7ffd1d05db7bb98860d918092454146153d62788f224c0157c65853ed4a0245ab3e0a593a3f85fa81cc4cb99eeaa643bfc793eab"
-electionVerifyKey = "32f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c0828"
-electionVerifyKeyProof = "01fc695a8c51d4599cbe032a39832ad49bab900d88105b01d025b760b0d0d555b8c828f2d8fe29cc78c6307d979e6358b8bba9cf4d8200f272cc85b2a3813eff"
+# The ConfigureBaker payload serializes baker keys as electionVerifyKey, proofElection,
+# signatureVerifyKey, proofSig, aggregationVerifyKey, proofAggregation. The device reads the
+# election key at payload offset 0 and the signature key at offset 96, so these names have to
+# line up with that layout: the bytes below are unchanged, only the labels were swapped before.
+electionVerifyKey = "7873cd57848d7aea7be03fbb3f1e8b9e69987fc73f13e473356776a16f26c96b"
+electionVerifyKeyProof = "a47cdf9133572e9ad5c02c3a7ffd1d05db7bb98860d918092454146153d62788f224c0157c65853ed4a0245ab3e0a593a3f85fa81cc4cb99eeaa643bfc793eab"
+signVerifyKey = "32f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c0828"
+signVerifyKeyProof = "01fc695a8c51d4599cbe032a39832ad49bab900d88105b01d025b760b0d0d555b8c828f2d8fe29cc78c6307d979e6358b8bba9cf4d8200f272cc85b2a3813eff"
 aggregationVerifyKey = "7873cd57848d7aea7be03fbb3f1e8b9e69987fc73f13e473356776a16f26c96b32f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c082832f892fb3d0dc6138976b6848259cf730e37fa4a61a659c782ec6def978c0828"
 aggregationVerifyKeyProof = "957aec4b2b7ed979ba2079d62246d135aefd61e7f46690c452fec8bcbb593481e229f6f1968194a09cf612490887e71d96730e2d852201e53fec9c89d36f8a90"
+
+# SHA-256 over the three verification keys above, in payload order and with no separators.
+# The proofs are excluded: they carry fresh per-transaction randomness, so including them
+# would change the value on every attempt and leave the user nothing stable to compare.
+# The device shows this on its "Baker keys hash" screen, so the golden snapshots of every
+# test below that sets bit 3 of the bitmap must display exactly this value.
+BAKER_KEYS_DIGEST = "b89f45442a2f20b6c215fc20f0bcc1c27612b488652a8941e98acfb17aefc171"
 
 
 # In these tests we send to the device a transaction to sign and validate it on screen
 # The transactions are short and will be sent in one chunk
 # We will ensure that the displayed information is correct by using screenshots comparison
+
+
+@pytest.mark.active_test_scope
+def test_baker_keys_digest_vector():
+    """Pin the digest the device must show for the baker key vectors used below.
+
+    Snapshot comparison proves the "Baker keys hash" screen is *stable*, not that it is
+    *correct*: if the app digested the wrong offsets, or folded the proofs in, regenerating
+    the goldens would happily pin the wrong value. Recomputing the expectation here on the
+    host, independently of the device, is what makes those snapshots meaningful — and it
+    fails loudly if someone edits a key vector without refreshing the snapshots.
+    """
+    digest = sha256(
+        bytes.fromhex(electionVerifyKey + signVerifyKey + aggregationVerifyKey)
+    ).hexdigest()
+    assert digest == BAKER_KEYS_DIGEST
 
 
 @pytest.mark.active_test_scope
@@ -137,7 +166,7 @@ def test_sign_configure_baker_only_keys(
 
     # Create the transaction that will be sent to the device for signing
     transaction = (
-        signVerifyKey + signVerifyKeyProof + electionVerifyKey + electionVerifyKeyProof
+        electionVerifyKey + electionVerifyKeyProof + signVerifyKey + signVerifyKeyProof
     )
     transaction = bytes.fromhex(transaction)
 
