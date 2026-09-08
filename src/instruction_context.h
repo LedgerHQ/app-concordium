@@ -134,6 +134,9 @@ typedef struct {
     uint8_t sourceHash[COMMON_HASH_SIZE];
     char sourceHashDisplay[COMMON_HASH_SIZE * 2 + 1];
     char versionDisplay[11];
+    /** Digest of the module source as it streams, so the code being deployed is represented on
+     * the signing screen instead of only its length. */
+    cx_sha256_t sourceHashCtx;
 } deployModule_t;
 
 typedef enum {
@@ -154,6 +157,12 @@ typedef struct {
     uint32_t remainingNameLength;
     uint32_t paramsLength;
     uint32_t remainingParamsLength;
+    /** Contract name and a digest of the parameters. Both are hashed into the signed
+     * transaction, so both must be represented on the approval screen. Parameters are arbitrary
+     * binary of up to 64 KiB, so only a digest can honestly represent them. */
+    char nameDisplay[CONTRACT_NAME_SIZE];
+    char paramsHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t paramsHashCtx;
     initContractState_t state;
 } initContract_t;
 
@@ -176,6 +185,12 @@ typedef struct {
     uint32_t remainingNameLength;
     uint32_t paramsLength;
     uint32_t remainingParamsLength;
+    /** Contract name and a digest of the parameters. Both are hashed into the signed
+     * transaction, so both must be represented on the approval screen. Parameters are arbitrary
+     * binary of up to 64 KiB, so only a digest can honestly represent them. */
+    char nameDisplay[CONTRACT_NAME_SIZE];
+    char paramsHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t paramsHashCtx;
     updateContractState_t state;
 } updateContract_t;
 

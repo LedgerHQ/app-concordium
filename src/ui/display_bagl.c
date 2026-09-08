@@ -999,13 +999,16 @@ void uiSignScheduledTransferPairFlowDisplay(void) {
 UX_STEP_NOCB(ux_deploy_module_1_step,
              bnnn_paging,
              {.title = "Version", .text = (char *) global.deployModule.versionDisplay});
+// Digest of the module source. The step existed but was left out of the flow, so the code being
+// deployed was never represented on screen.
 UX_STEP_NOCB(ux_deploy_module_2_step,
              bnnn_paging,
-             {.title = "TX hash", .text = (char *) global.deployModule.sourceHashDisplay});
+             {.title = "Module hash", .text = (char *) global.deployModule.sourceHashDisplay});
 UX_FLOW(ux_deploy_module,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
         &ux_deploy_module_1_step,
+        &ux_deploy_module_2_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
@@ -1020,11 +1023,21 @@ UX_STEP_NOCB(ux_init_contract_1_step,
 UX_STEP_NOCB(ux_init_contract_2_step,
              bnnn_paging,
              {.title = "Module ref", .text = (char *) global.initContract.moduleRefDisplay});
+UX_STEP_NOCB(ux_init_contract_3_step,
+             bnnn_paging,
+             {.title = "Contract name", .text = (char *) global.initContract.nameDisplay});
+// Digest over the contract name followed by its parameters - everything the transaction hash
+// covers beyond the fields already shown above.
+UX_STEP_NOCB(ux_init_contract_4_step,
+             bnnn_paging,
+             {.title = "Payload hash", .text = (char *) global.initContract.paramsHashDisplay});
 UX_FLOW(ux_init_contract,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
         &ux_init_contract_1_step,
         &ux_init_contract_2_step,
+        &ux_init_contract_3_step,
+        &ux_init_contract_4_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
@@ -1042,12 +1055,20 @@ UX_STEP_NOCB(ux_update_contract_2_step,
 UX_STEP_NOCB(ux_update_contract_3_step,
              bnnn_paging,
              {.title = "Sub index", .text = (char *) global.updateContract.subIndexDisplay});
+UX_STEP_NOCB(ux_update_contract_4_step,
+             bnnn_paging,
+             {.title = "Receive name", .text = (char *) global.updateContract.nameDisplay});
+UX_STEP_NOCB(ux_update_contract_5_step,
+             bnnn_paging,
+             {.title = "Payload hash", .text = (char *) global.updateContract.paramsHashDisplay});
 UX_FLOW(ux_update_contract,
         &ux_sign_flow_shared_review,
         &ux_sign_flow_account_sender_view,
         &ux_update_contract_1_step,
         &ux_update_contract_2_step,
         &ux_update_contract_3_step,
+        &ux_update_contract_4_step,
+        &ux_update_contract_5_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
