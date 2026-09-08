@@ -110,7 +110,9 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
         // Digest the name alongside the parameters, so the signed name is always represented
         // even when it is too long to render, and retain the text when it does fit.
         if (lc > nameOffset) {
-            update_hash((cx_hash_t *) &ctx_init_contract->paramsHashCtx, cdata + nameOffset, lc - nameOffset);
+            update_hash((cx_hash_t *) &ctx_init_contract->paramsHashCtx,
+                        cdata + nameOffset,
+                        lc - nameOffset);
             if (ctx_init_contract->nameLength < sizeof(ctx_init_contract->nameDisplay)) {
                 size_t used = strlen(ctx_init_contract->nameDisplay);
                 memmove(ctx_init_contract->nameDisplay + used, cdata + nameOffset, lc - nameOffset);

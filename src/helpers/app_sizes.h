@@ -34,6 +34,10 @@
 // Hex digest of a hashed payload (module source, contract name + parameters), plus a NUL.
 #define HASH_DISPLAY_SIZE (COMMON_HASH_SIZE * 2 + 1)
 
+// Signed `energy_amount` from the account transaction header, as decimal text.
+// UINT64_MAX is 20 digits, plus a NUL.
+#define ENERGY_DISPLAY_SIZE 21
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 
