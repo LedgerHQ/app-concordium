@@ -228,9 +228,18 @@ typedef struct {
 } exportPrivateKeyContext_t;
 
 typedef struct {
-    uint8_t display[21];
-    /** Without trusted descriptor: path-derived base58. With PKI descriptor: tag 0x20 UTF-8 (cert).
-     */
+    /** Row label for `display`: "Identity" for the compact P1 formats, "Derivation path" for the
+     * full-path format, whose review shows the path itself. */
+    uint8_t display_label[VERIFY_ADDRESS_LABEL_SIZE];
+    /** Compact formats: "idp/identity/counter". Full-path format: every node of the path, because
+     * every node feeds key derivation and a hidden suffix would otherwise change the address
+     * behind an unchanged label. */
+    uint8_t display[VERIFY_ADDRESS_PATH_DISPLAY_SIZE];
+    /** Network the reviewed path commits to. Host-chosen (P2, or the coin-type node of a full
+     * path) and it changes the derived key, so it is part of the review. */
+    uint8_t network[NETWORK_DISPLAY_SIZE];
+    /** Base58 account address derived on-device from the reviewed path and credential counter. A
+     * trusted-name descriptor never replaces it; it must match it (see pki_bind_descriptor). */
     char address[TRUSTED_NAME_MAX_LEN + 1];
 } verifyAddressContext_t;
 
@@ -445,6 +454,11 @@ typedef struct trustedNameTlvExtracted_s {
     buffer_t address;
     uint64_t chain_id;
     uint64_t challenge;
+    /** Tag 0x10 semver cutoff: the app version after which the backend revokes the descriptor.
+     * Meaningful only when CCD_TAG_NOT_VALID_AFTER is in `received_tags`. */
+    uint8_t not_valid_after_major;
+    uint8_t not_valid_after_minor;
+    uint16_t not_valid_after_patch;
     uint16_t signer_key_id;
     uint8_t signer_algo;
     buffer_t signature;

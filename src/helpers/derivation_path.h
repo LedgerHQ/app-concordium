@@ -220,6 +220,15 @@ void path_display_legacy(uint8_t *dst,
                          uint32_t identityIndex,
                          uint32_t accountIndex);
 
+/**
+ * Write the whole path as "44'/919'/403'/404'/8'" into `dst`, always NUL-terminated.
+ *
+ * Used where the host supplies a serialized path of its own choosing: every node reaches key
+ * derivation, so every node has to be on screen. Nodes are rendered hardened because the parsers'
+ * output is hardened before derivation regardless of how the host sent it.
+ */
+void path_display_full(uint8_t *dst, size_t dstLength, const derivation_path_t *derivation_path);
+
 /** Human-readable new-path line: "idp/identity/account". */
 void path_display_new(uint8_t *dst,
                       size_t dstLength,

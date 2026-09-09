@@ -7,12 +7,20 @@
 #define TRUSTED_NAME_MAX_LEN     64
 #define TRUSTED_ADDRESS_MAX_SIZE 64
 
+/** Tag 0x23 (chain id) values this app derives keys for. VERIFY_ADDRESS maps the network of the
+ * reviewed path onto these and refuses a descriptor signed for the other one. */
+#define CCD_CHAIN_ID_MAINNET 0
+#define CCD_CHAIN_ID_TESTNET 1
+
 /** Tag 0x20: certified display string (UTF-8, e.g. Concordium ccd_context_address). */
 extern char g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 /** Tag 0x22: account public key bytes (32 B Ed25519); VERIFY_ADDRESS binds the derivation path to
  * this. */
 extern uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 extern uint8_t g_trusted_address_len;
+/** Tag 0x23: the authenticated chain id the descriptor was signed for, kept outside the
+ * instruction union so VERIFY_ADDRESS can bind it to the network of the reviewed path. */
+extern uint64_t g_trusted_chain_id;
 extern bool g_trusted_name_valid;
 /** GET_CHALLENGE nonce stored here so it survives the explicit_bzero(&global) in app_main.c that
  * runs before each new instruction.  Written by handle_get_challenge, consumed and erased by
