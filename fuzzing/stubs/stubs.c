@@ -47,6 +47,7 @@ derivation_path_t global_derivation_path;
 tx_state_t        global_tx_state;
 instructionContext global;
 accountSender_t   global_account_sender;
+comparePublicKey_t global_compare_public_key;
 
 /* ── Trusted-name globals (replaces set_trusted_name.c definitions) ───── */
 char    g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];

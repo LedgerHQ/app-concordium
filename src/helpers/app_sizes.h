@@ -42,6 +42,11 @@
 // the longest label in derivation_path.h, which asserts the fit at compile time.
 #define NETWORK_DISPLAY_SIZE 24
 
+// Public-key comparison snapshot (see comparePublicKey_t). Sized to match the corresponding
+// fields of exportPublicKeyContext_t, which get_public_key.c asserts.
+#define COMPARE_IDENTITY_DISPLAY_SIZE 21
+#define COMPARE_PUBLIC_KEY_HEX_SIZE   68
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 

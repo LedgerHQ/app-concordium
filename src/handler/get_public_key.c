@@ -131,7 +131,20 @@ void send_public_key(bool compare) {
     if (compare) {
         // Show the public-key so that the user can verify the public-key.
         send_success_result_no_idle(tx);
-        to_paginated_hex(publicKey, sizeof(publicKey), ctx->publicKey, sizeof(ctx->publicKey));
+
+        // Snapshot what the comparison screen shows into storage outside the instruction union.
+        // The next instruction is accepted while that screen is still up (see below) and zeroes
+        // the union, so a host could otherwise change the key the user is comparing against.
+        _Static_assert(sizeof(global_compare_public_key.display) == sizeof(ctx->display),
+                       "comparison identity snapshot must match exportPublicKeyContext");
+        _Static_assert(sizeof(global_compare_public_key.publicKey) == sizeof(ctx->publicKey),
+                       "comparison key snapshot must match exportPublicKeyContext");
+        memmove(global_compare_public_key.display, ctx->display, sizeof(ctx->display));
+        to_paginated_hex(publicKey,
+                         sizeof(publicKey),
+                         global_compare_public_key.publicKey,
+                         sizeof(global_compare_public_key.publicKey));
+
         // Allow for receiving a new instruction even while comparing public keys.
         tx_state->currentInstruction = INSTRUCTION_NONE;
         uiComparePubkey();
