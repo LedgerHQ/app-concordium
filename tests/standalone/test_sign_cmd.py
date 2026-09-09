@@ -21,6 +21,9 @@ MAX_APDU_LEN: int = 255
 # corresponding test without a fee for the same transaction payload.
 TEST_DISPLAY_FEE_MICROCCD = 123_456_798
 
+# Concordium-specific status word: the app refuses a transaction it cannot display faithfully.
+SW_INVALID_TRANSACTION = 0x6B04
+
 
 # In this test we send to the device a transaction to sign and validate it on screen
 # The transaction is short and will be sent in one chunk
@@ -569,3 +572,32 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
         response.hex()
         == "9056db36dfa7b0ba722660b2becb227ed490dcaff9e332a7fba4c6d534ff0ff3368b21da8e7ebb62891be561261abd7c0435dfb46e596b1116c9996269d2a70b"
     )
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_embedded_nul(backend):
+    """A memo is hashed in full but rendered as a C string.
+
+    An embedded NUL would end the review at that byte while the signature still covered the
+    bytes after it, so the user would approve a memo they never saw. The app must refuse the
+    transaction rather than sign data it did not display.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # CBOR text string (major type 3, one-byte length) hiding a suffix behind a NUL.
+    hidden = b"visible\x00hidden"
+    memo = bytes([0x78, len(hidden)]) + hidden
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION

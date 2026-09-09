@@ -17,11 +17,13 @@ extern const ux_flow_step_t *const ux_sign_flow_shared[];
  * length Only supports major type 0, 1 and 3 (non-negative integers, negative integers and utf-8
  * strings) Does not support streaming (shortCount = 31).
  */
-void readCborInitial(uint8_t *cdata, uint8_t dataLength);
+/** @return SWO_SUCCESS, or the status word to refuse the transaction with. */
+uint16_t readCborInitial(uint8_t *cdata, uint8_t dataLength);
 /**
  * Read part of a CBOR encoded dataBlob. Should only be used after readCborInitial.
  */
-void readCborContent(uint8_t *cdata, uint8_t dataLength);
+/** @return SWO_SUCCESS, or the status word to refuse the transaction with. */
+uint16_t readCborContent(uint8_t *cdata, uint8_t dataLength);
 
 /** CBOR memo / register-data payload bounds (see readCborInitial, transfer handlers). */
 #define CBOR_2BYTE_HEADER    2

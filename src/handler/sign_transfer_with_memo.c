@@ -81,7 +81,11 @@ void handle_sign_transfer_with_memo(const command_t *cmd,
         }
         update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
-        readCborInitial(cdata, dataLength);
+        uint16_t cborSw = readCborInitial(cdata, dataLength);
+        if (cborSw != SWO_SUCCESS) {
+            send_rejection(cborSw);
+            return;
+        }
         if (memo_ctx->cborLength == 0) {
             finish_transfer_memo();
         } else {
@@ -94,7 +98,11 @@ void handle_sign_transfer_with_memo(const command_t *cmd,
         }
         update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
-        readCborContent(cdata, dataLength);
+        uint16_t cborSw = readCborContent(cdata, dataLength);
+        if (cborSw != SWO_SUCCESS) {
+            send_rejection(cborSw);
+            return;
+        }
         if (memo_ctx->cborLength != 0) {
             // The memo size is <=256 bytes, so we should always have received the complete memo by
             // this point

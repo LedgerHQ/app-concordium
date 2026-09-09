@@ -3,6 +3,7 @@
 #include <io.h>
 #include <status_words.h>
 
+#include "globals.h"
 #include "menu.h"
 
 void send_user_rejection(void) {
@@ -25,4 +26,9 @@ void send_success_no_idle(void) {
 
 void send_success_result_no_idle(uint8_t tx) {
     io_send_response_pointer(G_io_apdu_buffer, tx, SWO_SUCCESS);
+}
+
+void send_rejection(uint16_t sw) {
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
+    io_send_sw(sw);
 }
