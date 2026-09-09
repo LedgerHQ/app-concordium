@@ -24,3 +24,16 @@ int secondsToTm(long long t, tm *out);
  * the format yyyy-mm-dd hh:mm:ss.
  */
 int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength);
+
+/**
+ * Append ".mmm" to a timestamp already written by timeToDisplayText.
+ *
+ * The scheduled-release timestamp is signed in milliseconds, so showing only whole seconds let
+ * 1000 distinct signed values share one review. Always three digits.
+ *
+ * @param dst buffer holding the formatted timestamp
+ * @param dstLength bytes available in `dst`
+ * @param offset number of characters already written (timeToDisplayText's return value)
+ * @param milliseconds 0-999; anything larger is a malformed timestamp and is refused
+ */
+void appendMilliseconds(uint8_t *dst, size_t dstLength, size_t offset, uint16_t milliseconds);
