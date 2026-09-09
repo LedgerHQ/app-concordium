@@ -67,6 +67,14 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
                sizeof(accountSender->energyDisplay),
                U8BE(cdata, ENERGY_OFFSET_IN_HEADER));
 
+    // Node 1 of a BIP-44 path selects the network (919' mainnet, 1' testnet) and both prefixes
+    // are authorized, so the host picks it. Mainnet and testnet account addresses share one
+    // encoding, so the sender and recipient rows cannot be used to tell them apart: every
+    // account-transaction review has to state the network explicitly.
+    path_display_network(accountSender->network,
+                         sizeof(accountSender->network),
+                         &global_derivation_path);
+
     return hashHeaderAndType(cdata,
                              dataLength,
                              ACCOUNT_TRANSACTION_HEADER_LENGTH,

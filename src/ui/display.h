@@ -33,9 +33,9 @@ void rejectPrivateKeysNewPath(void);
 // Define the dynamic UI elements. These are required as the majority of
 // the transaction elements are optional, so the UI has to be dynamically set.
 // Sizes must match the definitions in display_bagl.c, which document each worst case.
-extern const ux_flow_step_t *ux_sign_configure_baker_first[11];
-extern const ux_flow_step_t *ux_sign_configure_baker_url[7];
-extern const ux_flow_step_t *ux_sign_configure_baker_commission[10];
+extern const ux_flow_step_t *ux_sign_configure_baker_first[12];
+extern const ux_flow_step_t *ux_sign_configure_baker_url[8];
+extern const ux_flow_step_t *ux_sign_configure_baker_commission[11];
 #endif
 
 void startConfigureBakerCommissionDisplay(void);
@@ -73,7 +73,7 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags);
 
 // Sign Transfer
 #ifdef HAVE_BAGL
-extern const ux_flow_step_t *ux_sign_amount_transfer[10];
+extern const ux_flow_step_t *ux_sign_amount_transfer[11];
 #endif
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags);
@@ -83,7 +83,7 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags);
 
 // Sign Transfer with Schedule
 #ifdef HAVE_BAGL
-extern const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
+extern const ux_flow_step_t *ux_sign_scheduled_amount_transfer[9];
 #endif
 
 void startInitialScheduledTransferDisplay(bool displayMemo);

@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "numberHelpers.h"
 
+#include <assert.h>  // _Static_assert
 #include <stddef.h>
 #include <string.h>
 #include <exceptions.h>
@@ -114,6 +115,65 @@ void detect_derivation_path_variant(derivation_path_t *derivation_path) {
     } else {
         derivation_path->variant = DERIVATION_PATH_VARIANT_FULL;
     }
+}
+
+derivation_path_network_t derivation_path_network(const derivation_path_t *derivation_path) {
+    if (derivation_path->len == 0) {
+        return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+    uint32_t purpose = derivation_path->nodes[0] & ~HARDENED_BIT;
+    if (purpose == LEGACY_PURPOSE) {
+        return DERIVATION_PATH_NETWORK_LEGACY;
+    }
+    /* Only the BIP-44 subtree carries a network node, and it is node 1. */
+    if (purpose != NEW_PURPOSE || derivation_path->len < 2) {
+        return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+    switch (derivation_path->nodes[1] & ~HARDENED_BIT) {
+        case NEW_MAINNET_COIN_TYPE:
+            return DERIVATION_PATH_NETWORK_MAINNET;
+        case NEW_TESTNET_COIN_TYPE:
+            return DERIVATION_PATH_NETWORK_TESTNET;
+        default:
+            return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+}
+
+void path_display_network(uint8_t *dst,
+                          size_t dstLength,
+                          const derivation_path_t *derivation_path) {
+    _Static_assert(sizeof(NETWORK_DISPLAY_MAINNET) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_TESTNET) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_LEGACY) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_UNKNOWN) <= NETWORK_DISPLAY_SIZE,
+                   "Every network label must fit NETWORK_DISPLAY_SIZE");
+    if (dstLength == 0) {
+        return;
+    }
+    const char *label;
+    switch (derivation_path_network(derivation_path)) {
+        case DERIVATION_PATH_NETWORK_MAINNET:
+            label = NETWORK_DISPLAY_MAINNET;
+            break;
+        case DERIVATION_PATH_NETWORK_TESTNET:
+            label = NETWORK_DISPLAY_TESTNET;
+            break;
+        case DERIVATION_PATH_NETWORK_LEGACY:
+            label = NETWORK_DISPLAY_LEGACY;
+            break;
+        default:
+            label = NETWORK_DISPLAY_UNKNOWN;
+            break;
+    }
+    size_t length = strlen(label);
+    if (length >= dstLength) {
+        /* Unreachable while every label fits NETWORK_DISPLAY_SIZE (asserted above); truncate
+         * rather than overflow if a label or a buffer is ever resized. */
+        length = dstLength - 1;
+    }
+    explicit_bzero(dst, dstLength);
+    memmove(dst, label, length);
+    dst[length] = '\0';
 }
 
 /**

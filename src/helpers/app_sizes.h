@@ -38,6 +38,10 @@
 // UINT64_MAX is 20 digits, plus a NUL.
 #define ENERGY_DISPLAY_SIZE 21
 
+// Network label derived from the signing path's coin type ("Mainnet", "Testnet", ...). Sized for
+// the longest label in derivation_path.h, which asserts the fit at compile time.
+#define NETWORK_DISPLAY_SIZE 24
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 
