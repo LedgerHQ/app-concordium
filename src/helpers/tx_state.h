@@ -19,6 +19,12 @@ typedef struct {
      * hash, unlike the host-supplied fee estimate, so every account-transaction review shows it.
      */
     uint8_t energyDisplay[ENERGY_DISPLAY_SIZE];
+    /**
+     * Network implied by the host-supplied signing path ("Mainnet", "Testnet", ...). Mainnet and
+     * testnet prefixes are both authorized and Concordium addresses look identical on the two
+     * networks, so without this row nothing on screen distinguishes them.
+     */
+    uint8_t network[NETWORK_DISPLAY_SIZE];
 } accountSender_t;
 
 extern accountSender_t global_account_sender;

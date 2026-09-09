@@ -25,9 +25,11 @@ static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
 /**
- * Writes the account header pairs that open every account-transaction review: the paying sender
- * and the signed energy ceiling. Any "Max fees" line is a host estimate outside the transaction
- * hash, so the energy figure is the only cost bound the signature commits to.
+ * Writes the account header pairs that open every account-transaction review: the paying sender,
+ * the signed energy ceiling and the network the signing path selects. Any "Max fees" line is a
+ * host estimate outside the transaction hash, so the energy figure is the only cost bound the
+ * signature commits to. The network comes from the host-supplied path and cannot be inferred from
+ * the addresses on screen, which are encoded identically on mainnet and testnet.
  * @param pairIndex next free slot in `pairs`
  * @param senderItem tag name for the sender row, which differs per flow ("Sender", "From")
  * @return next free slot in `pairs`
@@ -38,6 +40,9 @@ static uint8_t addAccountHeaderPairs(uint8_t pairIndex, const char *senderItem) 
     pairIndex++;
     pairs[pairIndex].item = "Max energy";
     pairs[pairIndex].value = (char *) global_account_sender.energyDisplay;
+    pairIndex++;
+    pairs[pairIndex].item = "Network";
+    pairs[pairIndex].value = (char *) global_account_sender.network;
     pairIndex++;
     return pairIndex;
 }
@@ -1455,13 +1460,14 @@ void uiInitContractDisplay(void) {
     content.smallCaseForValue = false;
     content.nbMaxLinesForValue = 0;
     content.startIndex = 0;
-    // Setup the review screen
+    // Setup the review screen. INS 0x07 creates a new contract instance; the titles used to be
+    // copies of the INS 0x08 update-contract wording, which named the wrong operation.
     nbgl_useCaseReview(TYPE_TRANSACTION,
                        &content,
                        &ICON_APP_HOME,
-                       "Review Transaction \nto update contract",
+                       "Review Transaction \nto initialize contract",
                        NULL,  // No subtitle
-                       "Sign transaction\nto update contract",
+                       "Sign transaction\nto initialize contract",
                        review_choice_sign);
 }
 

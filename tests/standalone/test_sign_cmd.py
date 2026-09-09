@@ -122,6 +122,34 @@ def test_sign_tx_simple_transfer_new_path(
     )
 
 
+# Same transaction as above on the testnet coin type (44'/1'). Mainnet and testnet account
+# addresses are encoded identically, so the "Network" review row is the only thing that
+# distinguishes the two flows on screen; the snapshots assert it says Testnet here and Mainnet
+# in the test above.
+@pytest.mark.active_test_scope
+def test_sign_tx_simple_transfer_new_path_testnet(
+    backend, navigator, default_screenshot_path, test_name
+):
+    client = CommandSender(backend)
+    path: str = "m/44/1/0/0/0/0"
+
+    transaction = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da70320a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7ffffffffffffffff"
+    transaction = bytes.fromhex(transaction)
+
+    with client.sign_simple_transfer(path=path, transaction=transaction):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+
+    response = client.get_async_response()
+    assert response.status == StatusWords.SWO_SUCCESS
+    # A testnet path must not produce the mainnet signature for the same payload.
+    assert (
+        response.data.hex()
+        != "e5f112237d58f908c44385827e71048869db7e8f513e2ceb5da6a6370e2088f4371f93d6e08f9f6c1dd92c74fe565727b8f81600541e817d35cfeec4cc3bc408"
+    )
+
+
 # In this test we send to the device a transaction to sign and validate it on screen
 # The transaction is short and will be sent in one chunk
 # We will ensure that the displayed information is correct by using screenshots comparison
