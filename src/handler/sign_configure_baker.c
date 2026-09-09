@@ -15,6 +15,7 @@
 #include "concordium_crypto.h"
 #include "derivation_path.h"
 #include "display.h"
+#include "display_text.h"
 #include "numberHelpers.h"
 #include "tx_hash.h"
 
@@ -374,6 +375,12 @@ void handle_sign_configure_baker(const command_t *cmd,
         _Static_assert(COMMON_URL_DISPLAY_SIZE >= (size_t) UINT8_MAX + 1,
                        "urlDisplay must hold a max-length URL chunk plus a NUL terminator");
         if (ctx_conf_baker->url.urlLength > dataLength) {
+            // The URL is hashed in full but shown as a C string, so a chunk carrying bytes that
+            // cannot be rendered is refused rather than signed with a truncated review.
+            if (!is_displayable_text(cdata, dataLength)) {
+                send_rejection(ERROR_INVALID_TRANSACTION);
+                return;
+            }
             update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
             ctx_conf_baker->url.urlLength -= dataLength;
             explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
@@ -384,6 +391,10 @@ void handle_sign_configure_baker(const command_t *cmd,
             startConfigureBakerUrlDisplay(false);
             *flags |= IO_ASYNCH_REPLY;
         } else if (ctx_conf_baker->url.urlLength == dataLength) {
+            if (!is_displayable_text(cdata, ctx_conf_baker->url.urlLength)) {
+                send_rejection(ERROR_INVALID_TRANSACTION);
+                return;
+            }
             explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, ctx_conf_baker->url.urlLength);
             ctx_conf_baker->url.urlDisplay[ctx_conf_baker->url.urlLength] = '\0';

@@ -10,6 +10,7 @@
 #include <status_words.h>
 
 #include "concordium_crypto.h"
+#include "display_text.h"
 #include "numberHelpers.h"
 
 #define UINT64_MAX_DECIMAL_DIGITS 20
@@ -27,7 +28,7 @@
 
 static cborContext_t *ctx = &global.withDataBlob.cborContext;
 
-void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
+uint16_t readCborInitial(uint8_t *cdata, uint8_t dataLength) {
     uint8_t remainingDataLength = dataLength;
     /* remainingDataLength guards the physical APDU buffer; cborLength guards the
      * protocol-declared stream total (set from a prior APDU) — both must have
@@ -115,14 +116,14 @@ void readCborInitial(uint8_t *cdata, uint8_t dataLength) {
             if (ctx->cborLength != length) {
                 THROW(ERROR_INVALID_STATE);
             }
-            readCborContent(cdata, dataLength - 1 - sizeLength);
-            break;
+            return readCborContent(cdata, dataLength - 1 - sizeLength);
         default:
             THROW(ERROR_UNSUPPORTED_CBOR);
     }
+    return SWO_SUCCESS;
 }
 
-void readCborContent(uint8_t *cdata, uint8_t contentLength) {
+uint16_t readCborContent(uint8_t *cdata, uint8_t contentLength) {
     if (ctx->cborLength < contentLength) {
         THROW(SWO_INCORRECT_DATA);
     }
@@ -132,6 +133,11 @@ void readCborContent(uint8_t *cdata, uint8_t contentLength) {
             // Reserve space for NUL terminator
             if (ctx->displayUsed + contentLength >= sizeof(ctx->display)) {
                 THROW(ERROR_BUFFER_OVERFLOW);
+            }
+            // The memo is hashed in full but shown as a C string, so bytes that cannot be
+            // rendered are refused instead of being signed unseen.
+            if (!is_displayable_text(cdata, contentLength)) {
+                return ERROR_INVALID_TRANSACTION;
             }
             memmove(ctx->display + ctx->displayUsed, cdata, contentLength);
             ctx->displayUsed += contentLength;
@@ -146,4 +152,5 @@ void readCborContent(uint8_t *cdata, uint8_t contentLength) {
         default:
             THROW(ERROR_INVALID_STATE);
     }
+    return SWO_SUCCESS;
 }

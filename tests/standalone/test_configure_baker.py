@@ -4,6 +4,7 @@ import pytest
 
 from application_client.command_sender import CommandSender
 from utils import navigate_until_text_and_compare
+from ragger.error import ExceptionRAPDU
 from ragger.navigator import NavInsID
 
 url = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -25,6 +26,9 @@ aggregationVerifyKeyProof = "957aec4b2b7ed979ba2079d62246d135aefd61e7f46690c452f
 # The device shows this on its "Baker keys hash" screen, so the golden snapshots of every
 # test below that sets bit 3 of the bitmap must display exactly this value.
 BAKER_KEYS_DIGEST = "b89f45442a2f20b6c215fc20f0bcc1c27612b488652a8941e98acfb17aefc171"
+
+# Concordium-specific status word: the app refuses a transaction it cannot display faithfully.
+SW_INVALID_TRANSACTION = 0x6B04
 
 
 # In these tests we send to the device a transaction to sign and validate it on screen
@@ -476,3 +480,22 @@ def test_sign_configure_baker_all_parameters(
         response_hex
         == "bba026c23bae21bf5deb23cab3f6ec57ccbe2fb504324dbfe28298ea9eb0a1874626db70d911c0922348616862a7eadac7b479dd181a706e31246ceab1a5f604"
     )
+
+
+@pytest.mark.active_test_scope
+def test_sign_configure_baker_url_rejects_embedded_nul(backend):
+    """The metadata URL is hashed in full but rendered as a C string.
+
+    A URL such as ``https://trusted.example\\0.evil.example`` would be reviewed as the benign
+    prefix while the signature covered the whole byte sequence, so the app must refuse it.
+    """
+    client = CommandSender(backend)
+    url_bytes = b"https://trusted.example\x00.evil.example"
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_configure_baker_url(
+            url=url_bytes,
+            bitmap=bytes.fromhex("0010"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
