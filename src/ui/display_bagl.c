@@ -101,9 +101,18 @@ void uiGeneratePubkey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+// The title is a buffer, not a literal: the compact P1 formats review an "Identity" triple while
+// the full-path format reviews the derivation path itself.
 UX_STEP_NOCB(ux_verify_address_0_step,
              bnnn_paging,
-             {.title = "Verify Address", .text = (char *) global.verifyAddressContext.display});
+             {.title = (char *) global.verifyAddressContext.display_label,
+              .text = (char *) global.verifyAddressContext.display});
+
+// The host picks the network, and mainnet and testnet addresses are encoded identically, so the
+// address on screen does not reveal which one was derived.
+UX_STEP_NOCB(ux_verify_address_network_step,
+             bnnn_paging,
+             {.title = "Network", .text = (char *) global.verifyAddressContext.network});
 
 UX_STEP_NOCB(ux_verify_address_1_step,
              bnnn_paging,
@@ -112,6 +121,7 @@ UX_STEP_CB(ux_verify_address_approve_step, pb, send_success(0), {&C_icon_validat
 UX_STEP_CB(ux_verify_address_reject_step, pb, send_user_rejection(), {&C_icon_crossmark, "Reject"});
 UX_FLOW(ux_verify_address,
         &ux_verify_address_0_step,
+        &ux_verify_address_network_step,
         &ux_verify_address_1_step,
         &ux_verify_address_approve_step,
         &ux_verify_address_reject_step);

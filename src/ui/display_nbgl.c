@@ -1333,8 +1333,14 @@ void uiSignScheduledTransferPairFlowSignDisplay(void) {
 
 void uiVerifyAddress(volatile unsigned int *flags) {
     uint8_t index = 0;
-    pairs[index].item = "Identity";
+    // "Identity" for the compact P1 formats, "Derivation path" for the full-path one.
+    pairs[index].item = (char *) global.verifyAddressContext.display_label;
     pairs[index].value = (char *) global.verifyAddressContext.display;
+    index++;
+    // The host picks the network, and mainnet and testnet addresses are encoded identically, so
+    // the address on screen does not reveal which one was derived.
+    pairs[index].item = "Network";
+    pairs[index].value = (char *) global.verifyAddressContext.network;
     index++;
 
     // Create the page content

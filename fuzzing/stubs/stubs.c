@@ -53,6 +53,7 @@ comparePublicKey_t global_compare_public_key;
 char    g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 uint8_t g_trusted_address_len;
+uint64_t g_trusted_chain_id;
 bool    g_trusted_name_valid;
 
 /* ── APDU I/O buffer ──────────────────────────────────────────────────── */
@@ -351,6 +352,7 @@ void clear_trusted_name_binding(void) {
     memset(g_trusted_name, 0, sizeof(g_trusted_name));
     memset(g_trusted_address, 0, sizeof(g_trusted_address));
     g_trusted_address_len = 0;
+    g_trusted_chain_id    = 0;
     g_trusted_name_valid  = false;
 }
 void handle_set_trusted_name(const command_t *cmd) { (void)cmd; }

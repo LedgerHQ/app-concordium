@@ -224,6 +224,37 @@ void path_display_legacy(uint8_t *dst,
     bin_to_dec(dst + offset, dstLength - offset, accountIndex);
 }
 
+void path_display_full(uint8_t *dst, size_t dstLength, const derivation_path_t *derivation_path) {
+    if (dstLength == 0) {
+        return;
+    }
+    explicit_bzero(dst, dstLength);
+
+    /* Worst case is DERIVATION_PATH_NODES_MAX nodes of "4294967295'" plus a separator each, so
+     * VERIFY_ADDRESS_PATH_DISPLAY_SIZE always fits; the bounds checks below only keep a smaller
+     * caller buffer from overflowing. */
+    size_t offset = 0;
+    for (size_t i = 0; i < derivation_path->len; i++) {
+        if (i > 0) {
+            if (offset + 1 >= dstLength) {
+                return;
+            }
+            dst[offset] = '/';
+            offset += 1;
+        }
+        /* Every node is hardened before key derivation, so every node is shown hardened. */
+        offset += number_to_text(dst + offset,
+                                 dstLength - offset,
+                                 derivation_path->nodes[i] & ~HARDENED_BIT);
+        if (offset + 1 >= dstLength) {
+            return;
+        }
+        dst[offset] = '\'';
+        offset += 1;
+    }
+    dst[offset] = '\0';
+}
+
 void path_display_new(uint8_t *dst,
                       size_t dstLength,
                       uint32_t identityProviderIndex,

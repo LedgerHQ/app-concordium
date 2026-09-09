@@ -7,6 +7,14 @@ Allows the user to approve or reject the address, determining whether the app re
 For an account address to match the one that is displayed, the account's primary credential must be made using the PRF-key exported by the same Ledger on the same identity index and credential counter.
 The address is the credId's sh256 hash, and is displayed in base58.
 
+The review has three rows:
+
+| Row | Value |
+| --- | ----- |
+| `Identity` / `Derivation path` | `identityProvider/identity/credCounter` for the compact formats (`P1 = 0x00`, `P1 = 0x01`). For the full-path format (`P1 = 0x02`) the row is labelled `Derivation path` and shows every node of the path, e.g. `44'/919'/403'/404'/8'` — all of them reach key derivation, so showing only a fixed three would let a hidden suffix change the address behind an unchanged label |
+| `Network` | `Mainnet`, `Testnet` or `Legacy (any network)`, from the coin type the path commits to. The host picks the network (via `P2`, or the coin-type node of a full path) and it changes the derived key, while mainnet and testnet addresses are encoded identically, so the address alone does not reveal it |
+| `Address` | The base58 account address, always derived on device from the path and credential counter under review |
+
 ## Protocol description
 
 - Single command
@@ -29,7 +37,7 @@ The compact formats (`P1 = 0x00` and `P1 = 0x01`) carry plain, unhardened indice
 | `<n>`    | 1 byte | Depth of the derivation path                     |
 | `<node>` | 4 bytes| Path node, big-endian `uint32` (hardened = `0x80000000 \| index`) |
 
-For `P1 = 0x02` (full-path mode) there is no separate credential counter field in CDATA; the app uses the parsed path as given and `cred_counter == 0` in the BLS address step. Use `P1 = 0x01` / `P1 = 0x00` when you need an explicit `credCounter` in the APDU.
+For `P1 = 0x02` (full-path mode) there is no separate credential counter field in CDATA; the app uses the parsed path as given and `cred_counter == 0` in the BLS address step. Use `P1 = 0x01` / `P1 = 0x00` when you need an explicit `credCounter` in the APDU. A zero-node path is rejected with `ERROR_INVALID_PATH` (`0x6B02`); every other depth up to 8 is accepted and rendered in full on the review.
 
 ### Example
 

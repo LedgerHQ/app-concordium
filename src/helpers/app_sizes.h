@@ -42,6 +42,13 @@
 // the longest label in derivation_path.h, which asserts the fit at compile time.
 #define NETWORK_DISPLAY_SIZE 24
 
+// VERIFY_ADDRESS path row. The compact formats render "idp/identity/counter", but the full-path
+// format renders every node that feeds key derivation ("44'/919'/403'/404'/8'"), so the buffer is
+// sized for DERIVATION_PATH_NODES_MAX nodes of "4294967295'" plus separators and a NUL.
+#define VERIFY_ADDRESS_PATH_DISPLAY_SIZE 104
+// Label for that row: "Identity" for the compact formats, "Derivation path" for the full one.
+#define VERIFY_ADDRESS_LABEL_SIZE 20
+
 // Public-key comparison snapshot (see comparePublicKey_t). Sized to match the corresponding
 // fields of exportPublicKeyContext_t, which get_public_key.c asserts.
 #define COMPARE_IDENTITY_DISPLAY_SIZE 21
