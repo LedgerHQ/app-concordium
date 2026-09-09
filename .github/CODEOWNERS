@@ -1,0 +1,10 @@
+# Review ownership for this repository.
+#
+# Without this file any collaborator can approve a change to the signing logic, the review
+# screens or the CI that gates them, so no specific team is required on a pull request.
+#
+# @LedgerHQ/embedded-apps is the fallback owner for everything. Replace it with a
+# Concordium-specific team if one is created, and add narrower rules below the fallback:
+# later matching rules win, so a path rule must come after the `*` line.
+
+* @LedgerHQ/embedded-apps
