@@ -616,9 +616,67 @@ def test_sign_tx_memo_rejects_embedded_nul(backend):
         "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
         "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
     )
-    # CBOR text string (major type 3, one-byte length) hiding a suffix behind a NUL.
+    # CBOR text string hiding a suffix behind a NUL. The header must be the CANONICAL inline
+    # form (0x60 | len) for a length below 24: the one-byte-length form 0x78 is non-canonical
+    # and would be refused by the deterministic-encoding check first, which returns the same
+    # status word and would make this test pass without ever reaching the NUL check.
     hidden = b"visible\x00hidden"
-    memo = bytes([0x78, len(hidden)]) + hidden
+    memo = bytes([0x60 | len(hidden)]) + hidden
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_trailing_bytes_after_integer(backend):
+    """An integer memo is complete once its argument is read, so no APDU byte may follow it.
+
+    The device previously tracked only the protocol-declared CBOR length, so a host could
+    declare a 3-byte memo and send {0x05, 0xAA, 0xBB}: the review showed integer 5 while
+    0xAA 0xBB stayed in the signed transaction hash.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # 0x05 is the whole CBOR item (unsigned integer 5); 0xAA 0xBB are trailing bytes.
+    memo = bytes([0x05, 0xAA, 0xBB])
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_non_canonical_integer(backend):
+    """Deterministic CBOR requires the shortest encoding of an argument.
+
+    Integer 1 encodes canonically as 0x01. Accepting 0x1801, 0x190001, 0x1a00000001 and
+    0x1b0000000000000001 as well meant five distinct signed byte strings reviewed identically.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # 0x18 0x01 is integer 1 in the one-byte-length form; canonical is the inline 0x01.
+    memo = bytes([0x18, 0x01])
 
     with pytest.raises(ExceptionRAPDU) as exc:
         with client.sign_simple_transfer_with_memo(

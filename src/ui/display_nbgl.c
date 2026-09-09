@@ -1161,6 +1161,11 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
     signRegisterData_t *ctx = &global.withDataBlob.signRegisterData;
 
     uint8_t index = 0;
+    // The CBOR major type beside the value: a numeric and a text payload that decode to the
+    // same characters are distinct signed byte strings and must not review identically.
+    pairs[index].item = "Data type";
+    pairs[index].value = (char *) global.withDataBlob.cborContext.typeLabel;
+    index++;
     pairs[index].item = "Data";
     pairs[index].value = (char *) global.withDataBlob.cborContext.display;
     index++;
@@ -1204,6 +1209,11 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     pairs[index].value = (char *) global.withDataBlob.signTransferContext.displayStr;
     index++;
     if (displayMemo) {
+        // The CBOR major type beside the value: a numeric and a text payload that decode to the
+        // same characters are distinct signed byte strings and must not review identically.
+        pairs[index].item = "Memo type";
+        pairs[index].value = (char *) global.withDataBlob.cborContext.typeLabel;
+        index++;
         pairs[index].item = "Memo";
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;
@@ -1367,6 +1377,11 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
     pairs[index].value = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr;
     index++;
     if (displayMemo) {
+        // The CBOR major type beside the value: a numeric and a text payload that decode to the
+        // same characters are distinct signed byte strings and must not review identically.
+        pairs[index].item = "Memo type";
+        pairs[index].value = (char *) global.withDataBlob.cborContext.typeLabel;
+        index++;
         pairs[index].item = "Memo";
         pairs[index].value = (char *) global.withDataBlob.cborContext.display;
         index++;

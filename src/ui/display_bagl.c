@@ -21,6 +21,12 @@
 accountSender_t global_account_sender;
 comparePublicKey_t global_compare_public_key;
 
+// The CBOR major type, shown beside the value: a numeric memo and a text memo that decode to
+// the same characters are distinct signed byte strings and must not review identically.
+UX_STEP_NOCB(ux_display_cbor_type_step,
+             bnnn_paging,
+             {"Memo type", (char *) global.withDataBlob.cborContext.typeLabel});
+
 UX_STEP_NOCB(ux_display_memo_step_nocb,
              bnnn_paging,
              {"Memo", (char *) global.withDataBlob.cborContext.display});
@@ -911,6 +917,10 @@ UX_STEP_VALID(ux_register_data_display_data_step,
               bnnn_paging,
               register_data_on_data_confirm(),
               {"Data", (char *) global.withDataBlob.cborContext.display});
+
+UX_STEP_NOCB(ux_register_data_type_step,
+             bnnn_paging,
+             {"Data type", (char *) global.withDataBlob.cborContext.typeLabel});
 UX_FLOW(ux_register_data_initial,
         &ux_sign_flow_review_register_data,
         &ux_sign_flow_account_sender_view,
@@ -918,7 +928,7 @@ UX_FLOW(ux_register_data_initial,
         &ux_sign_flow_network_view,
         &ux_register_data_initial_flow_step);
 
-UX_FLOW(ux_register_data_payload, &ux_register_data_display_data_step);
+UX_FLOW(ux_register_data_payload, &ux_register_data_type_step, &ux_register_data_display_data_step);
 
 void uiSignFlowSharedDisplay(void) {
     ux_flow_init(0, ux_sign_flow_shared, NULL);
@@ -935,9 +945,9 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 }
 
 // Sign Transfer
-// Worst case 11 steps: review, sender, energy, network, amount, recipient, memo, fee estimate,
-// sign, decline, FLOW_END.
-const ux_flow_step_t *ux_sign_amount_transfer[11];
+// Worst case 12 steps: review, sender, energy, network, amount, recipient, memo type, memo,
+// fee estimate, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_amount_transfer[12];
 
 UX_STEP_NOCB(ux_sign_flow_1_step,
              bnnn_paging,
@@ -958,6 +968,7 @@ void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     ux_sign_amount_transfer[index++] = &ux_sign_flow_2_step;
 
     if (displayMemo) {
+        ux_sign_amount_transfer[index++] = &ux_display_cbor_type_step;
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
     if (global.withDataBlob.signTransferContext.has_fee_display) {
@@ -1001,9 +1012,10 @@ UX_STEP_NOCB(
      .text = (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str});
 
 // Sign Transfer with Schedule
-// Worst case 9 steps: review, sender, energy, network, recipient, memo, fee estimate, continue,
-// FLOW_END. The per-release pairs and the signing steps live in their own static flows.
-const ux_flow_step_t *ux_sign_scheduled_amount_transfer[9];
+// Worst case 10 steps: review, sender, energy, network, recipient, memo type, memo, fee
+// estimate, continue, FLOW_END. The per-release pairs and the signing steps live in their own
+// static flows.
+const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
@@ -1053,6 +1065,7 @@ void startInitialScheduledTransferDisplay(bool displayMemo) {
     ux_sign_scheduled_amount_transfer[index++] = &ux_scheduled_transfer_initial_flow_1_step;
 
     if (displayMemo) {
+        ux_sign_scheduled_amount_transfer[index++] = &ux_display_cbor_type_step;
         ux_sign_scheduled_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
 

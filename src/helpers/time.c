@@ -110,6 +110,24 @@ static int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
     return 0;
 }
 
+void appendMilliseconds(uint8_t *dst, size_t dstLength, size_t offset, uint16_t milliseconds) {
+    if (milliseconds > 999) {
+        THROW(ERROR_INVALID_TRANSACTION);
+    }
+    // ".mmm" plus the terminator.
+    if (offset + 5 > dstLength) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+    dst[offset] = '.';
+    offset += 1;
+    // Always three digits, so 1 ms reads ".001" rather than ".1" - the latter would be
+    // indistinguishable from 100 ms.
+    dst[offset] = (uint8_t) ('0' + (milliseconds / 100));
+    dst[offset + 1] = (uint8_t) ('0' + ((milliseconds / 10) % 10));
+    dst[offset + 2] = (uint8_t) ('0' + (milliseconds % 10));
+    dst[offset + 3] = '\0';
+}
+
 int timeToDisplayText(tm time, uint8_t *dst, size_t dstLength) {
     // Reject negative or zero tm_year: a negative value silently wraps to a huge
     // uint64_t when passed to number_to_text, producing an unbounded digit string.

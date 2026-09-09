@@ -73,7 +73,7 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags);
 
 // Sign Transfer
 #ifdef HAVE_BAGL
-extern const ux_flow_step_t *ux_sign_amount_transfer[11];
+extern const ux_flow_step_t *ux_sign_amount_transfer[12];
 #endif
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags);
@@ -83,7 +83,7 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags);
 
 // Sign Transfer with Schedule
 #ifdef HAVE_BAGL
-extern const ux_flow_step_t *ux_sign_scheduled_amount_transfer[9];
+extern const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 #endif
 
 void startInitialScheduledTransferDisplay(bool displayMemo);

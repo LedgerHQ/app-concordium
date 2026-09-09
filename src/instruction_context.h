@@ -87,6 +87,8 @@ typedef struct {
     uint32_t displayUsed;
     uint8_t display[COMMON_DISPLAY_SIZE];
     uint8_t majorType;
+    /** Major type in words, so a numeric value and a text value cannot review identically. */
+    char typeLabel[CBOR_TYPE_LABEL_SIZE];
 } cborContext_t;
 
 typedef enum {

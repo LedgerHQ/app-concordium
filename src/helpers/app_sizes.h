@@ -54,6 +54,10 @@
 #define COMPARE_IDENTITY_DISPLAY_SIZE 21
 #define COMPARE_PUBLIC_KEY_HEX_SIZE   68
 
+// CBOR major-type label shown beside a memo / register-data value ("Unsigned integer",
+// "Negative integer", "Text"), plus a NUL.
+#define CBOR_TYPE_LABEL_SIZE 20
+
 #define U32_BYTES        4
 #define MAX_CDATA_LENGTH 255
 

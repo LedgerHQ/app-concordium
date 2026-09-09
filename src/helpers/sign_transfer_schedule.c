@@ -31,7 +31,12 @@ void processNextScheduledAmount(uint8_t *buffer) {
         if (ctx->pos + 8 > sizeof(ctx->buffer)) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
-        uint64_t timestamp = U8BE(ctx->buffer, ctx->pos) / 1000;
+        // The signed field is milliseconds. Dividing by 1000 for display used to drop the
+        // remainder, so 1000 distinct signed timestamps rendered as the same second; the
+        // remainder is kept and appended below instead.
+        uint64_t timestampMs = U8BE(ctx->buffer, ctx->pos);
+        uint64_t timestamp = timestampMs / 1000;
+        uint16_t milliseconds = (uint16_t) (timestampMs % 1000);
         update_hash((cx_hash_t *) &tx_state->hash, buffer + ctx->pos, 8);
         ctx->pos += 8;
         int valid = secondsToTm(timestamp, &ctx->time);
@@ -44,7 +49,12 @@ void processNextScheduledAmount(uint8_t *buffer) {
         if (ctx->time.tm_year > 9999) {
             THROW(ERROR_INVALID_PARAM);
         }
-        timeToDisplayText(ctx->time, ctx->displayTimestamp, sizeof(ctx->displayTimestamp));
+        int timestampLength =
+            timeToDisplayText(ctx->time, ctx->displayTimestamp, sizeof(ctx->displayTimestamp));
+        appendMilliseconds(ctx->displayTimestamp,
+                           sizeof(ctx->displayTimestamp),
+                           (size_t) timestampLength,
+                           milliseconds);
         if (ctx->pos + 8 > sizeof(ctx->buffer)) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
