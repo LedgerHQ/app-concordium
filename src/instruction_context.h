@@ -301,6 +301,15 @@ typedef struct {
     char identityProviderIndex[4 * 2 + 1];
     char arIdentity[4 * 2 + 1];
     char encIdCredPubShare[96 * 2 + 1];
+    /**
+     * Digest of the whole anonymity-revoker list, in the order it was received.
+     *
+     * Each AR packet overwrites arIdentity/encIdCredPubShare above, so a list longer than one
+     * entry left the review showing only the last pair while the signature covered them all.
+     * The review shows this digest instead; the count is already on the "AR threshold" row.
+     */
+    char arListHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t arListHashCtx;
 
     uint8_t validTo[COMMON_TIMESTAMP_SIZE];
     uint8_t createdAt[COMMON_TIMESTAMP_SIZE];

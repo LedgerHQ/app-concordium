@@ -110,20 +110,42 @@ static void confirm_initial_scheduled_transfer_callback(bool confirm) {
         send_user_rejection();
     }
 }
+/**
+ * End the whole operation because the user rejected one of its staged screens.
+ *
+ * nbgl_useCaseReviewLight reports a rejection as `confirm == false`. Answering it with success
+ * would leave the transaction active and simply ask the host for the next packet, so a "reject"
+ * on an intermediate screen would be silently downgraded to "continue" and the user could still
+ * be walked to the final signing screen. Clear the flow so no later packet can resume it.
+ */
+static void rejectStagedReview(void) {
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
+    send_user_rejection();
+}
+
 static void sendSuccessNoIdleCallback(bool confirm) {
-    (void) confirm;  // Suppress unused parameter warning
+    if (!confirm) {
+        rejectStagedReview();
+        return;
+    }
     send_success_no_idle();
 }
 
 // Baker reviews must release the stage parked while the screen was up, rather than just
 // replying; see confirmConfigureBakerStage.
 static void confirmConfigureBakerStageCallback(bool confirm) {
-    (void) confirm;  // Suppress unused parameter warning
+    if (!confirm) {
+        rejectStagedReview();
+        return;
+    }
     confirmConfigureBakerStage();
 }
 
 static void processNextVerificationKeyNoIdleCallback(bool confirm) {
-    (void) confirm;  // Suppress unused parameter warning
+    if (!confirm) {
+        rejectStagedReview();
+        return;
+    }
     processNextVerificationKey();
 }
 
@@ -521,9 +543,11 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
         pairIndex++;
     }
 
-    // If there are additional steps show the continue screen, otherwise go
-    // to signing screens.
-    if (hasCommissionRate() || ctx->hasSuspended) {
+    // Offer signing only once every declared URL byte has been received AND no further stage
+    // follows. `lastUrlPage` was previously used only to pick the displayed pair, so a
+    // URL-only transaction whose URL spans several packets reached a terminal "Sign
+    // transaction" on its first chunk and signed a hash covering just that prefix.
+    if (!lastUrlPage || hasCommissionRate() || ctx->hasSuspended) {
         // Create the page content
         nbgl_contentTagValueList_t content;
         content.nbPairs = pairIndex;
@@ -686,11 +710,9 @@ void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) 
     pairs[pairIndex].item = "Identity provider";
     pairs[pairIndex].value = (char *) cred->identityProviderIndex;
     pairIndex++;
-    pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char *) cred->arIdentity;
-    pairIndex++;
-    pairs[pairIndex].item = "EncryptedShare";
-    pairs[pairIndex].value = (char *) cred->encIdCredPubShare;
+    // One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
+    pairs[pairIndex].item = "AR list hash";
+    pairs[pairIndex].value = (char *) cred->arListHashDisplay;
     pairIndex++;
 
     nbgl_contentTagValueList_t content;
@@ -813,11 +835,9 @@ void uiSignCredentialDeploymentNewIntroDisplay(void) {
     pairs[pairIndex].value =
         (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
-    pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
-    pairIndex++;
-    pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
+    // One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
+    pairs[pairIndex].item = "AR list hash";
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arListHashDisplay;
     pairIndex++;
 
     // Create the page content
@@ -856,11 +876,9 @@ void uiSignCredentialDeploymentExistingIntroDisplay(void) {
     pairs[pairIndex].value =
         (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
-    pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
-    pairIndex++;
-    pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
+    // One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
+    pairs[pairIndex].item = "AR list hash";
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arListHashDisplay;
     pairIndex++;
     pairs[pairIndex].item = "Address";
     pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountAddress;
@@ -902,11 +920,9 @@ void uiSignCredentialDeploymentNewDisplay(void) {
     pairs[pairIndex].value =
         (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
-    pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
-    pairIndex++;
-    pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
+    // One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
+    pairs[pairIndex].item = "AR list hash";
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arListHashDisplay;
     pairIndex++;
 
     // Create the page content
@@ -945,11 +961,9 @@ void uiSignCredentialDeploymentExistingDisplay(void) {
     pairs[pairIndex].value =
         (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold;
     pairIndex++;
-    pairs[pairIndex].item = "AR identity";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arIdentity;
-    pairIndex++;
-    pairs[pairIndex].item = "Encrypted Share";
-    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.encIdCredPubShare;
+    // One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
+    pairs[pairIndex].item = "AR list hash";
+    pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.arListHashDisplay;
     pairIndex++;
     pairs[pairIndex].item = "Address";
     pairs[pairIndex].value = (char *) global.signCredentialDeploymentContext.accountAddress;
