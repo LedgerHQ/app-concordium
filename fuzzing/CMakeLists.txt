@@ -60,6 +60,7 @@ set(SHARED_SOURCES
     ${APP_SRC}/helpers/base58check.c
     ${APP_SRC}/helpers/cbor_data_blob.c
     ${APP_SRC}/helpers/derivation_path.c
+    ${APP_SRC}/helpers/display_text.c
     ${APP_SRC}/helpers/fee_display.c
     ${APP_SRC}/helpers/numberHelpers.c
     ${APP_SRC}/helpers/sign_transfer_schedule.c
