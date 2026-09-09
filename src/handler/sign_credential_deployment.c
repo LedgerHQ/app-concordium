@@ -281,6 +281,11 @@ void handle_sign_credential_deployment(const command_t *cmd,
             THROW(SWO_INCORRECT_DATA);
         }
         ctx->anonymityRevocationListLength = U2BE(dataBuffer, 0);
+        // Fold every AR pair into one digest so a multi-entry list is represented honestly.
+        explicit_bzero(ctx->arListHashDisplay, sizeof(ctx->arListHashDisplay));
+        if (cx_sha256_init(&ctx->arListHashCtx) != CX_SHA256) {
+            THROW(ERROR_FAILED_CX_OPERATION);
+        }
         update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, 2);
         // Add the total amount of revokers to the display of threshold to get "x out of y"
         bin_to_dec(ctx->anonymityRevocationThreshold + offset,
@@ -305,6 +310,7 @@ void handle_sign_credential_deployment(const command_t *cmd,
         }
         ctx->arIdentity[8] = '\0';
         update_hash((cx_hash_t *) &tx_state->hash, dataBuffer, 4);
+        update_hash((cx_hash_t *) &ctx->arListHashCtx, dataBuffer, 4);
         dataBuffer += 4;
         remainingDataLength -= 4;
 
@@ -322,8 +328,23 @@ void handle_sign_credential_deployment(const command_t *cmd,
         }
         ctx->encIdCredPubShare[96 * 2] = '\0';
         update_hash((cx_hash_t *) &tx_state->hash, encIdCredPubShare, 96);
+        update_hash((cx_hash_t *) &ctx->arListHashCtx, encIdCredPubShare, 96);
 
         if (ctx->anonymityRevocationListLength == 1) {
+            // Last pair received: turn the list into the digest the review shows.
+            uint8_t arListHash[COMMON_HASH_SIZE];
+            hash((cx_hash_t *) &ctx->arListHashCtx,
+                 CX_LAST,
+                 NULL,
+                 0,
+                 arListHash,
+                 sizeof(arListHash));
+            if (format_hex(arListHash,
+                           sizeof(arListHash),
+                           ctx->arListHashDisplay,
+                           sizeof(ctx->arListHashDisplay)) == -1) {
+                THROW(ERROR_BUFFER_OVERFLOW);
+            }
             ctx->state = TX_CREDENTIAL_DEPLOYMENT_CREDENTIAL_DATES;
         }
         ctx->anonymityRevocationListLength -= 1;

@@ -621,15 +621,11 @@ UX_STEP_NOCB(ux_sign_credential_deployment_2_step,
              {.title = "Identity provider",
               .text = (char *) global.signCredentialDeploymentContext.identityProviderIndex});
 
+// One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
 UX_STEP_NOCB(ux_sign_credential_deployment_3_step,
              bnnn_paging,
-             {.title = "AR identity",
-              .text = (char *) global.signCredentialDeploymentContext.arIdentity});
-
-UX_STEP_NOCB(ux_sign_credential_deployment_4_step,
-             bnnn_paging,
-             {.title = "EncryptedShare",
-              .text = (char *) global.signCredentialDeploymentContext.encIdCredPubShare});
+             {.title = "AR list hash",
+              .text = (char *) global.signCredentialDeploymentContext.arListHashDisplay});
 
 UX_STEP_CB(ux_sign_credential_deployment_approve_step,
            pnn,
@@ -673,7 +669,6 @@ UX_FLOW(ux_sign_update_credential_added_credential,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_added_credential_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -686,7 +681,6 @@ UX_FLOW(ux_sign_credential_deployment_existing_with_intro,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -698,7 +692,6 @@ UX_FLOW(ux_sign_credential_deployment_existing,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -710,7 +703,6 @@ UX_FLOW(ux_sign_credential_deployment_new_with_intro,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -721,7 +713,6 @@ UX_FLOW(ux_sign_credential_deployment_new,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
