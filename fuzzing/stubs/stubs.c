@@ -289,6 +289,7 @@ void send_user_rejection_no_idle(void)  {}
 void send_success_no_idle(void)         {}
 void send_success_result_no_idle(uint8_t tx) { (void)tx; }
 void send_success(uint8_t tx)           { (void)tx; }
+void send_rejection(uint16_t sw)        { (void)sw; }
 
 /* ──────────────────────────────────────────────────────────────────────
  * UI / display stubs (replaces src/ui/display_*.c)
