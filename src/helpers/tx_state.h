@@ -28,3 +28,18 @@ typedef struct {
 } accountSender_t;
 
 extern accountSender_t global_account_sender;
+
+/**
+ * Text shown on the public-key comparison screen, held outside `instructionContext`.
+ *
+ * That screen appears after the response has already been sent, and the app deliberately keeps
+ * accepting instructions while it is up — which zeroes and reuses the instruction union. Drawing
+ * the screen straight from the union would let a host swap the key the user is comparing against,
+ * so the values are copied here first and stay put until the user leaves the screen.
+ */
+typedef struct {
+    uint8_t display[COMPARE_IDENTITY_DISPLAY_SIZE];
+    char publicKey[COMPARE_PUBLIC_KEY_HEX_SIZE];
+} comparePublicKey_t;
+
+extern comparePublicKey_t global_compare_public_key;

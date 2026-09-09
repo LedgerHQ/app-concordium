@@ -19,6 +19,7 @@
 #include "menu.h"
 
 accountSender_t global_account_sender;
+comparePublicKey_t global_compare_public_key;
 
 UX_STEP_NOCB(ux_display_memo_step_nocb,
              bnnn_paging,
@@ -57,9 +58,10 @@ UX_STEP_NOCB(ux_sign_flow_fees_view,
 
 // UI definitions for comparison of public-key on the device
 // with the public-key that the caller received.
+// Drawn from the snapshot, not the instruction union: this screen outlives its instruction.
 UX_STEP_NOCB(ux_sign_compare_public_key_0_step,
              bnnn_paging,
-             {.title = "Compare", .text = (char *) global.exportPublicKeyContext.publicKey});
+             {.title = "Compare", .text = (char *) global_compare_public_key.publicKey});
 UX_STEP_CB(ux_compare_accept_step, pb, ui_menu_main(), {&C_icon_validate_14, "Accept"});
 UX_STEP_CB(ux_compare_decline_step, pb, ui_menu_main(), {&C_icon_crossmark, "Decline"});
 UX_FLOW(ux_sign_compare_public_key,

@@ -20,6 +20,7 @@
 #define MAX_REVIEW_PAIRS 10
 
 accountSender_t global_account_sender;
+comparePublicKey_t global_compare_public_key;
 static nbgl_contentTagValue_t pairs[MAX_REVIEW_PAIRS];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
@@ -143,10 +144,11 @@ static void review_credential_attribute(bool confirm) {
 }
 
 void uiComparePubkey(void) {
+    // Drawn from the snapshot, not the instruction union: this screen outlives its instruction.
     pairs[0].item = "Identity";
-    pairs[0].value = (char *) global.exportPublicKeyContext.display;
+    pairs[0].value = (char *) global_compare_public_key.display;
     pairs[1].item = "Public key";
-    pairs[1].value = global.exportPublicKeyContext.publicKey;
+    pairs[1].value = global_compare_public_key.publicKey;
 
     static nbgl_contentTagValueList_t content;
     content.nbPairs = 2;
