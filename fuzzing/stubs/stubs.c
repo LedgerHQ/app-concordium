@@ -56,8 +56,11 @@
 #include "handler/set_trusted_name.h"
 #include "handler/sign_configure_baker.h"
 
-/* ── THROW jump buffer ────────────────────────────────────────────────── */
+/* ── THROW jump buffer and last-throw site (see stubs/ledger/exceptions.h) ── */
 jmp_buf g_fuzzer_jmp_buf;
+const char *g_fuzz_throw_file = NULL;
+int g_fuzz_throw_line = 0;
+unsigned int g_fuzz_throw_sw = 0;
 
 /* ── Global state (replaces globals.c) ───────────────────────────────── */
 derivation_path_t global_derivation_path;
