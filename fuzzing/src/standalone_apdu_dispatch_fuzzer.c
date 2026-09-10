@@ -23,6 +23,8 @@
  */
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <setjmp.h>
 #include "../stubs/ledger/exceptions.h"
 #include "../stubs/ledger/parser.h"
@@ -33,9 +35,28 @@
 /* A BOLOS APDU is at most 5 header bytes plus 255 of cdata. */
 #define FUZZ_MAX_FRAME 260
 
+/* Set once from FUZZ_REPORT_THROWS, so the check below is not a getenv per input. */
+static int g_report_throws = -1;
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (size < 2) return 0;
-    if (setjmp(g_fuzzer_jmp_buf) != 0) return 0;
+
+    if (setjmp(g_fuzzer_jmp_buf) != 0) {
+        /*
+         * A THROW escaped apdu_dispatcher(). On device this reaches the SDK top-level catch and
+         * exits the app to the dashboard, which is finding V-006: one malformed APDU ends the
+         * session instead of drawing a status word. Run with FUZZ_REPORT_THROWS=1 to print
+         * which site an input reached; that is how the conversion list was built.
+         */
+        if (g_report_throws > 0) {
+            fprintf(stderr,
+                    "V006-THROW %s:%d sw=0x%04x\n",
+                    g_fuzz_throw_file ? g_fuzz_throw_file : "?",
+                    g_fuzz_throw_line,
+                    g_fuzz_throw_sw);
+        }
+        return 0;
+    }
 
     fuzz_reset_app_state();
 
@@ -97,5 +118,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 int LLVMFuzzerInitialize(int *argc, char ***argv) {
     (void) argc;
     (void) argv;
+    g_report_throws = (getenv("FUZZ_REPORT_THROWS") != NULL) ? 1 : 0;
     return 0;
 }
