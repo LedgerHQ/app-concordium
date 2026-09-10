@@ -23,7 +23,7 @@
 
 #define MAX_KEYS_TO_EXPORT 3
 
-#define LENGTH_AND_PRIVATE_KEY_SIZE 33  // 1 byte for length, 32 bytes for private key
+#define LENGTH_AND_PRIVATE_KEY_SIZE 65  // 1 byte for length, up to 64 bytes for exported key data
 
 #define ACCOUNT_SUBTREE 0
 #define NORMAL_ACCOUNTS 0
