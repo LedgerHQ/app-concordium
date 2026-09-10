@@ -6,6 +6,7 @@
 #include <parser.h>
 #include <status_words.h>
 
+#include "apdu/apdu_response.h"
 #include "concordium_crypto.h"
 #include "display.h"
 #include "fee_display.h"

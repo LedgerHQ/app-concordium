@@ -20,6 +20,11 @@ fuzzing/corpus/
 fuzzing/crashes/
 fuzzing/out/
 fuzzing/.cache/
+# Seeds and dictionaries are generated from tests/standalone/ by
+# fuzzing/tools/generate_seed_corpus.py, which both build.sh and run_local.sh invoke. The
+# generator is the tracked source of truth; the ~300 derived blobs are not.
+fuzzing/seeds/
+fuzzing/dictionaries/
 
 # Python
 *.pyc[cod]

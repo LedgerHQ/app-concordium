@@ -471,6 +471,24 @@ typedef struct trustedNamePkiContext_s {
     trustedNameTlvExtracted_t tlv;
 } trustedNamePkiContext_t;
 
+/* ----- ABI guards -----
+ *
+ * The device build compiles with -fshort-enums and -funsigned-char (SDK Makefile.defines), so
+ * every state enum below is one byte there. The host fuzz build has to use the same flags: a
+ * four-byte enum shifts every offset inside `global`, changes the union's size and padding, and
+ * leaves the fuzzers exercising a layout the device never runs. These assertions fail the build
+ * if either side loses the flags.
+ */
+_Static_assert(sizeof(simpleTransferState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(registerDataState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(transferWithScheduleState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(protocolState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(configureBakerState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert((char) 0xFF > 0, "char must be unsigned (-funsigned-char)");
+
 /* ----- Union ----- */
 
 typedef union {
