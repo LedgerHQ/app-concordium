@@ -34,6 +34,12 @@ else()
     set(COMPILATION_FLAGS_ "$ENV{LIB_FUZZING_ENGINE} $ENV{CFLAGS}")
 endif()
 
+# ABI flags the SDK applies to the device build (Makefile.defines: -funsigned-char
+# -fshort-enums). Without them a state enum is 4 bytes here but 1 byte on device, so every
+# offset inside `global` shifts and the fuzzers exercise a struct layout the device never runs.
+# instruction_context.h asserts the enum widths so a future flag change fails the build.
+string(APPEND COMPILATION_FLAGS_ " -funsigned-char -fshort-enums")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 string(REPLACE " " ";" COMPILATION_FLAGS ${COMPILATION_FLAGS_})
@@ -102,6 +108,17 @@ function(add_fuzz_target TARGET)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# App identity the SDK's Makefile normally supplies. Only the query handlers routed to by the
+# real dispatcher read these, and they _Static_assert on them.
+# ---------------------------------------------------------------------------
+set(FUZZ_APP_DEFINES
+    APPNAME=\"Concordium\"
+    MAJOR_VERSION=1
+    MINOR_VERSION=0
+    PATCH_VERSION=0
+)
+
+# ---------------------------------------------------------------------------
 # Fuzz targets
 # cbor_data_blob_fuzzer has no dedicated handler; cbor_data_blob.c is shared.
 # ---------------------------------------------------------------------------
@@ -161,3 +178,66 @@ add_fuzz_target(standalone_init_contract_fuzzer
 
 add_fuzz_target(standalone_update_contract_fuzzer
     ${APP_SRC}/handler/update_contract.c)
+
+# ---------------------------------------------------------------------------
+# Raw-APDU target: the SDK's real parser plus the app's real dispatcher (finding V-096).
+#
+# Every other target synthesises an already-parsed command_t and calls one handler, so nothing
+# covered the frame boundary or the routing in between: a short frame, an Lc that disagrees
+# with the physical length, the lc == 0 / data == NULL representation, an unknown INS, or the
+# guard that stops a host from switching instruction mid-flow. This one feeds length-delimited
+# raw frames through apdu_parser() and apdu_dispatcher(), so it needs every handler the
+# dispatcher can route to. set_trusted_name stays stubbed here - it has its own target below.
+# ---------------------------------------------------------------------------
+add_fuzz_target(standalone_apdu_dispatch_fuzzer
+    ${LEDGER_SDK}/lib_standard_app/parser.c
+    ${APP_SRC}/apdu/dispatcher.c
+    ${APP_SRC}/handler/deploy_module.c
+    ${APP_SRC}/handler/export_private_key_legacy_path.c
+    ${APP_SRC}/handler/export_private_key_new_path.c
+    ${APP_SRC}/handler/get_app_name.c
+    ${APP_SRC}/handler/get_app_version.c
+    ${APP_SRC}/handler/get_challenge.c
+    ${APP_SRC}/handler/get_public_key.c
+    ${APP_SRC}/handler/init_contract.c
+    ${APP_SRC}/handler/sign_configure_baker.c
+    ${APP_SRC}/handler/sign_configure_delegation.c
+    ${APP_SRC}/handler/sign_credential_deployment.c
+    ${APP_SRC}/handler/sign_public_information_for_ip.c
+    ${APP_SRC}/handler/sign_register_data.c
+    ${APP_SRC}/handler/sign_transfer.c
+    ${APP_SRC}/handler/sign_transfer_to_public.c
+    ${APP_SRC}/handler/sign_transfer_with_memo.c
+    ${APP_SRC}/handler/sign_transfer_with_schedule.c
+    ${APP_SRC}/handler/sign_transfer_with_schedule_and_memo.c
+    ${APP_SRC}/handler/sign_update_credential.c
+    ${APP_SRC}/handler/update_contract.c
+    ${APP_SRC}/handler/verify_address.c)
+target_compile_definitions(standalone_apdu_dispatch_fuzzer PRIVATE
+    FUZZ_REAL_APDU_PARSER
+    ${FUZZ_APP_DEFINES})
+
+# ---------------------------------------------------------------------------
+# Trusted-name target: the app's real TLV schema and the SDK's real TLV parser (V-114, V-099).
+#
+# The suite excluded set_trusted_name.c and replaced _parse_tlv_internal() with an
+# always-false stub, so the DER/TLV parser, the per-tag callbacks, the duplicate and
+# required-tag rules, the multi-hash processing, the challenge comparison and the PKI dispatch
+# were unreachable from every target - and, because nothing could set g_trusted_name_valid,
+# so was the whole trusted-name branch of handle_verify_address().
+#
+# lib_tlv must precede stubs/ on the include path so that "tlv_library.h" resolves to the
+# SDK's real header rather than the stub one.
+# ---------------------------------------------------------------------------
+add_fuzz_target(standalone_set_trusted_name_fuzzer
+    ${APP_SRC}/handler/set_trusted_name.c
+    ${APP_SRC}/handler/verify_address.c
+    ${LEDGER_SDK}/lib_tlv/tlv_library.c)
+target_include_directories(standalone_set_trusted_name_fuzzer BEFORE PRIVATE
+    ${LEDGER_SDK}/lib_tlv)
+target_compile_definitions(standalone_set_trusted_name_fuzzer PRIVATE
+    FUZZ_REAL_TRUSTED_NAME
+    FUZZ_REAL_TLV
+    # verify_fields() refuses a descriptor whose not-valid-after precedes the running app
+    # version, so the handler needs the same version triplet the Makefile supplies on device.
+    ${FUZZ_APP_DEFINES})
