@@ -21,7 +21,11 @@
 
 pushd fuzzing
 cmake -DBOLOS_SDK=../BOLOS_SDK -Bbuild -H.
-make -C build
+
+# Each target links its own copy of the shared sources, so the object count is the target count
+# times the source count and the build is almost perfectly parallel. FUZZ_BUILD_JOBS lets a
+# caller cap that on a busy machine; CI just takes the runner it is given.
+make -C build -j"${FUZZ_BUILD_JOBS:-$(nproc)}"
 
 python3 tools/generate_seed_corpus.py
 
