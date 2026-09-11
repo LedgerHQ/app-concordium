@@ -1,13 +1,17 @@
 name: Unit testing with Codecov coverage checking
 
+# The triggers below were commented out, so this workflow gated nothing, and it changed into a
+# unit-tests/ directory that did not exist on this branch - a manual run failed before CMake.
+# Regression cover for the parsing and display helpers was therefore absent from CI entirely
+# (finding V-116).
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - master
-  #     - main
-  #     - develop
-  # pull_request:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
 
 jobs:
   job_unit_test:
@@ -46,16 +50,21 @@ jobs:
           name: code-coverage
           path: unit-tests/coverage
 
-      - name: Install codecov dependencies
-        run: apk update && apk add curl gpg
+      # The "Install codecov dependencies" step that used to sit here ran `apk add curl gpg`.
+      # This job runs in ledger-app-builder-lite, which is Debian, so apk does not exist and the
+      # step failed the job before the upload was even attempted. curl and gpg are already in
+      # the image, so nothing needs installing.
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
+        # Coverage reporting is informational; the gate is the test result above. An upload
+        # outage - or a missing CODECOV_TOKEN - must not turn a green test run red.
+        continue-on-error: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./unit-tests/coverage.info
           flags: unittests
           name: codecov-app-concordium
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
