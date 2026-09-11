@@ -110,9 +110,17 @@ static int prefixWithZero(uint8_t *dst, size_t dstLength, int value) {
     return 0;
 }
 
-void appendMilliseconds(uint8_t *dst, size_t dstLength, size_t offset, uint16_t milliseconds) {
+void appendMilliseconds(uint8_t *dst, size_t dstLength, uint16_t milliseconds) {
     if (milliseconds > 999) {
         THROW(ERROR_INVALID_TRANSACTION);
+    }
+    // Append at the end of the string, found here rather than passed in: bin_to_dec - and so
+    // timeToDisplayText - returns a byte count that includes the NUL, so a caller passing that
+    // count wrote ".mmm" one byte past the terminator. That stayed inside the buffer, so it
+    // neither overflowed nor threw; the milliseconds were simply never displayed.
+    size_t offset = 0;
+    while (offset < dstLength && dst[offset] != '\0') {
+        offset += 1;
     }
     // ".mmm" plus the terminator.
     if (offset + 5 > dstLength) {
