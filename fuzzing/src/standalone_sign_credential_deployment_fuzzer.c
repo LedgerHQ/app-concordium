@@ -23,7 +23,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     fuzz_reset_app_state();
 
     volatile unsigned int flags = 0;
-    command_t cmd = fuzz_make_command(INS_CREDENTIAL_DEPLOYMENT, data[0], data[1], data + 3, size - 3);
+    command_t cmd =
+        fuzz_make_command(INS_CREDENTIAL_DEPLOYMENT, data[0], data[1], data + 3, size - 3);
     // Bit 0 of the control byte drives isInitialCall, so the harness can also enter a
     // handler as a continuation packet rather than always as the first one.
     bool isInitialCall = (data[2] & 1) != 0;

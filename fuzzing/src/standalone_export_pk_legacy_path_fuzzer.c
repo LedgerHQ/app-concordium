@@ -22,7 +22,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     fuzz_reset_app_state();
 
     volatile unsigned int flags = 0;
-    command_t cmd = fuzz_make_command(INS_EXPORT_PRIVATE_KEY_LEGACY, data[0], data[1], data + 3, size - 3);
+    command_t cmd =
+        fuzz_make_command(INS_EXPORT_PRIVATE_KEY_LEGACY, data[0], data[1], data + 3, size - 3);
 
     handle_export_private_key_legacy_path(&cmd, &flags);
     /* Answer the review screen as the user would (finding V-102). */

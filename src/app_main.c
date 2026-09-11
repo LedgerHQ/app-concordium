@@ -60,7 +60,9 @@
  * a host cannot resume a half-parsed transaction with the next packet, and no partially parsed
  * material stays in RAM. That mirrors what send_rejection() does for a handler-level refusal.
  */
-static void dispatch_guarded(const command_t *cmd, volatile unsigned int *flags, bool isInitialCall) {
+static void dispatch_guarded(const command_t *cmd,
+                             volatile unsigned int *flags,
+                             bool isInitialCall) {
     /* Written inside TRY and read after it, so both must survive the longjmp. */
     volatile uint16_t sw = 0;
 
