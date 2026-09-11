@@ -49,12 +49,8 @@ void processNextScheduledAmount(uint8_t *buffer) {
         if (ctx->time.tm_year > 9999) {
             THROW(ERROR_INVALID_PARAM);
         }
-        int timestampLength =
-            timeToDisplayText(ctx->time, ctx->displayTimestamp, sizeof(ctx->displayTimestamp));
-        appendMilliseconds(ctx->displayTimestamp,
-                           sizeof(ctx->displayTimestamp),
-                           (size_t) timestampLength,
-                           milliseconds);
+        timeToDisplayText(ctx->time, ctx->displayTimestamp, sizeof(ctx->displayTimestamp));
+        appendMilliseconds(ctx->displayTimestamp, sizeof(ctx->displayTimestamp), milliseconds);
         if (ctx->pos + 8 > sizeof(ctx->buffer)) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }
