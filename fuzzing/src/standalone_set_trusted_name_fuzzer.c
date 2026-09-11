@@ -48,8 +48,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     fuzz_reset_app_state();
 
     uint8_t control = data[0];
-    g_fuzz_pki_status =
-        (check_signature_with_pki_status_t) (data[1] % FUZZ_PKI_STATUS_COUNT);
+    g_fuzz_pki_status = (check_signature_with_pki_status_t) (data[1] % FUZZ_PKI_STATUS_COUNT);
 
     const uint8_t *body = data + 3;
     size_t body_len = size - 3;
@@ -84,11 +83,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     const uint8_t *path = body + set_len;
     size_t path_len = body_len - set_len;
 
-    command_t verify_cmd = fuzz_make_command(INS_VERIFY_ADDRESS,
-                                             (uint8_t) (control >> 3),
-                                             0,
-                                             path,
-                                             path_len);
+    command_t verify_cmd =
+        fuzz_make_command(INS_VERIFY_ADDRESS, (uint8_t) (control >> 3), 0, path, path_len);
     handle_verify_address(&verify_cmd, &g_fuzz_flags);
     fuzz_answer_pending_ui((control & 1) != 0);
 
