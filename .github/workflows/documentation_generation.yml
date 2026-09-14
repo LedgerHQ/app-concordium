@@ -9,21 +9,30 @@ on:
       - develop
   pull_request:
 
+# Doxygen runs with a configuration taken from the pull request, and several Doxygen options
+# execute commands. Keep no ambient credential for it to reach.
+permissions:
+  contents: read
+
 jobs:
   job_generate_doc:
     name: Generate project documentation
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     container:
+      # Ledger builder tags stay on their documented trust policy and are deliberately not pinned.
       image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
 
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
       - name: HTML documentation
         run: doxygen .doxygen/Doxyfile
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: documentation
           path: doc/html

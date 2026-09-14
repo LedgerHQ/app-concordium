@@ -30,7 +30,7 @@ APPNAME = "Concordium"
 # Application version
 APPVERSION_M = 5
 APPVERSION_N = 6
-APPVERSION_P = 3
+APPVERSION_P = 5
 APPVERSION = "$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)"
 
 DEFINES += APPVERSION=\"$(APPVERSION)\"
@@ -120,6 +120,11 @@ ENABLE_NBGL_QRCODE = 1
 #DISABLE_STANDARD_SNPRINTF = 1
 #DISABLE_STANDARD_USB = 1
 #DISABLE_STANDARD_WEBUSB = 1
+# This app exposes no FIDO/U2F function, and the SDK's CTAP HID decoder forwards the payload of
+# a CTAPHID_CANCEL frame to the application while exempting it from the pending-reply latch.
+# That turns CANCEL into a way to inject an APDU during an on-screen review, so the transport is
+# switched off rather than left enabled for a feature the app does not offer.
+DISABLE_STANDARD_U2F = 1
 #DISABLE_STANDARD_BAGL_UX_FLOW = 1
 #DISABLE_DEBUG_LEDGER_ASSERT = 1
 #DISABLE_DEBUG_THROW = 1

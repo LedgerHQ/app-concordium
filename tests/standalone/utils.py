@@ -119,7 +119,14 @@ def navigate_until_text_and_compare(
         confirm_instructions = [NavInsID.BOTH_CLICK]
     else:
         go_right_instruction = NavInsID.SWIPE_CENTER_TO_LEFT
-        confirm_instructions = [nav_ins_confirm_instruction]
+        # A sequence is accepted so that flows needing more than one tap can be expressed.
+        # Rejecting an NBGL review is the main case: USE_CASE_REVIEW_REJECT only opens the
+        # rejection confirmation modal, which must then be confirmed for the app's callback
+        # to run at all (see bundleNavReviewChoice in the SDK's nbgl_use_case.c).
+        if isinstance(nav_ins_confirm_instruction, (list, tuple)):
+            confirm_instructions = list(nav_ins_confirm_instruction)
+        else:
+            confirm_instructions = [nav_ins_confirm_instruction]
 
     navigator.navigate_until_text_and_compare(
         go_right_instruction,
@@ -131,6 +138,30 @@ def navigate_until_text_and_compare(
         screen_change_before_first_instruction,
         screen_change_after_last_instruction,
     )
+
+
+def screenshots_taken_so_far(backend, screenshot_path, test_name) -> int:
+    """Count the snapshots the preceding navigation already wrote for this test.
+
+    Ragger numbers a test's snapshots continuously across navigation calls, so a later
+    ``navigate_and_compare`` has to be told which index to resume from. Hardcoding that index
+    per device is silently destructive: when a review gains or loses a screen, the second
+    navigation starts writing over the tail of the first, and because ``--golden_run`` only
+    writes and never compares, it regenerates the damaged set without ever failing. Deriving
+    the index from what was actually written keeps the two navigations in step on every device.
+
+    Args:
+        backend: Ragger backend, used for the device name in the snapshot path
+        screenshot_path: The ``default_screenshot_path`` fixture value
+        test_name: The ``test_name`` fixture value
+
+    Returns:
+        Number of snapshots written so far, i.e. the next free snapshot index.
+    """
+    # Ragger saves every screenshot here before comparing or writing the golden, in both
+    # normal and golden-run mode (see SpeculosBackend.compare_screen_with_snapshot).
+    snaps_dir = Path(screenshot_path) / "snapshots-tmp" / backend.device.name / test_name
+    return len(list(snaps_dir.glob("[0-9]*.png")))
 
 
 def _read_makefile() -> List[str]:

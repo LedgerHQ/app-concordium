@@ -8,6 +8,8 @@
 #include <parser.h>
 #include <status_words.h>
 
+#include "apdu/apdu_response.h"
+
 #include "deploy_module.h"
 #include "export_private_key_legacy_path.h"
 #include "export_private_key_new_path.h"
@@ -241,7 +243,13 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         default:
-            THROW(SWO_INVALID_INS);
+            /*
+             * app_main() claims currentInstruction from cmd->ins before dispatching, so an
+             * unknown instruction has already opened a flow that no handler will ever close.
+             * send_rejection() releases it along with replying, which a bare THROW did not:
+             * the next legitimate APDU would otherwise be refused by the switching guard above.
+             */
+            send_rejection(SWO_INVALID_INS);
             break;
     }
     return 0;

@@ -1,10 +1,13 @@
 #include "globals.h"
 
+#include <string.h>
+
 #include <os.h>
 #include <cx.h>
 #include <io.h>
 #include <parser.h>
 #include <status_words.h>
+#include <format.h>
 
 #include "apdu/apdu_response.h"
 #include "concordium_crypto.h"
@@ -84,11 +87,20 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
                        subIndex);
 
         ctx_update_contract->state = UPDATE_CONTRACT_NAME_FIRST;
+        // The receive name and parameters are hashed into the signed transaction, so both have
+        // to reach the approval screen. Parameters are arbitrary binary, so they are digested.
+        explicit_bzero(ctx_update_contract->nameDisplay, sizeof(ctx_update_contract->nameDisplay));
+        explicit_bzero(ctx_update_contract->paramsHashDisplay,
+                       sizeof(ctx_update_contract->paramsHashDisplay));
+        if (cx_sha256_init(&ctx_update_contract->paramsHashCtx) != CX_SHA256) {
+            THROW(ERROR_FAILED_CX_OPERATION);
+        }
         send_success_no_idle();
     }
 
     else if (p1 == P1_NAME) {
         uint8_t lengthSize = 2;
+        uint8_t nameOffset = 0;
         if (ctx_update_contract->state == UPDATE_CONTRACT_NAME_FIRST) {
             // extract the name length
             if (lc < 2) {
@@ -102,22 +114,45 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
             }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_NAME_NEXT;
+            nameOffset = lengthSize;  // skip the length prefix when retaining the name
         } else if (ctx_update_contract->remainingNameLength < lc) {
             THROW(ERROR_INVALID_NAME_LENGTH);
         }
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
+        // Digest the name alongside the parameters, so the signed name is always represented
+        // even when it is too long to render, and retain the text when it does fit.
+        if (lc > nameOffset) {
+            update_hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx,
+                        cdata + nameOffset,
+                        lc - nameOffset);
+            if (ctx_update_contract->nameLength < sizeof(ctx_update_contract->nameDisplay)) {
+                size_t used = strlen(ctx_update_contract->nameDisplay);
+                memmove(ctx_update_contract->nameDisplay + used,
+                        cdata + nameOffset,
+                        lc - nameOffset);
+                ctx_update_contract->nameDisplay[used + (lc - nameOffset)] = '\0';
+            }
+        }
         // subtract the length of the chunk from the remaining name length
         ctx_update_contract->remainingNameLength -= lc;
         if (ctx_update_contract->remainingNameLength > 0) {
             send_success_no_idle();
         } else if (ctx_update_contract->remainingNameLength == 0) {
+            if (ctx_update_contract->nameLength >= sizeof(ctx_update_contract->nameDisplay)) {
+                // Replaced entirely, not truncated: a shortened entrypoint would let a host
+                // disguise the method. The digest still covers the exact name bytes.
+                memmove(ctx_update_contract->nameDisplay,
+                        "(too long to display - see hash)",
+                        sizeof("(too long to display - see hash)"));
+            }
             ctx_update_contract->state = UPDATE_CONTRACT_PARAMS_FIRST;
             send_success_no_idle();
         }
 
     } else if (p1 == P1_PARAMS) {
         uint8_t lengthSize = 2;
+        uint8_t paramsOffset = 0;
         if (ctx_update_contract->state == UPDATE_CONTRACT_PARAMS_FIRST) {
             // extract the params length
             if (lc < 2) {
@@ -132,16 +167,35 @@ void handle_update_contract(const command_t *cmd, bool isInitialCall) {
             }
             // set the state to the next state
             ctx_update_contract->state = UPDATE_CONTRACT_PARAMS_NEXT;
+            paramsOffset = lengthSize;  // skip the length prefix when digesting the parameters
         } else if (ctx_update_contract->remainingParamsLength < lc) {
             THROW(ERROR_INVALID_PARAMS_LENGTH);
         }
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
+        if (lc > paramsOffset) {
+            update_hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx,
+                        cdata + paramsOffset,
+                        lc - paramsOffset);
+        }
         // subtract the length of the chunk from the remaining params length
         ctx_update_contract->remainingParamsLength -= lc;
         if (ctx_update_contract->remainingParamsLength > 0) {
             send_success_no_idle();
         } else if (ctx_update_contract->remainingParamsLength == 0) {
+            uint8_t paramsHash[COMMON_HASH_SIZE];
+            hash((cx_hash_t *) &ctx_update_contract->paramsHashCtx,
+                 CX_LAST,
+                 NULL,
+                 0,
+                 paramsHash,
+                 sizeof(paramsHash));
+            if (format_hex(paramsHash,
+                           sizeof(paramsHash),
+                           ctx_update_contract->paramsHashDisplay,
+                           sizeof(ctx_update_contract->paramsHashDisplay)) == -1) {
+                THROW(ERROR_BUFFER_OVERFLOW);
+            }
             uiUpdateContractDisplay();
         }
 

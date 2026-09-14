@@ -19,10 +19,19 @@ extern const uint8_t BLS_G1_ORDER[32];
 #define ED25519_PUBLIC_KEY_CURVE_SIZE 64
 #define ED25519_SIGN_COMPRESSED_BIT   0x80
 
+#define ED25519_EXTENDED_PRIVATE_KEY_LENGTH (2 * KEY_LENGTH)
+
 /** HKDF salt prefix length for BLS keygen ("BLS-SIG-KEYGEN-SALT-" …). */
 #define BLS_SALT_INITIAL_LENGTH 20
 
 void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *privateKey);
+
+/** Ed25519 private key and chain code for a SLIP-10 path. */
+void get_extended_private_key(const derivation_path_t *path,
+                              uint8_t *privateKey,
+                              size_t privateKeySize,
+                              uint8_t *chainCode,
+                              size_t chainCodeSize);
 
 /**
  * Public key for global_derivation_path (32 bytes, Concordium format).

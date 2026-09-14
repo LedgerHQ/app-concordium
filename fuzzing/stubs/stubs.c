@@ -26,33 +26,63 @@
 #include "ledger/parser.h"
 #include "ledger/status_words.h"
 #include "buffer.h"
+/*
+ * A quoted include is resolved against the including file's own directory first, so
+ * "tlv_library.h" would always find the stub sitting next to this file - even in the target
+ * that puts the SDK's lib_tlv ahead of stubs/ on the include path. The angle-bracket form
+ * skips that rule and honours the -I order, which is what lets the trusted-name target
+ * compile against the real TLV header while every other target keeps the stub.
+ */
+#ifdef FUZZ_REAL_TLV
+#include <tlv_library.h>
+#else
 #include "tlv_library.h"
+#endif
+#include "fuzz_ui.h"
+#ifdef FUZZ_REAL_TRUSTED_NAME
+#include "ledger_pki.h"
+#endif
 
 /* App source headers (found via include paths set in CMakeLists.txt) */
 #include "app_sizes.h"
 #include "helpers/tx_state.h"
 #include "derivation_path.h"
+#include "globals.h"
 #include "instruction_context.h"
 #include "apdu/apdu_response.h"
 #include "helpers/concordium_crypto.h"
 #include "helpers/base58check.h"
 #include "ui/display.h"
 #include "handler/set_trusted_name.h"
+#include "handler/sign_configure_baker.h"
 
-/* ── THROW jump buffer ────────────────────────────────────────────────── */
+/* ── THROW jump buffer and last-throw site (see stubs/ledger/exceptions.h) ── */
 jmp_buf g_fuzzer_jmp_buf;
+const char *g_fuzz_throw_file = NULL;
+int g_fuzz_throw_line = 0;
+unsigned int g_fuzz_throw_sw = 0;
 
 /* ── Global state (replaces globals.c) ───────────────────────────────── */
 derivation_path_t global_derivation_path;
 tx_state_t        global_tx_state;
 instructionContext global;
 accountSender_t   global_account_sender;
+comparePublicKey_t global_compare_public_key;
 
-/* ── Trusted-name globals (replaces set_trusted_name.c definitions) ───── */
+/*
+ * ── Trusted-name globals (replaces set_trusted_name.c definitions) ─────
+ *
+ * standalone_set_trusted_name_fuzzer links the real src/handler/set_trusted_name.c, which
+ * defines all of these itself (finding V-114).
+ */
+#ifndef FUZZ_REAL_TRUSTED_NAME
 char    g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 uint8_t g_trusted_address_len;
+uint64_t g_trusted_chain_id;
 bool    g_trusted_name_valid;
+uint64_t g_stored_challenge;
+#endif
 
 /* ── APDU I/O buffer ──────────────────────────────────────────────────── */
 uint8_t G_io_apdu_buffer[260];
@@ -60,6 +90,33 @@ uint8_t G_io_apdu_buffer[260];
 /* ──────────────────────────────────────────────────────────────────────
  * Ledger SDK crypto stubs
  * ──────────────────────────────────────────────────────────────────────*/
+
+/*
+ * Read every source byte, the way the real cx_* hashing does.
+ *
+ * These stubs used to discard (in, in_len) entirely, so a handler that passed an out-of-bounds
+ * or uninitialised range to update_hash produced no sanitizer report at all - nothing
+ * dereferenced it. That hid precisely the class of bug these fuzzers exist to find, because in
+ * production cx_hash_no_throw() consumes the whole range. The accumulator is volatile so the
+ * reads cannot be optimised away.
+ *
+ * Only a zero length short-circuits: `hash(..., CX_LAST, NULL, 0, ...)` is a legitimate
+ * finalise call. A NULL pointer with a non-zero length is dereferenced on purpose, since
+ * production would fault there too and the sanitizer should say so.
+ */
+static volatile uint8_t g_fuzz_hash_sink;
+
+static void fuzz_consume(const void *in, size_t len) {
+    if (len == 0) {
+        return;
+    }
+    const uint8_t *bytes = (const uint8_t *) in;
+    uint8_t acc = g_fuzz_hash_sink;
+    for (size_t i = 0; i < len; i++) {
+        acc = (uint8_t) (acc + bytes[i]);
+    }
+    g_fuzz_hash_sink = acc;
+}
 
 cx_err_t cx_sha256_init_no_throw(cx_sha256_t *hash) {
     (void)hash;
@@ -69,13 +126,14 @@ cx_err_t cx_sha256_init_no_throw(cx_sha256_t *hash) {
 cx_err_t cx_hash_no_throw(cx_hash_t *hash, uint32_t mode,
                            const uint8_t *in, size_t in_len,
                            uint8_t *out, size_t out_len) {
-    (void)hash; (void)mode; (void)in; (void)in_len;
+    (void)hash; (void)mode;
+    fuzz_consume(in, in_len);
     if (out && out_len) memset(out, 0, out_len);
     return CX_OK;
 }
 
 size_t cx_hash_sha256(const uint8_t *in, size_t len, uint8_t *out, size_t out_len) {
-    (void)in; (void)len;
+    fuzz_consume(in, len);
     if (out && out_len >= CX_SHA256_SIZE) memset(out, 0, CX_SHA256_SIZE);
     return CX_SHA256_SIZE;
 }
@@ -86,7 +144,8 @@ cx_err_t cx_hash_init(cx_hash_t *hash, cx_md_t hash_id) {
 }
 
 cx_err_t cx_hash_update(cx_hash_t *hash, const uint8_t *in, size_t in_len) {
-    (void)hash; (void)in; (void)in_len;
+    (void)hash;
+    fuzz_consume(in, in_len);
     return CX_OK;
 }
 
@@ -100,6 +159,43 @@ size_t cx_hash_get_size(const cx_hash_t *ctx) {
     (void)ctx;
     return 32;
 }
+
+/*
+ * The trusted-name descriptor is hashed with whichever algorithm its TLV names, so the real
+ * handler needs every init the SDK offers. Only the trusted-name target links that handler.
+ */
+#ifdef FUZZ_REAL_TRUSTED_NAME
+cx_err_t cx_keccak_init_no_throw(cx_sha3_t *hash, size_t size) {
+    (void)hash; (void)size;
+    return CX_OK;
+}
+cx_err_t cx_sha3_init_no_throw(cx_sha3_t *hash, size_t size) {
+    (void)hash; (void)size;
+    return CX_OK;
+}
+cx_err_t cx_sha512_init_no_throw(cx_sha512_t *hash) {
+    (void)hash;
+    return CX_OK;
+}
+cx_err_t cx_ripemd160_init_no_throw(cx_ripemd160_t *hash) {
+    (void)hash;
+    return CX_OK;
+}
+
+/* Verdict supplied by the harness; see ledger_pki.h. */
+check_signature_with_pki_status_t g_fuzz_pki_status = CHECK_SIGNATURE_WITH_PKI_WRONG_SIGNATURE;
+
+check_signature_with_pki_status_t check_signature_with_pki(const buffer_t hash,
+                                                          const uint8_t *expected_key_usage,
+                                                          const cx_curve_t *expected_curve,
+                                                          const buffer_t signature) {
+    (void)expected_key_usage; (void)expected_curve;
+    /* Production reads both ranges; an out-of-bounds hash or signature must be reported. */
+    fuzz_consume(hash.ptr, hash.size);
+    fuzz_consume(signature.ptr, signature.size);
+    return g_fuzz_pki_status;
+}
+#endif /* FUZZ_REAL_TRUSTED_NAME */
 
 /* BN stubs */
 cx_err_t cx_bn_lock(size_t word_nbytes, uint32_t flags) {
@@ -215,11 +311,19 @@ cx_err_t cx_eddsa_sign_no_throw(const cx_ecfp_private_key_t *pvkey,
     return CX_OK;
 }
 
-/* apdu_parser stub */
+/*
+ * apdu_parser stub.
+ *
+ * standalone_apdu_dispatch_fuzzer links the SDK's real lib_standard_app/parser.c and so
+ * defines this symbol itself; every other target keeps the always-false stub, since it never
+ * feeds raw frames (finding V-096).
+ */
+#ifndef FUZZ_REAL_APDU_PARSER
 bool apdu_parser(command_t *cmd, uint8_t *buf, size_t buf_len) {
     (void)cmd; (void)buf; (void)buf_len;
     return false;
 }
+#endif
 
 /* ──────────────────────────────────────────────────────────────────────
  * concordium_crypto.c stubs (replaces entire src/helpers/concordium_crypto.c)
@@ -236,6 +340,16 @@ void get_public_key(uint8_t *publicKeyArray) {
     memset(publicKeyArray, 0, KEY_LENGTH);
 }
 
+void get_extended_private_key(const derivation_path_t *path,
+                              uint8_t *privateKey,
+                              size_t privateKeySize,
+                              uint8_t *chainCode,
+                              size_t chainCodeSize) {
+    (void)path;
+    memset(privateKey, 0, privateKeySize);
+    memset(chainCode, 0, chainCodeSize);
+}
+
 void sign(uint8_t *input, uint8_t *signatureOnInput) {
     (void)input;
     memset(signatureOnInput, 0, 64);
@@ -244,12 +358,14 @@ void sign(uint8_t *input, uint8_t *signatureOnInput) {
 void hash(cx_hash_t *h, uint32_t mode,
           const unsigned char *in, unsigned int len,
           unsigned char *out, unsigned int out_len) {
-    (void)h; (void)mode; (void)in; (void)len;
+    (void)h; (void)mode;
+    fuzz_consume(in, len);
     if (out) memset(out, 0, out_len);
 }
 
 void update_hash(cx_hash_t *h, const unsigned char *in, unsigned int len) {
-    (void)h; (void)in; (void)len;
+    (void)h;
+    fuzz_consume(in, len);
 }
 
 void get_bls_private_key(const derivation_path_t *path, uint8_t *privateKey,
@@ -279,73 +395,285 @@ void send_user_rejection_no_idle(void)  {}
 void send_success_no_idle(void)         {}
 void send_success_result_no_idle(uint8_t tx) { (void)tx; }
 void send_success(uint8_t tx)           { (void)tx; }
+void send_rejection(uint16_t sw)        { (void)sw; }
+
+/*
+ * io_send_sw / io_send_response_pointer are reached only through the real dispatcher and the
+ * query handlers it routes to, which standalone_apdu_dispatch_fuzzer links (finding V-096).
+ * The response pointer stub reads its whole range: a handler that hands the transport an
+ * out-of-bounds or uninitialised buffer must be reported, and production would transmit it.
+ */
+int io_send_sw(uint16_t sw) {
+    (void)sw;
+    return 0;
+}
+
+int io_send_response_pointer(const void *ptr, size_t len, uint16_t sw) {
+    (void)sw;
+    fuzz_consume(ptr, len);
+    return 0;
+}
+
+cx_err_t cx_rng_no_throw(uint8_t *buffer, size_t len) {
+    if (buffer && len) memset(buffer, 0, len);
+    return CX_OK;
+}
 
 /* ──────────────────────────────────────────────────────────────────────
  * UI / display stubs (replaces src/ui/display_*.c)
+ *
+ * These draw nothing, but they do record which approve/reject callback the real entry point
+ * registers, so a harness can answer it - see fuzz_ui.h and fuzz_answer_pending_ui() below
+ * (finding V-102). Where the production function chooses between two callbacks, the choice is
+ * reproduced here from the same globals display_nbgl.c reads, with a comment naming the line.
  * ──────────────────────────────────────────────────────────────────────*/
 
-void uiComparePubkey(void)                                           {}
-void uiGeneratePubkey(volatile unsigned int *flags)                  { (void)flags; }
-void uiExportPrivateKey(volatile unsigned int *flags)                { (void)flags; }
-void uiExportPrivateKeysNewPath(volatile unsigned int *flags)        { (void)flags; }
+fuzz_ui_action_t g_fuzz_pending_ui_action = FUZZ_UI_NONE;
 
-void startConfigureBakerCommissionDisplay(void)                      {}
-void startConfigureBakerUrlDisplay(bool lastUrlPage)                 { (void)lastUrlPage; }
-void startConfigureBakerSuspendedDisplay(void)                       {}
-void startConfigureBakerDisplay(void)                                {}
-void startConfigureDelegationDisplay(void)                           {}
+/* Declared normally in sign_configure_baker.h; only the baker target links its definition. */
+extern bool hasCommissionRate(void) __attribute__((weak));
 
-void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags)             { (void)flags; }
-void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags)                  { (void)flags; }
-void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags)           { (void)flags; }
-void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags) { (void)flags; }
-void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags) { (void)flags; }
-void uiSignCredentialDeploymentNewIntroDisplay(void)                 {}
-void uiSignCredentialDeploymentNewDisplay(void)                      {}
-void uiSignCredentialDeploymentExistingIntroDisplay(void)            {}
-void uiSignCredentialDeploymentExistingDisplay(void)                 {}
+static void fuzz_park(fuzz_ui_action_t action) {
+    g_fuzz_pending_ui_action = action;
+}
 
-void uiReviewPublicInformationForIpDisplay(void)                     {}
-void uiSignPublicInformationForIpPublicKeyDisplay(void)              {}
-void uiSignPublicInformationForIpCompleteDisplay(void)               {}
-void uiSignPublicInformationForIpFinalDisplay(void)                  {}
+void uiComparePubkey(void)                             { fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
+void uiGeneratePubkey(volatile unsigned int *flags)    { (void)flags; fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
+void uiExportPrivateKey(volatile unsigned int *flags)  { (void)flags; fuzz_park(FUZZ_UI_EXPORT_PRIVATE_KEY); }
+void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
+    (void)flags;
+    fuzz_park(FUZZ_UI_EXPORT_PRIVATE_KEYS_NEW_PATH);
+}
 
-void uiSignFlowSharedDisplay(void)                                   {}
-void uiRegisterDataInitialDisplay(volatile unsigned int *flags)      { (void)flags; }
-void uiRegisterDataPayloadDisplay(volatile unsigned int *flags)      { (void)flags; }
+/*
+ * The configure-baker screens park a stage while more packets are expected and only present
+ * the signing screen once nothing is left to review (display_nbgl.c:376, :550, :482).
+ */
+void startConfigureBakerCommissionDisplay(void) {
+    fuzz_park(global.signConfigureBaker.hasSuspended ? FUZZ_UI_CONFIGURE_BAKER_STAGE
+                                                     : FUZZ_UI_SIGN_TRANSACTION);
+}
+void startConfigureBakerUrlDisplay(bool lastUrlPage) {
+    bool more = !lastUrlPage || global.signConfigureBaker.hasSuspended ||
+                (hasCommissionRate && hasCommissionRate());
+    fuzz_park(more ? FUZZ_UI_CONFIGURE_BAKER_STAGE : FUZZ_UI_SIGN_TRANSACTION);
+}
+void startConfigureBakerSuspendedDisplay(void)         { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void startConfigureBakerDisplay(void) {
+    bool more = global.signConfigureBaker.hasMetadataUrl ||
+                global.signConfigureBaker.hasSuspended ||
+                (hasCommissionRate && hasCommissionRate());
+    fuzz_park(more ? FUZZ_UI_CONFIGURE_BAKER_STAGE : FUZZ_UI_SIGN_TRANSACTION);
+}
+void startConfigureDelegationDisplay(void)             { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+
+void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags)   { (void)flags; fuzz_park(FUZZ_UI_SUCCESS_NO_IDLE); }
+void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags)        { (void)flags; fuzz_park(FUZZ_UI_SUCCESS_NO_IDLE); }
+void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) { (void)flags; fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags)     { (void)flags; fuzz_park(FUZZ_UI_NEXT_VERIFICATION_KEY); }
+void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags) { (void)flags; fuzz_park(FUZZ_UI_NEXT_VERIFICATION_KEY); }
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) { (void)flags; fuzz_park(FUZZ_UI_ADDED_CREDENTIAL); }
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags)   { (void)flags; fuzz_park(FUZZ_UI_CREDENTIAL_ATTRIBUTE); }
+void uiSignCredentialDeploymentNewIntroDisplay(void)      { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignCredentialDeploymentNewDisplay(void)           { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignCredentialDeploymentExistingIntroDisplay(void) { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignCredentialDeploymentExistingDisplay(void)      { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+
+void uiReviewPublicInformationForIpDisplay(void)          { fuzz_park(FUZZ_UI_SUCCESS_NO_IDLE); }
+void uiSignPublicInformationForIpPublicKeyDisplay(void)   { fuzz_park(FUZZ_UI_SUCCESS_NO_IDLE); }
+void uiSignPublicInformationForIpCompleteDisplay(void)    { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignPublicInformationForIpFinalDisplay(void)       { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+
+void uiSignFlowSharedDisplay(void)                        { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiRegisterDataInitialDisplay(volatile unsigned int *flags) { (void)flags; fuzz_park(FUZZ_UI_SUCCESS_NO_IDLE); }
+/* display_nbgl.c:1180 - a payload chunk still to come only asks for the next packet. */
+void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
+    (void)flags;
+    fuzz_park(global.withDataBlob.signRegisterData.dataLength > 0 ? FUZZ_UI_SUCCESS_NO_IDLE
+                                                                  : FUZZ_UI_SIGN_TRANSACTION);
+}
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     (void)displayMemo; (void)flags;
+    fuzz_park(FUZZ_UI_SIGN_TRANSACTION);
 }
-void uiSignTransferToPublicDisplay(volatile unsigned int *flags)     { (void)flags; }
-void startInitialScheduledTransferDisplay(bool displayMemo)          { (void)displayMemo; }
-void uiSignScheduledTransferPairFlowSignDisplay(void)                {}
-void uiSignScheduledTransferPairFlowDisplay(void)                    {}
+void uiSignTransferToPublicDisplay(volatile unsigned int *flags) { (void)flags; fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void startInitialScheduledTransferDisplay(bool displayMemo) {
+    (void)displayMemo;
+    fuzz_park(FUZZ_UI_INITIAL_SCHEDULED_TRANSFER);
+}
+void uiSignScheduledTransferPairFlowSignDisplay(void)     { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiSignScheduledTransferPairFlowDisplay(void)         { fuzz_park(FUZZ_UI_NEXT_SCHEDULED_PAIR); }
 
-void uiDeployModuleDisplay(void)                                     {}
-void uiInitContractDisplay(void)                                     {}
-void uiUpdateContractDisplay(void)                                   {}
+void uiDeployModuleDisplay(void)                          { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiInitContractDisplay(void)                          { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+void uiUpdateContractDisplay(void)                        { fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
 
-void uiVerifyAddress(volatile unsigned int *flags)                   { (void)flags; }
-void startPltDisplay(volatile unsigned int *flags)                   { (void)flags; }
+void uiVerifyAddress(volatile unsigned int *flags)        { (void)flags; fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
+
+/* PLT ends on the shared sign/decline step (ux_sign_flow_shared_sign / review_choice_sign),
+ * so it parks as an ordinary signing review and resumes via buildAndSignTransactionHash. */
+void startPltDisplay(volatile unsigned int *flags)        { (void)flags; fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Answering a parked review screen (finding V-102)
+ *
+ * Each continuation lives in a handler translation unit that only some targets link, so they
+ * are declared weak and checked before use: in a target that cannot reach a given screen the
+ * symbol is simply absent, and that screen can never have been parked either.
+ * ──────────────────────────────────────────────────────────────────────*/
+
+extern void buildAndSignTransactionHash(void)        __attribute__((weak));
+extern void confirmInitialScheduledTransfer(void)    __attribute__((weak));
+extern void processNextScheduledAmount(uint8_t *buf) __attribute__((weak));
+extern void confirmConfigureBakerStage(void)         __attribute__((weak));
+extern void processNextVerificationKey(void)         __attribute__((weak));
+extern void confirmAddedCredential(void)             __attribute__((weak));
+extern void confirmCredentialAttribute(void)         __attribute__((weak));
+extern void exportPrivateKey(void)                   __attribute__((weak));
+extern void sendPrivateKeysNewPath(void)             __attribute__((weak));
+extern void rejectPrivateKeysNewPath(void)           __attribute__((weak));
+
+/*
+ * display_nbgl.c:121 - a rejection on an intermediate screen must end the whole flow, or a
+ * later packet could resume it and walk the user to the signing screen anyway.
+ */
+static void fuzz_reject_staged_review(void) {
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
+    send_user_rejection();
+}
+
+void fuzz_answer_pending_ui(bool approve) {
+    fuzz_ui_action_t action = g_fuzz_pending_ui_action;
+    g_fuzz_pending_ui_action = FUZZ_UI_NONE;
+
+    switch (action) {
+        case FUZZ_UI_NONE:
+            return;
+
+        case FUZZ_UI_SIGN_TRANSACTION: /* review_choice_sign */
+            if (!approve) {
+                send_user_rejection();
+            } else if (buildAndSignTransactionHash) {
+                buildAndSignTransactionHash();
+            }
+            return;
+
+        case FUZZ_UI_INITIAL_SCHEDULED_TRANSFER:
+            if (!approve) {
+                send_user_rejection();
+            } else if (confirmInitialScheduledTransfer) {
+                confirmInitialScheduledTransfer();
+            }
+            return;
+
+        case FUZZ_UI_NEXT_SCHEDULED_PAIR: /* processNextScheduledAmountWrapper */
+            if (!approve) {
+                send_user_rejection();
+            } else if (processNextScheduledAmount) {
+                processNextScheduledAmount(
+                    global.withDataBlob.signTransferWithScheduleContext.buffer);
+            }
+            return;
+
+        case FUZZ_UI_SUCCESS_NO_IDLE:
+            if (!approve) {
+                fuzz_reject_staged_review();
+            } else {
+                send_success_no_idle();
+            }
+            return;
+
+        case FUZZ_UI_CONFIGURE_BAKER_STAGE:
+            if (!approve) {
+                fuzz_reject_staged_review();
+            } else if (confirmConfigureBakerStage) {
+                confirmConfigureBakerStage();
+            }
+            return;
+
+        case FUZZ_UI_NEXT_VERIFICATION_KEY:
+            if (!approve) {
+                fuzz_reject_staged_review();
+            } else if (processNextVerificationKey) {
+                processNextVerificationKey();
+            }
+            return;
+
+        case FUZZ_UI_ADDED_CREDENTIAL:
+            if (!approve) {
+                send_user_rejection();
+            } else if (confirmAddedCredential) {
+                confirmAddedCredential();
+            }
+            return;
+
+        case FUZZ_UI_CREDENTIAL_ATTRIBUTE:
+            if (!approve) {
+                send_user_rejection();
+            } else if (confirmCredentialAttribute) {
+                confirmCredentialAttribute();
+            }
+            return;
+
+        case FUZZ_UI_EXPORT_PRIVATE_KEY:
+            if (!approve) {
+                send_user_rejection();
+            } else if (exportPrivateKey) {
+                exportPrivateKey();
+            }
+            return;
+
+        case FUZZ_UI_EXPORT_PRIVATE_KEYS_NEW_PATH:
+            /* The reject side wipes derived key material, so it is the interesting half. */
+            if (!approve) {
+                if (rejectPrivateKeysNewPath) {
+                    rejectPrivateKeysNewPath();
+                }
+            } else if (sendPrivateKeysNewPath) {
+                sendPrivateKeysNewPath();
+            }
+            return;
+
+        case FUZZ_UI_CONFIRM_ONLY:
+            if (!approve) {
+                send_user_rejection();
+            } else {
+                send_success_no_idle();
+            }
+            return;
+    }
+}
 
 /* ──────────────────────────────────────────────────────────────────────
  * set_trusted_name stubs (replaces src/handler/set_trusted_name.c definitions)
+ *
+ * Compiled only for the targets that do not link the real handler. With these in place the
+ * TLV parser, the per-tag callbacks, the duplicate/required-tag rules, the challenge
+ * comparison and the PKI dispatch were unreachable from every target in the suite
+ * (finding V-114).
  * ──────────────────────────────────────────────────────────────────────*/
 
+#ifndef FUZZ_REAL_TRUSTED_NAME
 void trusted_name_send_set_error(uint16_t sw) { (void)sw; }
 void clear_trusted_name_binding(void) {
     memset(g_trusted_name, 0, sizeof(g_trusted_name));
     memset(g_trusted_address, 0, sizeof(g_trusted_address));
     g_trusted_address_len = 0;
+    g_trusted_chain_id    = 0;
     g_trusted_name_valid  = false;
 }
 void handle_set_trusted_name(const command_t *cmd) { (void)cmd; }
+#endif
 
 /* ──────────────────────────────────────────────────────────────────────
  * TLV library stubs
+ *
+ * The trusted-name target links the SDK's real lib_tlv/tlv_library.c instead, so that the
+ * app's DER/TLV schema is actually parsed rather than always rejected.
  * ──────────────────────────────────────────────────────────────────────*/
 
+#ifndef FUZZ_REAL_TLV
 bool _parse_tlv_internal(const _internal_tlv_handler_t *handlers,
                          uint8_t                        handlers_count,
                          tlv_handler_cb_t              *common_handler,
@@ -394,6 +722,7 @@ bool get_string_from_tlv_data(const tlv_data_t *data, char *out,
     if (out && out_size) out[0] = '\0';
     return false;
 }
+#endif /* FUZZ_REAL_TLV */
 
 /* ──────────────────────────────────────────────────────────────────────
  * buffer_t helpers

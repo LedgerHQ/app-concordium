@@ -15,6 +15,20 @@ All parameters of the payload are optional, and the first part of the payload is
 
 The Ledger expects that only necessary parts are sent. i.e. if the 4th bit in the bitmap is not set, there should not be a metadata url, and so the P1 = 2 and P1 = 3 parts should be skipped.
 
+## Baker keys digest
+
+When bit 3 is set, the device cannot show the three verification keys as raw hex — they are 160 bytes in total. Instead it shows a **Baker keys hash** screen before signing, so a host cannot substitute the keys being installed without the displayed value changing.
+
+The value is the SHA-256 digest, as lowercase hex, over the three verification keys concatenated **in transmission order and with no separators**:
+
+```
+SHA-256( electionVerifyKey[32] || signatureVerifyKey[32] || aggregationVerifyKey[96] )
+```
+
+The proofs are **not** covered by this digest: they carry fresh randomness per transaction, so including them would change the value on every attempt and leave nothing stable to compare against. They are still hashed into the signed transaction.
+
+A host that offers validator-key rotation should display the same digest, computed from the keys it is about to send, so the user can confirm the two match.
+
 ## Protocol description
 
 - Multiple commands

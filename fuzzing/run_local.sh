@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 #
-# Local fuzzing runner.  Builds if needed, then runs all 19 targets in parallel
+# Local fuzzing runner.  Always rebuilds, then runs all 19 targets in parallel
 # for a configurable duration, saving findings to fuzzing/corpus/ and crashes to
 # fuzzing/crashes/.
+#
+# Each target starts from the seed corpus in fuzzing/seeds/<target>/ and uses
+# fuzzing/dictionaries/<target>.dict, so a local run begins at the same deep, valid protocol
+# states as a CI campaign.  Both are generated here, exactly as .clusterfuzzlite/build.sh
+# generates them, so neither tree needs tracking.
 #
 # Usage:
 #   ./run_local.sh                        # run for 60 s per target (default)
@@ -16,6 +21,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_DIR="$SCRIPT_DIR/build"
 CORPUS_DIR="$SCRIPT_DIR/corpus"
 CRASH_DIR="$SCRIPT_DIR/crashes"
+# Generated starting corpus and dictionaries (see fuzzing/tools/generate_seed_corpus.py).
+SEEDS_DIR="$SCRIPT_DIR/seeds"
+DICTS_DIR="$SCRIPT_DIR/dictionaries"
 
 # ── defaults ─────────────────────────────────────────────────────────────────
 FUZZ_SECONDS=60
@@ -41,16 +49,36 @@ while getopts "t:j:f:h" opt; do
     esac
 done
 
-# ── build if needed ───────────────────────────────────────────────────────────
-if [[ ! -d "$BUILD_DIR" ]]; then
-    echo "[build] No build directory found — running cmake + make …"
-    cmake -DCMAKE_C_COMPILER=clang -B"$BUILD_DIR" -H"$SCRIPT_DIR"
-    make -C "$BUILD_DIR" -j"$(nproc)"
-elif [[ "$SCRIPT_DIR/CMakeLists.txt" -nt "$BUILD_DIR/Makefile" ]]; then
-    echo "[build] CMakeLists.txt changed — rebuilding …"
-    cmake -DCMAKE_C_COMPILER=clang -B"$BUILD_DIR" -H"$SCRIPT_DIR"
-    make -C "$BUILD_DIR" -j"$(nproc)"
-fi
+# ── build ─────────────────────────────────────────────────────────────────────
+# Always configure and build before collecting targets.
+#
+# This used to run the build system only when $BUILD_DIR was missing, or when CMakeLists.txt
+# was newer than the generated Makefile. Editing a production handler, a shared helper, a
+# harness, a stub or the SDK therefore rebuilt nothing: the run below picked up whatever
+# standalone_* binaries happened to be lying in $BUILD_DIR and reported coverage and crashes
+# for a previous revision (finding V-113). CMake and Make already track dependencies
+# precisely, so letting them run every time costs a no-op build when nothing changed, and is
+# the only thing that guarantees the binaries match the working tree.
+echo "[build] Configuring and incrementally rebuilding fuzz targets …"
+cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" -DCMAKE_C_COMPILER=clang
+cmake --build "$BUILD_DIR" --parallel "$(nproc)"
+
+# Regenerate the seeds and dictionaries for the same reason the build always runs: they are
+# derived from the harness input layouts, so an edited harness must not be fuzzed with the
+# seeds of the previous one.
+echo "[build] Generating seed corpus and dictionaries …"
+python3 "$SCRIPT_DIR/tools/generate_seed_corpus.py"
+
+# Record what was fuzzed next to the logs, so a stale-looking result can be tied to an exact
+# revision rather than guessed at.
+mkdir -p "$CRASH_DIR"
+{
+    echo "date:      $(date -Is)"
+    echo "commit:    $(git -C "$SCRIPT_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+    echo "dirty:     $(git -C "$SCRIPT_DIR" status --porcelain 2>/dev/null | wc -l) modified path(s)"
+    echo "compiler:  $(clang --version 2>/dev/null | head -1)"
+    echo "seconds:   $FUZZ_SECONDS"
+} >"$CRASH_DIR/build_info.txt"
 
 # ── collect targets ───────────────────────────────────────────────────────────
 if [[ -n "$FILTER" ]]; then
@@ -64,10 +92,8 @@ else
 fi
 
 echo "[run] ${#TARGETS[@]} target(s), ${FUZZ_SECONDS}s each, up to ${MAX_JOBS} parallel jobs"
-echo "[run] corpus → $CORPUS_DIR   crashes → $CRASH_DIR"
+echo "[run] corpus → $CORPUS_DIR   crashes → $CRASH_DIR   seeds → $SEEDS_DIR"
 echo
-
-mkdir -p "$CRASH_DIR"
 
 # ── run loop ──────────────────────────────────────────────────────────────────
 running=0
@@ -83,12 +109,22 @@ run_one() {
 
     mkdir -p "$corpus"
 
-    # libFuzzer: positional arg = corpus dir; artifact_prefix = crash output dir
+    # libFuzzer takes any number of corpus directories and only writes new units into the
+    # first, so passing the tracked seeds second gives every run the same deep starting
+    # states without the campaign ever modifying them.
+    local corpora=("$corpus")
+    [[ -d "$SEEDS_DIR/$name" ]] && corpora+=("$SEEDS_DIR/$name")
+
+    local dict_args=()
+    [[ -f "$DICTS_DIR/${name}.dict" ]] && dict_args+=("-dict=$DICTS_DIR/${name}.dict")
+
+    # libFuzzer: positional args = corpus dirs; artifact_prefix = crash output dir
     "$bin" \
         -max_total_time="$FUZZ_SECONDS" \
         -artifact_prefix="$CRASH_DIR/${name}-" \
         -print_final_stats=1 \
-        "$corpus" \
+        ${dict_args[@]+"${dict_args[@]}"} \
+        "${corpora[@]}" \
         >"$logfile" 2>&1
 
     local rc=$?
@@ -104,7 +140,7 @@ run_one() {
 }
 
 export -f run_one
-export CRASH_DIR CORPUS_DIR FUZZ_SECONDS
+export CRASH_DIR CORPUS_DIR SEEDS_DIR DICTS_DIR FUZZ_SECONDS
 
 for bin in "${TARGETS[@]}"; do
     run_one "$bin" &

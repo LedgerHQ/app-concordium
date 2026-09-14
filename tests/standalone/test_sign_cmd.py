@@ -5,10 +5,14 @@ from application_client.response_unpacker import (
     unpack_get_public_key_response,
     unpack_sign_tx_response,
 )
-from ledgered.devices import DeviceType
 from ragger.error import ExceptionRAPDU, StatusWords
 from ragger.navigator import NavInsID
-from utils import navigate_until_text_and_compare, instructions_builder, split_message
+from utils import (
+    navigate_until_text_and_compare,
+    instructions_builder,
+    screenshots_taken_so_far,
+    split_message,
+)
 
 MAX_SCHEDULE_PAIRS_IN_ONE_APDU: int = (250 // 16) * 16
 MAX_APDU_LEN: int = 255
@@ -16,6 +20,9 @@ MAX_APDU_LEN: int = 255
 # µCCD value appended when P2=0x01 (display-only; not hashed). Signature must match the
 # corresponding test without a fee for the same transaction payload.
 TEST_DISPLAY_FEE_MICROCCD = 123_456_798
+
+# Concordium-specific status word: the app refuses a transaction it cannot display faithfully.
+SW_INVALID_TRANSACTION = 0x6B04
 
 
 # In this test we send to the device a transaction to sign and validate it on screen
@@ -112,6 +119,34 @@ def test_sign_tx_simple_transfer_new_path(
     assert (
         response_hex
         == "e5f112237d58f908c44385827e71048869db7e8f513e2ceb5da6a6370e2088f4371f93d6e08f9f6c1dd92c74fe565727b8f81600541e817d35cfeec4cc3bc408"
+    )
+
+
+# Same transaction as above on the testnet coin type (44'/1'). Mainnet and testnet account
+# addresses are encoded identically, so the "Network" review row is the only thing that
+# distinguishes the two flows on screen; the snapshots assert it says Testnet here and Mainnet
+# in the test above.
+@pytest.mark.active_test_scope
+def test_sign_tx_simple_transfer_new_path_testnet(
+    backend, navigator, default_screenshot_path, test_name
+):
+    client = CommandSender(backend)
+    path: str = "m/44/1/0/0/0/0"
+
+    transaction = "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a0000000000000064000000290000000063de5da70320a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7ffffffffffffffff"
+    transaction = bytes.fromhex(transaction)
+
+    with client.sign_simple_transfer(path=path, transaction=transaction):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+
+    response = client.get_async_response()
+    assert response.status == StatusWords.SWO_SUCCESS
+    # A testnet path must not produce the mainnet signature for the same payload.
+    assert (
+        response.data.hex()
+        != "e5f112237d58f908c44385827e71048869db7e8f513e2ceb5da6a6370e2088f4371f93d6e08f9f6c1dd92c74fe565727b8f81600541e817d35cfeec4cc3bc408"
     )
 
 
@@ -259,11 +294,12 @@ def test_sign_tx_transfer_with_schedule_legacy_path(
         )
 
     # Process each chunk of pairs
-    screenshots_so_far = 3
-    if backend.device.is_nano:
-        screenshots_so_far = 6
-    #    elif backend.device.type == DeviceType.APEX_P:
-    #        screenshots_so_far = 4
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -342,10 +378,12 @@ def test_sign_tx_transfer_with_schedule_legacy_path_with_display_fee(
             NavInsID.USE_CASE_CHOICE_CONFIRM,
         )
 
-    screenshots_so_far = 4
-    if backend.device.is_nano:
-        screenshots_so_far = 8
-
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -436,11 +474,12 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path(
             )
 
     # Process each chunk of pairs
-    screenshots_so_far = 3
-    if backend.device.is_nano:
-        screenshots_so_far = 7
-    elif backend.device.type == DeviceType.APEX_P:
-        screenshots_so_far = 4
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -526,9 +565,12 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
                 NavInsID.USE_CASE_CHOICE_CONFIRM,
             )
 
-    screenshots_so_far = 4
-    if backend.device.is_nano:
-        screenshots_so_far = 8
+    # Resume snapshot numbering where the review above left off. Deriving this rather
+    # than hardcoding it per device keeps the pair screens from overwriting the tail of
+    # the review whenever a screen is added to or removed from that review.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
 
     for chunk in pairs_chunk:
         nbgl_confirm_instruction = NavInsID.USE_CASE_CHOICE_CONFIRM
@@ -558,3 +600,90 @@ def test_sign_tx_transfer_with_schedule_and_memo_legacy_path_with_display_fee(
         response.hex()
         == "9056db36dfa7b0ba722660b2becb227ed490dcaff9e332a7fba4c6d534ff0ff3368b21da8e7ebb62891be561261abd7c0435dfb46e596b1116c9996269d2a70b"
     )
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_embedded_nul(backend):
+    """A memo is hashed in full but rendered as a C string.
+
+    An embedded NUL would end the review at that byte while the signature still covered the
+    bytes after it, so the user would approve a memo they never saw. The app must refuse the
+    transaction rather than sign data it did not display.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # CBOR text string hiding a suffix behind a NUL. The header must be the CANONICAL inline
+    # form (0x60 | len) for a length below 24: the one-byte-length form 0x78 is non-canonical
+    # and would be refused by the deterministic-encoding check first, which returns the same
+    # status word and would make this test pass without ever reaching the NUL check.
+    hidden = b"visible\x00hidden"
+    memo = bytes([0x60 | len(hidden)]) + hidden
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_trailing_bytes_after_integer(backend):
+    """An integer memo is complete once its argument is read, so no APDU byte may follow it.
+
+    The device previously tracked only the protocol-declared CBOR length, so a host could
+    declare a 3-byte memo and send {0x05, 0xAA, 0xBB}: the review showed integer 5 while
+    0xAA 0xBB stayed in the signed transaction hash.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # 0x05 is the whole CBOR item (unsigned integer 5); 0xAA 0xBB are trailing bytes.
+    memo = bytes([0x05, 0xAA, 0xBB])
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_rejects_non_canonical_integer(backend):
+    """Deterministic CBOR requires the shortest encoding of an argument.
+
+    Integer 1 encodes canonically as 0x01. Accepting 0x1801, 0x190001, 0x1a00000001 and
+    0x1b0000000000000001 as well meant five distinct signed byte strings reviewed identically.
+    """
+    client = CommandSender(backend)
+    path: str = "m/1105/0/0/0/0/2/0/0"
+    header_and_to_address = bytes.fromhex(
+        "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7000000000000000a00000000000000640000002900000000"
+        "63de5da71620a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    )
+    # 0x18 0x01 is integer 1 in the one-byte-length form; canonical is the inline 0x01.
+    memo = bytes([0x18, 0x01])
+
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.sign_simple_transfer_with_memo(
+            path=path,
+            header_and_to_address=header_and_to_address,
+            memo=memo,
+            amount=bytes.fromhex("ffffffffffffffff"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION

@@ -11,6 +11,7 @@
 #include "concordium_crypto.h"
 #include "apdu/apdu_response.h"
 #include "base58check.h"
+#include "numberHelpers.h"
 
 #include "tx_hash.h"
 
@@ -46,7 +47,9 @@ static int hashHeaderAndType(uint8_t *cdata,
 int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
                                         uint8_t dataLength,
                                         uint8_t validTransactionKind) {
-    if (dataLength < ADDRESS_LENGTH) {
+    // The energy field is read below, so require the whole header up front rather than only
+    // the sender address.
+    if (dataLength < ACCOUNT_TRANSACTION_HEADER_LENGTH) {
         THROW(ERROR_INVALID_TRANSACTION);
     }
     size_t outputSize = sizeof(accountSender->sender);
@@ -55,6 +58,22 @@ int hashAccountTransactionHeaderAndKind(uint8_t *cdata,
         THROW(ERROR_INVALID_TRANSACTION);
     }
     accountSender->sender[BASE58_ADDRESS_LENGTH] = '\0';
+
+    // The signed energy limit bounds what the transaction may cost. Any fee suffix the host
+    // appends is display-only and outside the hash, so this is the only cost figure the
+    // signature actually commits to.
+    explicit_bzero(accountSender->energyDisplay, sizeof(accountSender->energyDisplay));
+    bin_to_dec(accountSender->energyDisplay,
+               sizeof(accountSender->energyDisplay),
+               U8BE(cdata, ENERGY_OFFSET_IN_HEADER));
+
+    // Node 1 of a BIP-44 path selects the network (919' mainnet, 1' testnet) and both prefixes
+    // are authorized, so the host picks it. Mainnet and testnet account addresses share one
+    // encoding, so the sender and recipient rows cannot be used to tell them apart: every
+    // account-transaction review has to state the network explicitly.
+    path_display_network(accountSender->network,
+                         sizeof(accountSender->network),
+                         &global_derivation_path);
 
     return hashHeaderAndType(cdata,
                              dataLength,

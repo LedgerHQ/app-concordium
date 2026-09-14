@@ -19,6 +19,13 @@
 #include "menu.h"
 
 accountSender_t global_account_sender;
+comparePublicKey_t global_compare_public_key;
+
+// The CBOR major type, shown beside the value: a numeric memo and a text memo that decode to
+// the same characters are distinct signed byte strings and must not review identically.
+UX_STEP_NOCB(ux_display_cbor_type_step,
+             bnnn_paging,
+             {"Memo type", (char *) global.withDataBlob.cborContext.typeLabel});
 
 UX_STEP_NOCB(ux_display_memo_step_nocb,
              bnnn_paging,
@@ -35,16 +42,32 @@ UX_STEP_NOCB(ux_sign_flow_account_sender_view,
              bnnn_paging,
              {.title = "From", .text = (char *) global_account_sender.sender});
 
+// The signed energy ceiling from the transaction header. Shown in every account-transaction
+// flow: any "Max fees" line is a host estimate outside the hash, so this is the only cost
+// bound the signature commits to.
+UX_STEP_NOCB(ux_sign_flow_max_energy_view,
+             bnnn_paging,
+             {.title = "Max energy", .text = (char *) global_account_sender.energyDisplay});
+
+// The network selected by node 1 of the host-supplied signing path. Shown in every
+// account-transaction flow: mainnet (44'/919') and testnet (44'/1') are both authorized prefixes
+// and Concordium encodes account addresses identically on both, so nothing else on screen tells
+// the user which chain the signature is for.
+UX_STEP_NOCB(ux_sign_flow_network_view,
+             bnnn_paging,
+             {.title = "Network", .text = (char *) global_account_sender.network});
+
 UX_STEP_NOCB(ux_sign_flow_fees_view,
              bnnn_paging,
-             {.title = "Max fees",
+             {.title = "Max fees (est.)",
               .text = (char *) global.withDataBlob.signTransferContext.fee_display_str});
 
 // UI definitions for comparison of public-key on the device
 // with the public-key that the caller received.
+// Drawn from the snapshot, not the instruction union: this screen outlives its instruction.
 UX_STEP_NOCB(ux_sign_compare_public_key_0_step,
              bnnn_paging,
-             {.title = "Compare", .text = (char *) global.exportPublicKeyContext.publicKey});
+             {.title = "Compare", .text = (char *) global_compare_public_key.publicKey});
 UX_STEP_CB(ux_compare_accept_step, pb, ui_menu_main(), {&C_icon_validate_14, "Accept"});
 UX_STEP_CB(ux_compare_decline_step, pb, ui_menu_main(), {&C_icon_crossmark, "Decline"});
 UX_FLOW(ux_sign_compare_public_key,
@@ -84,9 +107,18 @@ void uiGeneratePubkey(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
+// The title is a buffer, not a literal: the compact P1 formats review an "Identity" triple while
+// the full-path format reviews the derivation path itself.
 UX_STEP_NOCB(ux_verify_address_0_step,
              bnnn_paging,
-             {.title = "Verify Address", .text = (char *) global.verifyAddressContext.display});
+             {.title = (char *) global.verifyAddressContext.display_label,
+              .text = (char *) global.verifyAddressContext.display});
+
+// The host picks the network, and mainnet and testnet addresses are encoded identically, so the
+// address on screen does not reveal which one was derived.
+UX_STEP_NOCB(ux_verify_address_network_step,
+             bnnn_paging,
+             {.title = "Network", .text = (char *) global.verifyAddressContext.network});
 
 UX_STEP_NOCB(ux_verify_address_1_step,
              bnnn_paging,
@@ -95,6 +127,7 @@ UX_STEP_CB(ux_verify_address_approve_step, pb, send_success(0), {&C_icon_validat
 UX_STEP_CB(ux_verify_address_reject_step, pb, send_user_rejection(), {&C_icon_crossmark, "Reject"});
 UX_FLOW(ux_verify_address,
         &ux_verify_address_0_step,
+        &ux_verify_address_network_step,
         &ux_verify_address_1_step,
         &ux_verify_address_approve_step,
         &ux_verify_address_reject_step);
@@ -104,8 +137,31 @@ void uiVerifyAddress(volatile unsigned int *flags) {
     *flags |= IO_ASYNCH_REPLY;
 }
 
-// Common initial view for signing flows.
-UX_STEP_NOCB(ux_sign_flow_shared_review, nn, {"Review transaction to", "send CCD"});
+// Initial view for signing flows. There is deliberately no generic step here: a single shared
+// "send CCD" intro used to open validator, delegation, credential, data-registration and
+// smart-contract flows, so the first trusted screen named an operation the transaction was not.
+// Each flow picks the intro that matches its transaction kind; only the sign/reject steps below
+// are shared.
+UX_STEP_NOCB(ux_sign_flow_review_transfer, nn, {"Review transaction to", "send CCD"});
+UX_STEP_NOCB(ux_sign_flow_review_transfer_to_public, nn, {"Review transaction to", "unshield CCD"});
+UX_STEP_NOCB(ux_sign_flow_review_scheduled_transfer,
+             nn,
+             {"Review transaction to", "send CCD on schedule"});
+UX_STEP_NOCB(ux_sign_flow_review_configure_baker,
+             nn,
+             {"Review transaction to", "configure validator"});
+UX_STEP_NOCB(ux_sign_flow_review_configure_delegation,
+             nn,
+             {"Review transaction to", "configure delegation"});
+UX_STEP_NOCB(ux_sign_flow_review_update_credentials,
+             nn,
+             {"Review transaction to", "update credentials"});
+UX_STEP_NOCB(ux_sign_flow_review_register_data, nn, {"Review transaction to", "register data"});
+UX_STEP_NOCB(ux_sign_flow_review_deploy_module, nn, {"Review transaction to", "deploy module"});
+UX_STEP_NOCB(ux_sign_flow_review_init_contract,
+             nn,
+             {"Review transaction to", "initialize contract"});
+UX_STEP_NOCB(ux_sign_flow_review_update_contract, nn, {"Review transaction to", "update contract"});
 
 // Common signature flow for all transactions allowing the user to either sign the transaction hash
 // that is currently being processed, or declining to do so (sending back a user rejection error to
@@ -131,6 +187,19 @@ UX_STEP_NOCB(ux_export_private_key_credid_step,
              bnnn_paging,
              {.title = (char *) global.exportPrivateKeyContext.display_credid_title,
               .text = (char *) global.exportPrivateKeyContext.display_credid});
+// Shared by both export flows: the secrets released, the P2-selected detail, and an explicit
+// warning that this is not a one-time signature.
+UX_STEP_NOCB(ux_export_private_key_detail_step,
+             bnnn_paging,
+             {.title = (char *) global.exportPrivateKeyContext.display_detail_title,
+              .text = (char *) global.exportPrivateKeyContext.display_detail});
+UX_STEP_NOCB(ux_export_private_key_types_step,
+             bnnn_paging,
+             {.title = "Keys released",
+              .text = (char *) global.exportPrivateKeyContext.display_key_types});
+UX_STEP_NOCB(ux_export_private_key_warning_step,
+             pnn,
+             {&C_icon_crossmark, "Secrets leave", "this Ledger"});
 UX_STEP_CB(ux_export_private_key_accept_step,
            pb,
            exportPrivateKey(),
@@ -142,6 +211,9 @@ UX_STEP_CB(ux_export_private_key_decline_step,
 UX_FLOW(ux_export_private_key,
         &ux_export_private_key_purpose_step,
         &ux_export_private_key_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_accept_step,
         &ux_export_private_key_decline_step);
 
@@ -172,7 +244,7 @@ UX_STEP_CB(ux_export_private_key_new_path_approve_step,
            });
 UX_STEP_CB(ux_export_private_key_new_path_reject_step,
            pb,
-           send_user_rejection(),
+           rejectPrivateKeysNewPath(),
            {
                &C_icon_crossmark,
                "Reject operation",
@@ -180,6 +252,9 @@ UX_STEP_CB(ux_export_private_key_new_path_reject_step,
 UX_FLOW(ux_export_private_key_new_path,
         &ux_export_private_key_new_path_purpose_step,
         &ux_export_private_key_new_path_credid_step,
+        &ux_export_private_key_detail_step,
+        &ux_export_private_key_types_step,
+        &ux_export_private_key_warning_step,
         &ux_export_private_key_new_path_approve_step,
         &ux_export_private_key_new_path_reject_step);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
@@ -190,10 +265,16 @@ void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
 
 static signConfigureBaker_t *ctx_conf_baker = &global.signConfigureBaker;
 
-const ux_flow_step_t *ux_sign_configure_baker_first[10];
-const ux_flow_step_t *ux_sign_configure_baker_url[6];
-const ux_flow_step_t *ux_sign_configure_baker_commission[9];
-const ux_flow_step_t *ux_sign_configure_baker_suspended[6];
+// Worst case 12 steps: review, sender, energy, network, capital, restake, open status, keys,
+// keys hash, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_first[12];
+// Worst case 8 steps: review, sender, energy, network, URL, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_url[8];
+// Worst case 11 steps: review, sender, energy, network, rates, the 3 commission rates, sign,
+// decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_commission[11];
+// Worst case 8 steps: review, sender, energy, network, suspended, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_baker_suspended[8];
 
 UX_STEP_NOCB(ux_sign_configure_baker_stop_baking_step, nn, {"Stop", "baking"});
 
@@ -214,10 +295,16 @@ UX_STEP_NOCB(
      (char *) global.signConfigureBaker.capitalRestakeDelegation.displayOpenForDelegation});
 
 UX_STEP_NOCB(ux_sign_configure_baker_keys_step, nn, {"Update baker", "keys"});
+// Digest of the three validator verification keys being installed. The keys themselves are
+// signed but far too long to compare on screen, so without this the rotation is blind.
+UX_STEP_NOCB(ux_sign_configure_baker_keys_hash_step,
+             bnnn_paging,
+             {.title = "Baker keys hash",
+              .text = (char *) global.signConfigureBaker.keysHashDisplay});
 
 UX_STEP_CB(ux_sign_configure_baker_url_cb_step,
            bnnn_paging,
-           send_success_no_idle(),
+           confirmConfigureBakerStage(),
            {.title = "URL", .text = (char *) global.signConfigureBaker.url.urlDisplay});
 
 UX_STEP_NOCB(ux_sign_configure_baker_url_step,
@@ -226,7 +313,7 @@ UX_STEP_NOCB(ux_sign_configure_baker_url_step,
 
 UX_STEP_CB(ux_sign_configure_baker_continue,
            nn,
-           send_success_no_idle(),
+           confirmConfigureBakerStage(),
            {"Continue", "with transaction"});
 
 UX_STEP_NOCB(ux_sign_configure_baker_empty_url_step, bn, {"Empty URL", ""});
@@ -264,8 +351,10 @@ UX_STEP_NOCB(ux_sign_configure_baker_suspended_step,
 void startConfigureBakerDisplay(void) {
     uint8_t index = 0;
 
-    ux_sign_configure_baker_first[index++] = &ux_sign_flow_shared_review;
+    ux_sign_configure_baker_first[index++] = &ux_sign_flow_review_configure_baker;
     ux_sign_configure_baker_first[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_configure_baker_first[index++] = &ux_sign_flow_max_energy_view;
+    ux_sign_configure_baker_first[index++] = &ux_sign_flow_network_view;
     ctx_conf_baker->firstDisplay = false;
 
     if (ctx_conf_baker->hasCapital) {
@@ -286,6 +375,7 @@ void startConfigureBakerDisplay(void) {
 
     if (ctx_conf_baker->hasKeys) {
         ux_sign_configure_baker_first[index++] = &ux_sign_configure_baker_keys_step;
+        ux_sign_configure_baker_first[index++] = &ux_sign_configure_baker_keys_hash_step;
     }
 
     // If there are additional steps, then show continue screen. If this is the last
@@ -318,8 +408,10 @@ void startConfigureBakerUrlDisplay(bool lastUrlPage) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
-        ux_sign_configure_baker_url[index++] = &ux_sign_flow_shared_review;
+        ux_sign_configure_baker_url[index++] = &ux_sign_flow_review_configure_baker;
         ux_sign_configure_baker_url[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_url[index++] = &ux_sign_flow_max_energy_view;
+        ux_sign_configure_baker_url[index++] = &ux_sign_flow_network_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -358,8 +450,10 @@ void startConfigureBakerCommissionDisplay(void) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
-        ux_sign_configure_baker_commission[index++] = &ux_sign_flow_shared_review;
+        ux_sign_configure_baker_commission[index++] = &ux_sign_flow_review_configure_baker;
         ux_sign_configure_baker_commission[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_commission[index++] = &ux_sign_flow_max_energy_view;
+        ux_sign_configure_baker_commission[index++] = &ux_sign_flow_network_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -407,8 +501,10 @@ void startConfigureBakerSuspendedDisplay(void) {
     uint8_t index = 0;
 
     if (ctx_conf_baker->firstDisplay) {
-        ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_shared_review;
+        ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_review_configure_baker;
         ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_account_sender_view;
+        ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_max_energy_view;
+        ux_sign_configure_baker_suspended[index++] = &ux_sign_flow_network_view;
         ctx_conf_baker->firstDisplay = false;
     }
 
@@ -425,8 +521,9 @@ void startConfigureBakerSuspendedDisplay(void) {
 
 static signConfigureDelegationContext_t *ctx_conf_delegation = &global.signConfigureDelegation;
 
-// There will at most be 8 UI steps when all 3 optional fields are available.
-const ux_flow_step_t *ux_sign_configure_delegation[8];
+// Worst case 10 steps when all 3 optional fields are available: review, sender, energy, network,
+// capital, restake, delegation target, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_configure_delegation[10];
 
 UX_STEP_NOCB(ux_sign_configure_delegation_capital_step,
              bnnn_paging,
@@ -448,8 +545,10 @@ UX_STEP_NOCB(ux_sign_configure_delegation_stop_delegation_step, nn, {"Stop", "de
 void startConfigureDelegationDisplay(void) {
     uint8_t index = 0;
 
-    ux_sign_configure_delegation[index++] = &ux_sign_flow_shared_review;
+    ux_sign_configure_delegation[index++] = &ux_sign_flow_review_configure_delegation;
     ux_sign_configure_delegation[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_configure_delegation[index++] = &ux_sign_flow_max_energy_view;
+    ux_sign_configure_delegation[index++] = &ux_sign_flow_network_view;
 
     if (ctx_conf_delegation->hasCapital) {
         if (ctx_conf_delegation->stopDelegation) {
@@ -489,8 +588,10 @@ UX_STEP_CB(ux_update_credentials_initial_flow_1_step,
            {"Continue", "with transaction"});
 
 UX_FLOW(ux_update_credentials_initial_flow,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_update_credentials,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_update_credentials_initial_flow_1_step);
 
 UX_STEP_NOCB(ux_credential_deployment_verification_key_flow_0_step,
@@ -536,15 +637,11 @@ UX_STEP_NOCB(ux_sign_credential_deployment_2_step,
              {.title = "Identity provider",
               .text = (char *) global.signCredentialDeploymentContext.identityProviderIndex});
 
+// One digest over the whole ordered AR list: the per-entry buffers hold only the last pair.
 UX_STEP_NOCB(ux_sign_credential_deployment_3_step,
              bnnn_paging,
-             {.title = "AR identity",
-              .text = (char *) global.signCredentialDeploymentContext.arIdentity});
-
-UX_STEP_NOCB(ux_sign_credential_deployment_4_step,
-             bnnn_paging,
-             {.title = "EncryptedShare",
-              .text = (char *) global.signCredentialDeploymentContext.encIdCredPubShare});
+             {.title = "AR list hash",
+              .text = (char *) global.signCredentialDeploymentContext.arListHashDisplay});
 
 UX_STEP_CB(ux_sign_credential_deployment_approve_step,
            pnn,
@@ -555,6 +652,42 @@ UX_STEP_CB(ux_sign_credential_deployment_reject_step,
            send_user_rejection(),
            {&C_icon_crossmark, "Decline to", "sign details"});
 
+// Revealed identity attribute review. Personal data that will become public on chain, so the
+// tag name and the exact value are both shown before the attribute is accepted.
+UX_STEP_NOCB(ux_credential_attribute_step,
+             bnnn_paging,
+             {.title = (char *) global.signCredentialDeploymentContext.attributeName,
+              .text = (char *) global.signCredentialDeploymentContext.attributeValue});
+UX_STEP_CB(ux_credential_attribute_confirm_step,
+           nn,
+           confirmAttribute(),
+           {"Continue", "with transaction"});
+UX_FLOW(ux_credential_attribute,
+        &ux_credential_attribute_step,
+        &ux_credential_attribute_confirm_step);
+
+// Added-credential review for update-credential transactions. The AR threshold needs a
+// display-only step here because ux_credential_deployment_threshold_flow_1_step acknowledges
+// the APDU, which must not happen until the whole credential has been reviewed.
+UX_STEP_NOCB(ux_added_credential_ar_threshold_step,
+             bn,
+             {"AR threshold",
+              (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold});
+UX_STEP_CB(ux_added_credential_approve_step,
+           pnn,
+           confirmAddedCredential(),
+           {&C_icon_validate_14, "Confirm added", "credential"});
+
+UX_FLOW(ux_sign_update_credential_added_credential,
+        &ux_credential_deployment_verification_key_flow_0_step,
+        &ux_credential_deployment_threshold_flow_0_step,
+        &ux_added_credential_ar_threshold_step,
+        &ux_sign_credential_deployment_1_step,
+        &ux_sign_credential_deployment_2_step,
+        &ux_sign_credential_deployment_3_step,
+        &ux_added_credential_approve_step,
+        &ux_sign_credential_deployment_reject_step);
+
 UX_FLOW(ux_sign_credential_deployment_existing_with_intro,
         &ux_credential_deployment_review_details,
         &ux_credential_deployment_verification_key_flow_0_step,
@@ -564,7 +697,6 @@ UX_FLOW(ux_sign_credential_deployment_existing_with_intro,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -576,7 +708,6 @@ UX_FLOW(ux_sign_credential_deployment_existing,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -588,7 +719,6 @@ UX_FLOW(ux_sign_credential_deployment_new_with_intro,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -599,7 +729,6 @@ UX_FLOW(ux_sign_credential_deployment_new,
         &ux_sign_credential_deployment_1_step,
         &ux_sign_credential_deployment_2_step,
         &ux_sign_credential_deployment_3_step,
-        &ux_sign_credential_deployment_4_step,
         &ux_sign_credential_deployment_approve_step,
         &ux_sign_credential_deployment_reject_step);
 
@@ -639,6 +768,16 @@ void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags) {
 
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags) {
     ux_flow_init(0, ux_sign_credential_update_threshold, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_sign_update_credential_added_credential, NULL);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags) {
+    ux_flow_init(0, ux_credential_attribute, NULL);
     *flags |= IO_ASYNCH_REPLY;
 }
 
@@ -778,12 +917,18 @@ UX_STEP_VALID(ux_register_data_display_data_step,
               bnnn_paging,
               register_data_on_data_confirm(),
               {"Data", (char *) global.withDataBlob.cborContext.display});
+
+UX_STEP_NOCB(ux_register_data_type_step,
+             bnnn_paging,
+             {"Data type", (char *) global.withDataBlob.cborContext.typeLabel});
 UX_FLOW(ux_register_data_initial,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_register_data,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_register_data_initial_flow_step);
 
-UX_FLOW(ux_register_data_payload, &ux_register_data_display_data_step);
+UX_FLOW(ux_register_data_payload, &ux_register_data_type_step, &ux_register_data_display_data_step);
 
 void uiSignFlowSharedDisplay(void) {
     ux_flow_init(0, ux_sign_flow_shared, NULL);
@@ -800,7 +945,9 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags) {
 }
 
 // Sign Transfer
-const ux_flow_step_t *ux_sign_amount_transfer[10];
+// Worst case 12 steps: review, sender, energy, network, amount, recipient, memo type, memo,
+// fee estimate, sign, decline, FLOW_END.
+const ux_flow_step_t *ux_sign_amount_transfer[12];
 
 UX_STEP_NOCB(ux_sign_flow_1_step,
              bnnn_paging,
@@ -813,12 +960,15 @@ UX_STEP_NOCB(ux_sign_flow_2_step,
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags) {
     uint8_t index = 0;
 
-    ux_sign_amount_transfer[index++] = &ux_sign_flow_shared_review;
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_review_transfer;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_max_energy_view;
+    ux_sign_amount_transfer[index++] = &ux_sign_flow_network_view;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_1_step;
     ux_sign_amount_transfer[index++] = &ux_sign_flow_2_step;
 
     if (displayMemo) {
+        ux_sign_amount_transfer[index++] = &ux_display_cbor_type_step;
         ux_sign_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
     if (global.withDataBlob.signTransferContext.has_fee_display) {
@@ -841,8 +991,10 @@ UX_STEP_NOCB(ux_sign_transfer_to_public_2_step,
              bnnn_paging,
              {.title = "Recipient", .text = (char *) global.signTransferToPublic.recipientAddress});
 UX_FLOW(ux_sign_transfer_to_public,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_transfer_to_public,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_sign_transfer_to_public_1_step,
         &ux_sign_transfer_to_public_2_step,
         &ux_sign_flow_shared_sign,
@@ -856,10 +1008,13 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
 UX_STEP_NOCB(
     ux_scheduled_flow_max_fees_step,
     bnnn_paging,
-    {.title = "Max fees",
+    {.title = "Max fees (est.)",
      .text = (char *) global.withDataBlob.signTransferWithScheduleContext.fee_display_str});
 
 // Sign Transfer with Schedule
+// Worst case 10 steps: review, sender, energy, network, recipient, memo type, memo, fee
+// estimate, continue, FLOW_END. The per-release pairs and the signing steps live in their own
+// static flows.
 const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
@@ -873,7 +1028,7 @@ UX_STEP_NOCB(ux_scheduled_transfer_initial_flow_1_step,
               .text = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr});
 UX_STEP_VALID(ux_scheduled_transfer_initial_flow_2_step,
               nn,
-              send_success_no_idle(),
+              confirmInitialScheduledTransfer(),
               {"Continue", "with transaction"});
 
 // UI definitions for displaying a timestamp and an amount of a scheduled transfer.
@@ -903,11 +1058,14 @@ UX_FLOW(ux_sign_scheduled_transfer_pair_flow_sign,
 void startInitialScheduledTransferDisplay(bool displayMemo) {
     uint8_t index = 0;
 
-    ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_shared_review;
+    ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_review_scheduled_transfer;
     ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_account_sender_view;
+    ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_max_energy_view;
+    ux_sign_scheduled_amount_transfer[index++] = &ux_sign_flow_network_view;
     ux_sign_scheduled_amount_transfer[index++] = &ux_scheduled_transfer_initial_flow_1_step;
 
     if (displayMemo) {
+        ux_sign_scheduled_amount_transfer[index++] = &ux_display_cbor_type_step;
         ux_sign_scheduled_amount_transfer[index++] = &ux_display_memo_step_nocb;
     }
 
@@ -933,13 +1091,18 @@ void uiSignScheduledTransferPairFlowDisplay(void) {
 UX_STEP_NOCB(ux_deploy_module_1_step,
              bnnn_paging,
              {.title = "Version", .text = (char *) global.deployModule.versionDisplay});
+// Digest of the module source. The step existed but was left out of the flow, so the code being
+// deployed was never represented on screen.
 UX_STEP_NOCB(ux_deploy_module_2_step,
              bnnn_paging,
-             {.title = "TX hash", .text = (char *) global.deployModule.sourceHashDisplay});
+             {.title = "Module hash", .text = (char *) global.deployModule.sourceHashDisplay});
 UX_FLOW(ux_deploy_module,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_deploy_module,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_deploy_module_1_step,
+        &ux_deploy_module_2_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
@@ -954,11 +1117,23 @@ UX_STEP_NOCB(ux_init_contract_1_step,
 UX_STEP_NOCB(ux_init_contract_2_step,
              bnnn_paging,
              {.title = "Module ref", .text = (char *) global.initContract.moduleRefDisplay});
+UX_STEP_NOCB(ux_init_contract_3_step,
+             bnnn_paging,
+             {.title = "Contract name", .text = (char *) global.initContract.nameDisplay});
+// Digest over the contract name followed by its parameters - everything the transaction hash
+// covers beyond the fields already shown above.
+UX_STEP_NOCB(ux_init_contract_4_step,
+             bnnn_paging,
+             {.title = "Payload hash", .text = (char *) global.initContract.paramsHashDisplay});
 UX_FLOW(ux_init_contract,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_init_contract,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_init_contract_1_step,
         &ux_init_contract_2_step,
+        &ux_init_contract_3_step,
+        &ux_init_contract_4_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
@@ -976,12 +1151,22 @@ UX_STEP_NOCB(ux_update_contract_2_step,
 UX_STEP_NOCB(ux_update_contract_3_step,
              bnnn_paging,
              {.title = "Sub index", .text = (char *) global.updateContract.subIndexDisplay});
+UX_STEP_NOCB(ux_update_contract_4_step,
+             bnnn_paging,
+             {.title = "Receive name", .text = (char *) global.updateContract.nameDisplay});
+UX_STEP_NOCB(ux_update_contract_5_step,
+             bnnn_paging,
+             {.title = "Payload hash", .text = (char *) global.updateContract.paramsHashDisplay});
 UX_FLOW(ux_update_contract,
-        &ux_sign_flow_shared_review,
+        &ux_sign_flow_review_update_contract,
         &ux_sign_flow_account_sender_view,
+        &ux_sign_flow_max_energy_view,
+        &ux_sign_flow_network_view,
         &ux_update_contract_1_step,
         &ux_update_contract_2_step,
         &ux_update_contract_3_step,
+        &ux_update_contract_4_step,
+        &ux_update_contract_5_step,
         &ux_sign_flow_shared_sign,
         &ux_sign_flow_shared_decline);
 
