@@ -52,6 +52,9 @@ diff
 .vscode/*
 !.vscode/20-ledger.ledgerblue.rules
 
+# JetBrains IDEs (CLion, PyCharm) — per-developer project settings
+.idea/
+
 # clangd (language server index; may appear under fuzzing/ or repo root)
 .cache/
 
