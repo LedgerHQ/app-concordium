@@ -163,6 +163,10 @@ typedef struct {
      * transaction, so both must be represented on the approval screen. Parameters are arbitrary
      * binary of up to 64 KiB, so only a digest can honestly represent them. */
     char nameDisplay[CONTRACT_NAME_SIZE];
+    /** Name bytes retained in `nameDisplay` so far. Counted rather than recovered with strlen:
+     * the two agree only while the text holds no NUL, and a name carrying one is exactly the
+     * case that must not silently rewind the write cursor. */
+    uint32_t nameDisplayUsed;
     char paramsHashDisplay[HASH_DISPLAY_SIZE];
     cx_sha256_t paramsHashCtx;
     initContractState_t state;
@@ -191,6 +195,10 @@ typedef struct {
      * transaction, so both must be represented on the approval screen. Parameters are arbitrary
      * binary of up to 64 KiB, so only a digest can honestly represent them. */
     char nameDisplay[CONTRACT_NAME_SIZE];
+    /** Name bytes retained in `nameDisplay` so far. Counted rather than recovered with strlen:
+     * the two agree only while the text holds no NUL, and a name carrying one is exactly the
+     * case that must not silently rewind the write cursor. */
+    uint32_t nameDisplayUsed;
     char paramsHashDisplay[HASH_DISPLAY_SIZE];
     cx_sha256_t paramsHashCtx;
     updateContractState_t state;
