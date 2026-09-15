@@ -10,6 +10,7 @@
 #include "concordium_crypto.h"
 #include "format.h"
 #include "display.h"
+#include "menu.h"
 #include "numberHelpers.h"
 
 #include "export_private_key_new_path.h"
@@ -247,6 +248,10 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
     ctx->newPathIdentityProvider = identityProvider;
     ctx->newPathIdentity = identity;
     ctx->newPathAccount = account;
+    // Witness that the fields above belong to a request this handler validated, checked in
+    // sendPrivateKeysNewPath() before it derives. Every path that clears the instruction union
+    // clears this too, and the legacy handler sets it false, so it cannot be inherited.
+    ctx->isNewPath = true;
     explicit_bzero(ctx->outputPrivateKeys, sizeof(ctx->outputPrivateKeys));
     ctx->privateKeysLength = 0;
 
@@ -331,7 +336,23 @@ void handle_export_private_key_new_path(const command_t *cmd, volatile unsigned 
 }
 
 void sendPrivateKeysNewPath(void) {
-    // Derivation happens here, not in the handler: the user has now approved the export.
+    /* Derivation happens here, not in the handler: the user has now approved the export. That
+     * keeps exportable secrets out of RAM while the review is up, but it also means these
+     * parameters are read long after the handler stored them, and they live in the instruction
+     * union that app_main() zeroes when it opens an instruction and dispatch_guarded() zeroes
+     * when a handler throws. Zeroed parameters still derive a perfectly valid key set - for
+     * IDP#0 ID#0, which is not what the user reviewed - so refuse rather than derive.
+     *
+     * Unreachable as things stand: the SDK will not deliver an APDU while the UX holds a
+     * pending reply (os_io_handle_ux_event_reject_apdu), and the transport that used to get
+     * around that is disabled (V-119). This is the local check that does not depend on either. */
+    if (!ctx->isNewPath) {
+        PRINTF("Export context was cleared while the review was up; refusing to derive\n");
+        send_rejection(ERROR_INVALID_STATE);
+        ui_menu_main();
+        return;
+    }
+
     ctx->privateKeysLength =
         (uint8_t) exportNewPathPrivateKeysForPurpose(ctx->newPathPurpose,
                                                      ctx->newPathNetwork,
