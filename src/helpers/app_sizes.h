@@ -81,6 +81,15 @@
 /* Maximum token-id byte length (1..PLT_TOKEN_ID_MAX per CIS-7 §3). */
 #define PLT_TOKEN_ID_MAX 128
 
+/* Decoded PLT memo text, plus a NUL.
+ * A CIS-7 memo is at most 256 bytes on the wire, and the device accepts only the tag-24 form,
+ * whose byte string wraps a CBOR text string - so the text itself is always shorter than the
+ * 256-byte envelope. Sized for the whole envelope anyway: the memo is part of the signed
+ * payload, so anything the review cannot hold in full has to be refused rather than trimmed,
+ * and refusing a memo a host may legitimately send is worse than the BSS. sign_plt.c asserts
+ * the context still fits its budget. */
+#define PLT_MEMO_DISPLAY_SIZE 257
+
 /* Display buffer for "<number> <tokenId>\0".
  * 40 = FPU64_TMP_LEN (max formatted number incl. decimal point and 18 dp).
  * 1  = space separator.

@@ -17,6 +17,7 @@
 #include "display.h"
 #include "helpers/base58check.h"
 #include "helpers/derivation_path.h"
+#include "helpers/display_text.h"
 #include "helpers/fee_display.h"
 #include "helpers/numberHelpers.h"
 #include "helpers/tx_hash.h"
@@ -46,6 +47,7 @@ _Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_T
 
 /* CBOR tag numbers used by CIS-7. */
 #define CBOR_TAG_DECIMAL_FRACTION 4u
+#define CBOR_TAG_ENCODED_CBOR     24u    /* RFC 8949 encoded CBOR data item */
 #define CBOR_TAG_ACCOUNT_ADDRESS  40307u /* BCR-2020-009 crypto-address */
 #define CBOR_TAG_COININFO         40305u /* BCR-2020-007 coin-info     */
 
@@ -64,9 +66,6 @@ _Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_T
 
 /* Longest op-name key in the CIS-7 spec: "removeAllowList" = 15 chars. */
 #define PLT_OP_NAME_MAX 16u
-
-/* Memo: bytes copied from CBOR for display; we never need the full 256. */
-#define MEMO_DISPLAY_BYTES 14u
 
 static signPltContext_t *ctx = &global.signPlt;
 static tx_state_t *tx_state = &global_tx_state;
@@ -242,84 +241,115 @@ static bool parse_address_value(CborValue *it) {
 }
 
 /*
- * Populate ctx->displayMemo from up to MEMO_DISPLAY_BYTES of bytes.
- * Displays as ASCII when all sampled bytes are printable (0x20-0x7E),
- * otherwise falls back to a "0x<hex>" prefix.
+ * Borrow a definite-length CBOR string's bytes where they already sit in ctx->cborBuf.
+ *
+ * The whole operations blob is accumulated before parsing, so a definite-length string is one
+ * contiguous chunk inside it and needs no copy. Indefinite-length strings are refused: they
+ * arrive as several chunks with no single canonical encoding, and only the first would be seen
+ * here. `it` is left untouched - the caller advances it.
  */
-static void format_memo_display(const uint8_t *bytes, size_t displayLen, size_t totalLen) {
-    static const char hex[] = "0123456789abcdef";
+static bool cbor_string_bytes_in_place(const CborValue *it, const uint8_t **bytes, size_t *length) {
+    bool isByteString = cbor_value_is_byte_string(it);
+    if (!isByteString && !cbor_value_is_text_string(it)) return false;
+    if (!cbor_value_is_length_known(it)) return false;
 
-    bool is_ascii = true;
-    for (size_t i = 0; i < displayLen; i++) {
-        if (bytes[i] < 0x20 || bytes[i] > 0x7E) {
-            is_ascii = false;
-            break;
-        }
-    }
+    size_t declared = 0;
+    if (cbor_value_get_string_length(it, &declared) != CborNoError) return false;
 
-    if (is_ascii && totalLen <= sizeof(ctx->displayMemo) - 1u) {
-        memmove(ctx->displayMemo, bytes, displayLen);
-        ctx->displayMemo[displayLen] = '\0';
-    } else if (is_ascii) {
-        /* Truncate long ASCII with ellipsis. */
-        size_t fit = sizeof(ctx->displayMemo) - 4u; /* leave room for "...\0" */
-        if (fit > displayLen) fit = displayLen;     /* don't overread the sample buffer */
-        memmove(ctx->displayMemo, bytes, fit);
-        ctx->displayMemo[fit] = '.';
-        ctx->displayMemo[fit + 1] = '.';
-        ctx->displayMemo[fit + 2] = '.';
-        ctx->displayMemo[fit + 3] = '\0';
+    CborValue iter = *it;
+    if (cbor_value_begin_string_iteration(&iter) != CborNoError) return false;
+
+    CborValue next;
+    CborError err;
+    if (isByteString) {
+        err = cbor_value_get_byte_string_chunk(&iter, bytes, length, &next);
     } else {
-        /* Hex prefix: "0x" + up to MEMO_DISPLAY_BYTES bytes. */
-        ctx->displayMemo[0] = '0';
-        ctx->displayMemo[1] = 'x';
-        /* "0x" prefix + hexBytes*2 hex chars + NUL must fit in displayMemo[30]:
-         * 2 + hexBytes*2 + 1 <= 30  =>  hexBytes <= 13. */
-        size_t hexMax = (sizeof(ctx->displayMemo) - 3u) / 2u; /* = 13 */
-        size_t hexBytes = displayLen < hexMax ? displayLen : hexMax;
-        for (size_t i = 0; i < hexBytes; i++) {
-            ctx->displayMemo[2u + i * 2u] = hex[bytes[i] >> 4];
-            ctx->displayMemo[2u + i * 2u + 1u] = hex[bytes[i] & 0x0Fu];
-        }
-        ctx->displayMemo[2u + hexBytes * 2u] = '\0';
+        const char *text = NULL;
+        err = cbor_value_get_text_string_chunk(&iter, &text, length, &next);
+        *bytes = (const uint8_t *) text;
     }
+    if (err != CborNoError) return false;
+
+    /* A definite-length string is a single chunk, so this must be the entire value. */
+    return *bytes != NULL && *length == declared;
 }
 
 /*
- * Parse a CIS-7 memo field: either a raw bstr or tag-24 (embedded CBOR) bstr.
- * Advances *it past the value and populates ctx->displayMemo.
+ * Decode the CBOR text string embedded in a tag-24 memo into ctx->displayMemo.
+ *
+ * Applies the same strictness as the native CCD memo path (parse_complete_cbor,
+ * helpers/cbor_data_blob.c): definite length only, the item must consume the whole byte string,
+ * and every byte must be renderable. The memo is part of the signed payload, so a memo the
+ * review cannot show faithfully is refused rather than trimmed or drawn as something else.
+ */
+static bool decode_memo_cbor(const uint8_t *bytes, size_t length) {
+    CborParser parser;
+    CborValue value;
+    if (cbor_parser_init(bytes, length, 0, &parser, &value) != CborNoError) return false;
+
+    /* Only a text string can be shown in the Memo row; a number, map or array would have to be
+     * rendered as something other than what was signed. */
+    if (!cbor_value_is_text_string(&value)) return false;
+
+    const uint8_t *text = NULL;
+    size_t textLength = 0;
+    if (!cbor_string_bytes_in_place(&value, &text, &textLength)) return false;
+
+    /* Trailing bytes inside the envelope stay in the transaction hash while the review shows
+     * only the text string, so the envelope must hold exactly one complete item. */
+    if (text + textLength != bytes + length) return false;
+
+    if (textLength > sizeof(ctx->displayMemo) - 1u) return false;
+    if (!is_displayable_text(text, textLength)) return false;
+
+    memmove(ctx->displayMemo, text, textLength);
+    ctx->displayMemo[textLength] = '\0';
+    return true;
+}
+
+/*
+ * Parse a CIS-7 memo field.
+ *
+ * CborMemo is a discriminated union (concordium-base token_operations.rs): an untagged byte
+ * string is Raw(Memo) - opaque bytes - and a tag-24 byte string is Cbor(Memo), whose content is
+ * an encoded CBOR data item (RFC 8949 tag 24). The tag is on the wire, so the device never has
+ * to guess which it received.
+ *
+ * Only the tag-24 form is accepted. Raw bytes have no faithful rendering, and unwrapping the
+ * tag without decoding what is inside put the inner CBOR header on screen as text - a tag-24
+ * memo holding "send with memo" reviewed as "nsend with memo", because header byte 0x6E is
+ * printable ASCII.
+ *
+ * Advances *it past the value. Returns false to refuse the transaction: a memo that cannot be
+ * parsed must not be signed, since it is permanent on chain and was never shown.
  */
 static bool parse_memo_value(CborValue *it) {
-    ctx->hasMemo = true;
-
-    uint8_t tmp[MEMO_DISPLAY_BYTES];
-    size_t totalLen = 0;
-
-    if (cbor_value_is_tag(it)) {
-        /* tag 24 = byte string containing embedded CBOR; unwrap one level.
-         * Tags are not containers in tinycbor — use advance_fixed to skip the
-         * tag header, then treat the content as a plain byte string. */
-        if (cbor_value_advance_fixed(it) != CborNoError) goto skip;
-        if (!cbor_value_is_byte_string(it)) goto skip;
-        cbor_value_get_string_length(it, &totalLen);
-        size_t copyLen = totalLen < sizeof(tmp) ? totalLen : sizeof(tmp);
-        if (cbor_value_copy_byte_string(it, tmp, &copyLen, it) != CborNoError) goto skip;
-        format_memo_display(tmp, copyLen, totalLen);
-        return true;
-    }
-
-    if (cbor_value_is_byte_string(it)) {
-        cbor_value_get_string_length(it, &totalLen);
-        size_t copyLen = totalLen < sizeof(tmp) ? totalLen : sizeof(tmp);
-        if (cbor_value_copy_byte_string(it, tmp, &copyLen, it) != CborNoError) goto skip;
-        format_memo_display(tmp, copyLen, totalLen);
-        return true;
-    }
-
-skip:
     ctx->hasMemo = false;
-    if (!cbor_value_at_end(it)) cbor_value_advance(it);
-    return true; /* non-fatal: treat unreadable memo as absent */
+
+    if (!cbor_value_is_tag(it)) return false;
+
+    CborTag tag = 0;
+    if (cbor_value_get_tag(it, &tag) != CborNoError) return false;
+    if (tag != CBOR_TAG_ENCODED_CBOR) return false;
+
+    /*
+     * Tags are not containers in tinycbor (cbor_value_is_container is false for CborTagType),
+     * so advance_fixed skips the tag header and leaves `it` on the tagged content without
+     * disturbing the enclosing map's remaining count.
+     */
+    if (cbor_value_advance_fixed(it) != CborNoError) return false;
+    if (!cbor_value_is_byte_string(it)) return false;
+
+    const uint8_t *envelope = NULL;
+    size_t envelopeLength = 0;
+    if (!cbor_string_bytes_in_place(it, &envelope, &envelopeLength)) return false;
+    if (!decode_memo_cbor(envelope, envelopeLength)) return false;
+
+    /* Step over the byte string only once its content has been accepted. */
+    if (cbor_value_advance(it) != CborNoError) return false;
+
+    ctx->hasMemo = true;
+    return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -428,7 +458,9 @@ static uint16_t parse_plt_cbor(void) {
             if (!parse_address_value(&inner)) return ERROR_PLT_CBOR_ERROR;
             addressSeen = true;
         } else if (strcmp(fieldName, "memo") == 0) {
-            if (!parse_memo_value(&inner)) return ERROR_PLT_CBOR_ERROR;
+            /* A memo the review cannot show is refused outright: it is part of the signed
+             * payload and permanent on chain, so it must never be approved unseen. */
+            if (!parse_memo_value(&inner)) return ERROR_PLT_UNSUPPORTED_MEMO;
         } else {
             /* Unknown field — skip its value. */
             if (cbor_value_advance(&inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;

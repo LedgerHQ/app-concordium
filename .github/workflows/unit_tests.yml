@@ -23,6 +23,10 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          # deps/tinycbor is a submodule and cbor_data_blob.c parses through it, so a checkout
+          # without it fails CMake outright. actions/checkout defaults to submodules: false.
+          submodules: true
 
       - name: Clone SDK
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4

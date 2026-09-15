@@ -66,7 +66,7 @@ Transfer tokens from the sender to a recipient.
 | ------------- | -------- | -------------------------- | -------------------------------------------------- |
 | `"amount"`    | yes      | tag 4 (decimal fraction)   | Amount to transfer; see [Amount encoding](#amount-encoding) |
 | `"recipient"` | yes      | tag 40307 (account address)| Destination account; see [Address encoding](#address-encoding) |
-| `"memo"`      | no       | bstr or tag-24 bstr        | Optional payment reference; see [Memo encoding](#memo-encoding) |
+| `"memo"`      | no       | tag-24 bstr (CBOR text)    | Optional payment reference; only the tag-24 CBOR-text form is accepted, see [Memo encoding](#memo-encoding) |
 
 ### `"mint"`
 
@@ -157,16 +157,29 @@ d9 9d 73  a2  01  d9 9d 71  a1  01  19 03 97  03  58 20  <32 bytes>
 
 ### Memo encoding
 
-Memos are plain byte strings or tag-24-wrapped byte strings:
+`CborMemo` is a discriminated union ([`token_operations.rs`](https://github.com/Concordium/concordium-base/blob/main/rust-src/concordium_base/src/protocol_level_tokens/token_operations.rs)), and the discriminator is on the wire, so the device never guesses which variant it received:
 
 ```
-bstr          ; raw bytes
-#6.24(bstr)   ; embedded CBOR (tag 24)
+bstr          ; CborMemo::Raw  — content is opaque bytes
+#6.24(bstr)   ; CborMemo::Cbor — content is an encoded CBOR data item (RFC 8949 tag 24)
 ```
 
-- Maximum length: 256 bytes (protocol limit).
-- Display: up to 14 bytes are sampled. If all sampled bytes are ASCII-printable, the memo is shown as text. Otherwise it is shown as `"0x<hex>"` covering the first bytes.
-- The app does not decode tag-24 content — it is shown as raw bytes regardless.
+The node's test vectors for the bytes `01020304` give `4401020304` (Raw) and `d8184401020304` (Cbor).
+
+**The app accepts only the `Cbor` variant, and only when the encoded item is a single definite-length CBOR text string that fills the whole byte string.** Everything else is refused with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`), and refusal aborts signing:
+
+| Memo | Result |
+|------|--------|
+| `#6.24(bstr)` wrapping one definite-length text string, all bytes renderable | decoded text is displayed |
+| `bstr` (the `Raw` variant) | refused — opaque bytes have no faithful rendering |
+| `#6.24(bstr)` wrapping a number, byte string, array or map | refused — could only be shown as something other than what was signed |
+| encoded item followed by trailing bytes | refused — the extra bytes stay in the hash unseen |
+| indefinite-length text string | refused — several chunks, no single canonical encoding |
+| text containing `0x00`–`0x1F` or `0x7F` | refused — a NUL ends the display while the signature covers what follows |
+| text longer than `PLT_MEMO_DISPLAY_SIZE - 1` | refused rather than trimmed |
+
+- Maximum length: 256 bytes (protocol limit); `displayMemo` is sized for the whole envelope so an accepted memo is always shown in full.
+- The same rules the native CCD memo path applies (`parse_complete_cbor`, `src/helpers/cbor_data_blob.c`): definite length only, no trailing bytes, renderable bytes only.
 
 ---
 

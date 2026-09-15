@@ -41,5 +41,8 @@ extern tx_state_t global_tx_state;
     0x6B10 /* payload has > 1 operation; rejected to prevent confirmation-blindness */
 #define ERROR_PLT_UNSUPPORTED_DECIMALS \
     0x6B11 /* amount exponent magnitude exceeds the app's 18-decimal display limit */
+#define ERROR_PLT_UNSUPPORTED_MEMO                                                           \
+    0x6B12 /* memo is not a tag-24 byte string holding one definite-length CBOR text string, \
+            * or that text cannot be rendered — see parse_memo_value() */
 
 #define ERROR_DEVICE_LOCKED 0x530C

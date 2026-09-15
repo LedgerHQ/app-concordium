@@ -20,6 +20,7 @@ Error status words (all in 0x6Bxx range):
   0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128]
   0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
   0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent magnitude > 18
+  0x6B12  ERROR_PLT_UNSUPPORTED_MEMO — memo is not a tag-24 CBOR text string, or is unrenderable
 """
 
 import pytest

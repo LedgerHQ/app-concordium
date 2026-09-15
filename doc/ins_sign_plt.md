@@ -42,7 +42,7 @@ Supported operations and their required fields:
 
 - **amount** — CBOR tag 4 (decimal fraction) wrapping `[exponent, significand]`. `exponent` must be ≤ 0; `significand` is an unsigned 64-bit integer.
 - **recipient / target** — CBOR tag 40307 wrapping a map: `{? 1: 40305({1: 919}), 3: bstr .size 32}`. Key `3` (the raw account address) is mandatory; the coininfo field under key `1` is optional but, when present, must be `40305({1: 919})`. See [plt_cbor_fields.md](plt_cbor_fields.md#address-encoding).
-- **memo** — a byte string (raw bytes) or tag-24 byte string (embedded CBOR). Up to 256 bytes; displayed as ASCII when all sampled bytes are printable, otherwise as a `0x…` hex prefix.
+- **memo** — must be a tag-24 byte string (`CborMemo::Cbor`) whose content is a single definite-length CBOR text string filling the whole byte string, with every byte renderable. The decoded text is displayed in full. The untagged `CborMemo::Raw` variant and any other tag-24 content are rejected with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) — a memo the review cannot show is never signed. See [plt_cbor_fields.md](plt_cbor_fields.md#memo-encoding).
 
 More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`).
 
@@ -60,6 +60,7 @@ More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP`
 | `0x6B0F` | `ERROR_PLT_DATA_ERROR`     | `token_id_length` is 0 or > 128                                                                        |
 | `0x6B10` | `ERROR_PLT_MULTI_OP`       | CBOR outer array contains more than one operation                                                      |
 | `0x6B11` | `ERROR_PLT_UNSUPPORTED_DECIMALS` | Amount exponent magnitude exceeds 18 (app display limit; the chain allows 0–255 decimals)    |
+| `0x6B12` | `ERROR_PLT_UNSUPPORTED_MEMO` | Memo is not a tag-24 byte string holding one definite-length CBOR text string, or that text cannot be rendered |
 
 ## Display
 
@@ -82,7 +83,7 @@ Fields in brackets `[…]` appear only when the host provides the corresponding 
 **Formatting details:**
 - **Amount** — displayed as `"<value> <tokenId>"` with the number of decimal places determined by the CBOR tag-4 exponent (e.g. `"1.500000 UPEU"`). Raw smallest units are never shown without decimal context. **App limit: the exponent magnitude must not exceed 18** (i.e. exponent ∈ [−18, 0]); tokens registered with more than 18 decimals are rejected with `ERROR_PLT_UNSUPPORTED_DECIMALS` (`0x6B11`). The chain permits 0–255 decimals; no mainnet or testnet token currently exceeds 18.
 - **Recipient / Target** — base58check-encoded 55-character Concordium address.
-- **Memo** — up to 14 bytes; shown as ASCII if all sampled characters are printable, otherwise as `"0x<hex>"` prefix. Truncation indicated by displayed byte count.
+- **Memo** — the decoded text of a tag-24 CBOR text string, shown in full. Anything that cannot be rendered faithfully is refused with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) rather than trimmed or hex-dumped, because the memo is part of the signed payload and permanent on chain.
 - **Max fees** — only shown when the host sends the fee suffix (P2=`0x01` on INIT); formatted as CCD with 6 decimal places (e.g. `"0.000727 CCD"`). If the host sends `0xFFFFFFFFFFFFFFFF`, the fee line is suppressed.
 - Long strings are paginated on Nano (scrollable); on Stax/Flex the review uses the standard pair-list layout.
 

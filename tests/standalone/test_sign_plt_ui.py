@@ -128,14 +128,32 @@ def _cis7_addr(addr: bytes = _ADDR_32, coininfo: bytes = None) -> bytes:
 # ------------------------------------------------------------------ #
 
 
-def _plt_transfer(exp: int, sig: int, recipient: bytes = _ADDR_32, memo: bytes = None,
-                  coininfo: bytes = None) -> bytes:
+def _cis7_memo(text: str) -> bytes:
+    """tag 24(bstr(<CBOR text string>)) — the CborMemo::Cbor variant.
+
+    CborMemo is a discriminated union (concordium-base token_operations.rs): an untagged bstr is
+    Raw(Memo) and a tag-24 bstr is Cbor(Memo), whose content is an encoded CBOR data item
+    (RFC 8949 tag 24).  The device accepts only this form, and only when the encoded item is one
+    definite-length text string filling the whole envelope.
+    """
+    return _tag(24, _bstr(_tstr(text)))
+
+
+def _plt_transfer(exp: int, sig: int, recipient: bytes = _ADDR_32, memo: str = None,
+                  coininfo: bytes = None, memo_value: bytes = None) -> bytes:
+    """transfer payload.
+
+    memo:       text carried in the accepted tag-24 CBOR-text-string form.
+    memo_value: a CBOR value placed in the memo slot verbatim, for refusal cases.
+    """
     fields = [
         (_tstr("amount"), _cis7_amount(exp, sig)),
         (_tstr("recipient"), _cis7_addr(recipient, coininfo)),
     ]
     if memo is not None:
-        fields.append((_tstr("memo"), _bstr(memo)))
+        fields.append((_tstr("memo"), _cis7_memo(memo)))
+    elif memo_value is not None:
+        fields.append((_tstr("memo"), memo_value))
     return _array([_map([(_tstr("transfer"), _map(fields))])])
 
 
@@ -224,15 +242,20 @@ def test_plt_transfer_reject(backend, navigator, default_screenshot_path, test_n
 
 
 # ================================================================== #
-# Tests 3–6: Transfer with various memo payloads                      #
+# Tests 3–6: Transfer with a tag-24 CBOR memo                         #
 # ================================================================== #
 
 
 @pytest.mark.active_test_scope
-def test_plt_transfer_memo_ascii(backend, navigator, default_screenshot_path, test_name):
-    """Transfer with short printable-ASCII memo — memo displayed as-is."""
+def test_plt_transfer_memo_cbor_text(backend, navigator, default_screenshot_path, test_name):
+    """tag-24 memo holding the CBOR text string "send with memo" — text shown, header decoded.
+
+    The envelope is 6e73656e64… : the device used to unwrap the tag and hand the bytes straight
+    to the display, so the inner CBOR header 0x6E reviewed as a leading 'n' ("nsend with memo").
+    The snapshot must show the text alone.
+    """
     client = CommandSender(backend)
-    cbor = _plt_transfer(-6, 500_000, memo=b"Hello")
+    cbor = _plt_transfer(-6, 500_000, memo="send with memo")
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -243,10 +266,10 @@ def test_plt_transfer_memo_ascii(backend, navigator, default_screenshot_path, te
 
 
 @pytest.mark.active_test_scope
-def test_plt_transfer_memo_non_ascii(backend, navigator, default_screenshot_path, test_name):
-    """Transfer with non-ASCII memo bytes — displayed as 0x<hex>."""
+def test_plt_transfer_memo_empty_text(backend, navigator, default_screenshot_path, test_name):
+    """tag-24 memo holding a zero-length CBOR text string — memo row present but empty."""
     client = CommandSender(backend)
-    cbor = _plt_transfer(-6, 1, memo=b"\x80\x81")
+    cbor = _plt_transfer(-6, 1_000_000, memo="")
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -257,10 +280,17 @@ def test_plt_transfer_memo_non_ascii(backend, navigator, default_screenshot_path
 
 
 @pytest.mark.active_test_scope
-def test_plt_transfer_memo_empty(backend, navigator, default_screenshot_path, test_name):
-    """Transfer with zero-length memo bstr — memo field present but content empty."""
+def test_plt_transfer_memo_20_bytes(backend, navigator, default_screenshot_path, test_name):
+    """A 20-character memo is shown in full — regression cover for the 15-29 byte window.
+
+    The old format_memo_display sampled 14 bytes upstream but compared the memo's true length
+    against displayMemo's 29-byte capacity, so 15-29 byte memos rendered as their first 14 bytes
+    with no ellipsis and no flag while the full memo was hashed and signed. Both branches are
+    gone, but nothing else in this file lands in that window: "send with memo" is exactly 14
+    characters, so it sat on the old boundary and would not have caught it.
+    """
     client = CommandSender(backend)
-    cbor = _plt_transfer(-6, 1_000_000, memo=b"")
+    cbor = _plt_transfer(-6, 250_000, memo="twenty-byte memo!!!!")
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -271,11 +301,14 @@ def test_plt_transfer_memo_empty(backend, navigator, default_screenshot_path, te
 
 
 @pytest.mark.active_test_scope
-def test_plt_transfer_memo_256b(backend, navigator, default_screenshot_path, test_name):
-    """Transfer with 256-byte ASCII memo — display truncated with '...'."""
+def test_plt_transfer_memo_long_text(backend, navigator, default_screenshot_path, test_name):
+    """A 200-character memo is shown in full, not truncated.
+
+    displayMemo holds the whole envelope (PLT_MEMO_DISPLAY_SIZE), because the memo is signed and
+    permanent on chain: a trimmed review would have the user approve text never shown.
+    """
     client = CommandSender(backend)
-    # 256 'A' bytes: exceeds ctx->displayMemo capacity, truncated to fit with "..."
-    cbor = _plt_transfer(-6, 1_000_000, memo=b"A" * 256)
+    cbor = _plt_transfer(-6, 1_000_000, memo="A" * 200)
     with client.sign_plt_with_ui(_PATH, _HEADER_60, _TOKEN_ID_MIN, cbor):
         navigate_until_text_and_compare(
             backend, navigator, "Sign", default_screenshot_path, test_name
@@ -283,6 +316,60 @@ def test_plt_transfer_memo_256b(backend, navigator, default_screenshot_path, tes
     resp = client.get_async_response()
     assert resp.status == StatusWords.SWO_SUCCESS
     assert len(resp.data) == 64
+
+
+# ------------------------------------------------------------------ #
+# Memos the review cannot show faithfully — refused, never signed.    #
+# ------------------------------------------------------------------ #
+
+# An indefinite-length text string: 0x7F, one "ab" chunk, 0xFF break.
+_INDEFINITE_TEXT = bytes([0x7F]) + _tstr("ab") + bytes([0xFF])
+
+_BAD_MEMOS = {
+    # CborMemo::Raw — the node's own vector for bytes 01020304 (4401020304). Opaque bytes have
+    # no faithful rendering, so the raw variant is refused outright.
+    "raw_variant_node_vector": _bstr(bytes([0x01, 0x02, 0x03, 0x04])),
+    "raw_variant_text_bytes": _bstr(b"send with memo"),
+    # CborMemo::Cbor — the node's vector d8184401020304. The envelope decodes as CBOR uint 1
+    # followed by three bytes outside the item, which stay in the hash unseen.
+    "cbor_variant_node_vector": _tag(24, _bstr(bytes([0x01, 0x02, 0x03, 0x04]))),
+    # Encoded item is not a text string: nothing to put in the Memo row that is what was signed.
+    "encoded_uint": _tag(24, _bstr(_uint(1))),
+    "encoded_negint": _tag(24, _bstr(_negint(-1))),
+    "encoded_bstr": _tag(24, _bstr(_bstr(b"ab"))),
+    "encoded_array": _tag(24, _bstr(_array([_uint(1)]))),
+    "encoded_map": _tag(24, _bstr(_map([(_uint(1), _uint(2))]))),
+    # Text string plus trailing bytes inside the envelope.
+    "trailing_bytes": _tag(24, _bstr(_tstr("ab") + bytes([0xFF]))),
+    # Indefinite length: several chunks, no single canonical encoding.
+    "indefinite_text": _tag(24, _bstr(_INDEFINITE_TEXT)),
+    # Bytes no screen can render honestly; the NUL would end the string early while the
+    # signature still covered what follows it.
+    "embedded_nul": _tag(24, _bstr(_tstr("a\x00b"))),
+    "control_byte": _tag(24, _bstr(_tstr("a\x1fb"))),
+    "del_byte": _tag(24, _bstr(_tstr("a\x7fb"))),
+    # Text longer than the review buffer: refused rather than trimmed.
+    "text_past_display": _tag(24, _bstr(_tstr("A" * 300))),
+    # Wrong discriminator tag entirely.
+    "wrong_tag": _tag(23, _bstr(_tstr("ab"))),
+    # Tagged value is not a byte string.
+    "tag24_over_text": _tag(24, _tstr("ab")),
+    # Memo slot holds a bare text string — neither union variant.
+    "bare_text": _tstr("ab"),
+    "bare_uint": _uint(1),
+}
+
+
+@pytest.mark.active_test_scope
+@pytest.mark.parametrize("case", sorted(_BAD_MEMOS))
+def test_plt_invalid_memo_encoding(backend, case):
+    """A memo that cannot be parsed aborts signing with ERROR_PLT_UNSUPPORTED_MEMO (0x6B12).
+
+    Signing used to continue with hasMemo = false, so the user approved a transaction carrying a
+    memo that was never displayed — and the memo is part of the signed payload.
+    """
+    cbor = _plt_transfer(-6, 100, memo_value=_BAD_MEMOS[case])
+    assert _exchange_plt_cbor(backend, cbor) == 0x6B12  # ERROR_PLT_UNSUPPORTED_MEMO
 
 
 # ================================================================== #
@@ -539,8 +626,18 @@ def test_plt_malformed_cbor(backend):
 
 
 def _exchange_plt_cbor(backend, cbor: bytes) -> int:
-    """Send INIT + a single CONT frame and return the CONT status word."""
-    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    """Send INIT + as many CONT frames as the payload needs, and return the last status word.
+
+    The blob must be split at MAX_APDU_LEN: a single frame caps at 255 bytes, and a payload
+    over that would fail in the transport instead of reaching the parser, so an over-length
+    refusal case would pass for the wrong reason. The device accumulates up to
+    APP_PLT_CBOR_MAX (512) across frames and parses only once the declared total has arrived,
+    so the refusal always comes from the final frame.
+    """
+    from application_client.command_sender import (
+        CLA, InsType, MAX_APDU_LEN, pack_derivation_path,
+    )
+    from utils import split_message
 
     init_data = (pack_derivation_path(_PATH) + _HEADER_60
                  + bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
@@ -548,8 +645,18 @@ def _exchange_plt_cbor(backend, cbor: bytes) -> int:
     resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=init_data)
     assert resp.status == StatusWords.SWO_SUCCESS
 
+    chunks = split_message(cbor, MAX_APDU_LEN)
     try:
-        return backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=cbor).status
+        for chunk in chunks[:-1]:
+            resp = backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
+            )
+            # An intermediate frame only accumulates; a refusal here is the answer.
+            if resp.status != StatusWords.SWO_SUCCESS:
+                return resp.status
+        return backend.exchange(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunks[-1]
+        ).status
     except ExceptionRAPDU as e:
         return e.status
 
