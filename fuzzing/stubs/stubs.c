@@ -437,6 +437,15 @@ static void fuzz_park(fuzz_ui_action_t action) {
     g_fuzz_pending_ui_action = action;
 }
 
+/*
+ * Return to the idle screen. Stubbed rather than parked: it is not an approval point, it is
+ * where a finished or refused flow leaves the UI. sendPrivateKeysNewPath() calls it when it
+ * refuses to derive from a cleared context, which is the only reference to it from a source
+ * file these targets compile - the apdu_response.c senders that normally call it are
+ * themselves stubbed below.
+ */
+void ui_menu_main(void)                                { }
+
 void uiComparePubkey(void)                             { fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
 void uiGeneratePubkey(volatile unsigned int *flags)    { (void)flags; fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
 void uiExportPrivateKey(volatile unsigned int *flags)  { (void)flags; fuzz_park(FUZZ_UI_EXPORT_PRIVATE_KEY); }
