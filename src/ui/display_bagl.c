@@ -1195,7 +1195,9 @@ UX_STEP_NOCB(ux_plt_fee_step,
              bnnn_paging,
              {.title = "Max fees", .text = global.signPlt.displayFee});
 
-static const ux_flow_step_t *ux_sign_plt[12];
+/* Worst case is a transfer with a memo and a host fee suffix: review, sender, max energy,
+ * network, token, operation, amount, recipient, memo, max fees, sign, decline, FLOW_END = 13. */
+static const ux_flow_step_t *ux_sign_plt[14];
 
 void startPltDisplay(volatile unsigned int *flags) {
     PRINTF("DBG: startPltDisplay entry\n");
@@ -1203,7 +1205,14 @@ void startPltDisplay(volatile unsigned int *flags) {
     uint8_t idx = 0;
 
     ux_sign_plt[idx++] = &ux_plt_review_step;
+    /* PLT is an account transaction (kind 27), so it opens with the same header steps as every
+     * other one. The energy ceiling is the only cost bound inside the hash - the "Max fees"
+     * step below is a host estimate outside it (V-001, V-084) - and the network cannot be read
+     * off the addresses, which are encoded identically on mainnet and testnet (V-057, V-093,
+     * V-095). */
     ux_sign_plt[idx++] = &ux_sign_flow_account_sender_view;
+    ux_sign_plt[idx++] = &ux_sign_flow_max_energy_view;
+    ux_sign_plt[idx++] = &ux_sign_flow_network_view;
     ux_sign_plt[idx++] = &ux_plt_token_step;
     ux_sign_plt[idx++] = &ux_plt_op_step;
 

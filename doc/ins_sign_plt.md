@@ -64,19 +64,19 @@ More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP`
 
 ## Display
 
-The app performs **clear signing**: each field is shown in human-readable form before the user signs. The review screen always shows **Sender** (from the 60-byte transaction header), **Token** (the token ID string), and **Operation** (human-readable op name). Additional fields depend on the operation type:
+The app performs **clear signing**: each field is shown in human-readable form before the user signs. PLT is an account transaction (kind 27), so every review opens with the same header rows as any other one — **Sender**, **Max energy** and **Network**, all taken from the 60-byte transaction header and the signing path — followed by **Token** (the token ID string) and **Operation** (human-readable op name). Additional fields depend on the operation type:
 
 | Operation       | Screens shown (in order)                                             |
 | --------------- | -------------------------------------------------------------------- |
-| `transfer`      | Sender · Token · Operation · Amount · Recipient · [Memo] · [Max fees] · Sign/Decline |
-| `mint`          | Sender · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
-| `burn`          | Sender · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
-| `addAllowList`  | Sender · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `removeAllowList` | Sender · Token · Operation · Target · [Max fees] · Sign/Decline                     |
-| `addDenyList`   | Sender · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `removeDenyList`| Sender · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `pause`         | Sender · Token · Operation · [Max fees] · Sign/Decline                                |
-| `unpause`       | Sender · Token · Operation · [Max fees] · Sign/Decline                                |
+| `transfer`      | Sender · Max energy · Network · Token · Operation · Amount · Recipient · [Memo] · [Max fees] · Sign/Decline |
+| `mint`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
+| `burn`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
+| `addAllowList`  | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
+| `removeAllowList` | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                     |
+| `addDenyList`   | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
+| `removeDenyList`| Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
+| `pause`         | Sender · Max energy · Network · Token · Operation · [Max fees] · Sign/Decline                                |
+| `unpause`       | Sender · Max energy · Network · Token · Operation · [Max fees] · Sign/Decline                                |
 
 Fields in brackets `[…]` appear only when the host provides the corresponding data.
 
@@ -85,6 +85,8 @@ Fields in brackets `[…]` appear only when the host provides the corresponding 
 - **Recipient / Target** — base58check-encoded 55-character Concordium address.
 - **Memo** — the decoded text of a tag-24 CBOR text string, shown in full. Anything that cannot be rendered faithfully is refused with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) rather than trimmed or hex-dumped, because the memo is part of the signed payload and permanent on chain.
 - **Max fees** — only shown when the host sends the fee suffix (P2=`0x01` on INIT); formatted as CCD with 6 decimal places (e.g. `"0.000727 CCD"`). If the host sends `0xFFFFFFFFFFFFFFFF`, the fee line is suppressed.
+- **Max energy** — the signed `energy_amount` from the transaction header, as decimal text. This is the only cost bound the signature commits to: any **Max fees** line is a host estimate that sits outside the transaction hash, so it is shown in addition to this row, never instead of it.
+- **Network** — derived from node 1 of the signing path (`919'` mainnet, `1'` testnet). Concordium encodes account addresses identically on both chains, so no other row on screen tells the user which chain they are signing for.
 - Long strings are paginated on Nano (scrollable); on Stax/Flex the review uses the standard pair-list layout.
 
 ## Sample INIT command disassembly

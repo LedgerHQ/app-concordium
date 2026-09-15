@@ -21,7 +21,7 @@ Fields are hashed into the transaction SHA-256 digest; none are CBOR-encoded.
 | ---------------- | ------------ | ------ | --------------------- | -------------------------------------- |
 | `sender_address` | 32           | 0      | raw bytes             | Shown as base58check (55 chars) on screen |
 | `nonce`          | 8            | 32     | big-endian uint64     | Not displayed                          |
-| `energy_amount`  | 8            | 40     | big-endian uint64     | Not displayed (fee shown via P2=0x01 suffix instead) |
+| `energy_amount`  | 8            | 40     | big-endian uint64     | Shown as the "Max energy" screen — the only cost bound inside the hash |
 | `payload_size`   | 4            | 48     | big-endian uint32     | Not displayed                          |
 | `expiry_date`    | 8            | 52     | big-endian uint64 (UNIX seconds) | Not displayed             |
 | `transaction_kind` | 1          | 60     | uint8 (must be `0x1B` = 27) | Identifies this as a PLT tx      |
@@ -188,9 +188,10 @@ The node's test vectors for the bytes `01020304` give `4401020304` (Raw) and `d8
 | Information       | Location              | Hashed | Displayed via          |
 | ----------------- | --------------------- | ------ | ---------------------- |
 | Sender address    | Account header        | yes    | "Sender" screen        |
+| Network           | Signing path (node 1) | n/a    | "Network" screen       |
 | Nonce             | Account header        | yes    | not shown              |
-| Max energy        | Account header        | yes    | not shown directly     |
-| Fee (µCCD)        | INIT APDU suffix (P2=0x01) | no | "Max fees" screen (optional) |
+| Max energy        | Account header        | yes    | "Max energy" screen    |
+| Fee (µCCD)        | INIT APDU suffix (P2=0x01) | no | "Max fees" screen (optional; a host estimate outside the hash, shown in addition to "Max energy") |
 | Expiry            | Account header        | yes    | not shown              |
 | Token ID          | PLT prefix (after header) | yes | "Token" screen         |
 | Operation type    | CBOR payload (op key) | yes    | "Operation" screen     |

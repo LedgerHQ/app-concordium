@@ -1514,9 +1514,13 @@ void startPltDisplay(volatile unsigned int *flags) {
     signPltContext_t *plt = &global.signPlt;
     uint8_t n = 0;
 
-    pairs[n].item = "Sender";
-    pairs[n].value = (char *) global_account_sender.sender;
-    n++;
+    /* PLT is an account transaction (kind 27), so it opens with the same header rows as every
+     * other one: sender, the signed energy ceiling and the network. This used to write the
+     * sender row by hand and show only the host's "Max fees" estimate, which sits outside the
+     * transaction hash - so the one cost bound the signature commits to was never displayed
+     * (V-001, V-084), and neither was the network, which the identically-encoded mainnet and
+     * testnet addresses on screen cannot convey (V-057, V-093, V-095). */
+    n = addAccountHeaderPairs(n, "Sender");
 
     pairs[n].item = "Token";
     pairs[n].value = (char *) plt->tokenId;
