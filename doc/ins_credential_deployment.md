@@ -16,6 +16,10 @@ already been reviewed.
 | --- | --- | -- | -- | -- |
 | `0xE0` | `0x04` | see below | `0x00` standalone, `0x02` embedded | var |
 
+P2 is not validated: the handler only tests for `0x02` at the two points described under
+[Shared with update credential](#shared-with-update-credential), and treats every other value as
+the standalone case. Hosts send `0x00` for standalone deployments.
+
 ## Packet sequence
 
 | Order | P1 | Contents |
