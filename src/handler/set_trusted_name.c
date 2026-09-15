@@ -134,15 +134,18 @@ static int finalize_multi_hash(trustedNameMultiHashCtx_t *h,
 /** Descriptor serialization version this app understands (SDK CURRENT_TRUSTED_NAME_SPEC_VERSION).
  */
 #define CCD_TRUSTED_NAME_SPEC_VERSION 0x03
-/** Trusted-name type: a canonical account ("context") address.
+/** Trusted-name type: Concordium's canonical account ("context") address.
  *
- * The SDK enum in lib_tlv/use_cases numbers CONTEXT_ADDRESS 0x06, while live descriptors from the
- * Ledger trusted-name API carry 0x07 for Concordium's ccd_context_address. Both are accepted so
- * the app keeps working against either numbering; every other type (EOA, smart contract,
- * collection, token, wallet label) is refused, because VERIFY_ADDRESS only ever reviews an
- * account address. */
-#define CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS_SDK 0x06
-#define CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS_CCD 0x07
+ * Pinned to the single value ADR 001 specifies for this descriptor: tag 0x70 "Must be
+ * 0x07 ccd_context_address". The generic SDK enum in lib_tlv/use_cases stops at
+ * CONTEXT_ADDRESS 0x06 and has no Concordium entry, so it is not the authority here; 0x06 is
+ * some other chain's context address and is refused like every other type (EOA, smart contract,
+ * collection, token, wallet label), because VERIFY_ADDRESS only ever reviews a Concordium
+ * account address.
+ *
+ * Accepting a second value would let a Ledger-signed descriptor issued for another use case be
+ * shown as the reviewed Concordium account, so exactly one value is allowed. */
+#define CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS 0x07
 /** Only the backend's dynamic resolver may name a Concordium account address; the other source
  * namespaces (local address book, CAL, ENS, Unstoppable Domains, Freename, DNS) belong to other
  * chains or to host-side data. */
@@ -318,9 +321,8 @@ static bool verify_fields(const trustedNameTlvExtracted_t *ctx) {
         PRINTF("Unsupported descriptor version %d\n", ctx->version);
         return false;
     }
-    if (ctx->trusted_name_type != CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS_SDK &&
-        ctx->trusted_name_type != CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS_CCD) {
-        PRINTF("Trusted-name type %d is not a context address\n", ctx->trusted_name_type);
+    if (ctx->trusted_name_type != CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS) {
+        PRINTF("Trusted-name type %d is not ccd_context_address\n", ctx->trusted_name_type);
         return false;
     }
     if (ctx->trusted_name_source != CCD_TRUSTED_NAME_SOURCE_DYNAMIC_RESOLVER) {

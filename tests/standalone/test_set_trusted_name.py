@@ -271,10 +271,36 @@ def test_set_trusted_name_rejects_unsupported_version(backend):
 
 
 @pytest.mark.active_test_scope
-def test_set_trusted_name_rejects_non_context_address_type(backend):
-    """A wallet-label descriptor (type 0x05) is not a Concordium account address."""
+@pytest.mark.parametrize(
+    "name_type",
+    [
+        pytest.param(0x01, id="eoa"),
+        pytest.param(0x02, id="smart_contract"),
+        pytest.param(0x03, id="collection"),
+        pytest.param(0x04, id="token"),
+        pytest.param(0x05, id="wallet_label"),
+        # 0x06 is the generic SDK CONTEXT_ADDRESS, i.e. another chain's context address. ADR 001
+        # pins Concordium to 0x07, so a 0x06 descriptor was issued for a different use case.
+        pytest.param(0x06, id="sdk_context_address"),
+        pytest.param(0x08, id="undefined"),
+    ],
+)
+def test_set_trusted_name_rejects_non_context_address_type(backend, name_type):
+    """Only ccd_context_address (0x07) names a Concordium account; every other type is refused."""
     client = CommandSender(backend)
-    _expect_rejected_descriptor(backend, client, name_type=0x05)
+    _expect_rejected_descriptor(backend, client, name_type=name_type)
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_accepts_ccd_context_address_type(backend):
+    """The one type ADR 001 specifies for this descriptor (0x07) is accepted."""
+    client = CommandSender(backend)
+    challenge = _load_pki_and_get_challenge(backend, client)
+    builder = TrustedNameTlvBuilder(
+        challenge=challenge,
+        name_type=CCD_NAME_TYPE_CONTEXT_ADDRESS,
+    )
+    _assert_set_trusted_name_ok(client, builder.build_signed())
 
 
 @pytest.mark.active_test_scope
