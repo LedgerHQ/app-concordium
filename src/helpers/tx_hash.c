@@ -121,7 +121,7 @@ void buildAndSignTransactionHash(void) {
     hash((cx_hash_t *) &tx_state->hash, CX_LAST, NULL, 0, tx_state->transactionHash, KEY_LENGTH);
 
     uint8_t signedHash[ED25519_SIGNATURE_LENGTH];
-    sign(tx_state->transactionHash, signedHash);
+    sign(&global_derivation_path, tx_state->transactionHash, signedHash);
     if (sizeof(signedHash) > sizeof(G_io_apdu_buffer)) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }

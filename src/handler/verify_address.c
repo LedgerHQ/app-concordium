@@ -327,7 +327,7 @@ void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
 
     if (g_trusted_name_valid) {
         uint8_t derived_ed25519_pub[KEY_LENGTH];
-        get_public_key(derived_ed25519_pub);
+        get_public_key(&global_derivation_path, derived_ed25519_pub);
         sw = pki_bind_descriptor(derived_ed25519_pub, network);
         explicit_bzero(derived_ed25519_pub, sizeof(derived_ed25519_pub));
         /* Single-use either way: a descriptor refused against this path must not stay available

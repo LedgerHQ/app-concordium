@@ -124,13 +124,13 @@ void get_extended_private_key(const derivation_path_t *path,
     END_TRY;
 }
 
-void get_public_key(uint8_t *publicKeyArray) {
+void get_public_key(const derivation_path_t *path, uint8_t *publicKeyArray) {
     cx_ecfp_private_key_t privateKey;
     cx_ecfp_public_key_t publicKey;
 
     BEGIN_TRY {
         TRY {
-            get_private_key(&global_derivation_path, &privateKey);
+            get_private_key(path, &privateKey);
             ensureNoError(
                 cx_ecfp_generate_pair_no_throw(CX_CURVE_Ed25519, &publicKey, &privateKey, 1));
         }
@@ -148,12 +148,12 @@ void get_public_key(uint8_t *publicKeyArray) {
     }
 }
 
-void sign(uint8_t *input, uint8_t *signatureOnInput) {
+void sign(const derivation_path_t *path, uint8_t *input, uint8_t *signatureOnInput) {
     cx_ecfp_private_key_t privateKey;
 
     BEGIN_TRY {
         TRY {
-            get_private_key(&global_derivation_path, &privateKey);
+            get_private_key(path, &privateKey);
             ensureNoError(cx_eddsa_sign_no_throw(&privateKey,
                                                  CX_SHA512,
                                                  input,

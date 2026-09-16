@@ -21,6 +21,8 @@
 
 accountSender_t global_account_sender;
 comparePublicKey_t global_compare_public_key;
+derivation_path_t global_reviewed_path;
+bool global_public_key_review_pending;
 static nbgl_contentTagValue_t pairs[MAX_REVIEW_PAIRS];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;

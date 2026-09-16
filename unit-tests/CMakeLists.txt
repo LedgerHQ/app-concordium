@@ -84,9 +84,11 @@ target_include_directories(app_host PUBLIC ${APP_INCLUDE_DIRS})
 
 # ---------------------------------------------------------------------------
 # One executable per test file, registered with CTest.
+# Usage: add_unit_test(<name> [extra_source ...]) - pass a handler .c to test it, the way
+# fuzzing/CMakeLists.txt does. app_host carries only what every test needs.
 # ---------------------------------------------------------------------------
 function(add_unit_test NAME)
-    add_executable(${NAME} ${NAME}.c)
+    add_executable(${NAME} ${NAME}.c ${ARGN})
     target_include_directories(${NAME} PRIVATE ${APP_INCLUDE_DIRS})
     target_link_libraries(${NAME} PRIVATE app_host cmocka gcov)
     add_test(NAME ${NAME} COMMAND ${NAME})
@@ -96,3 +98,4 @@ add_unit_test(test_display_text)
 add_unit_test(test_cbor_data_blob)
 add_unit_test(test_time)
 add_unit_test(test_derivation_path)
+add_unit_test(test_get_public_key ${APP_SRC}/handler/get_public_key.c)

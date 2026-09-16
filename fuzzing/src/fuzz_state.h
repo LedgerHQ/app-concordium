@@ -62,6 +62,11 @@ static inline void fuzz_reset_app_state(void) {
     memset(&global_derivation_path, 0, sizeof(global_derivation_path));
     memset(&global_account_sender, 0, sizeof(global_account_sender));
     memset(&global_compare_public_key, 0, sizeof(global_compare_public_key));
+    memset(&global_reviewed_path, 0, sizeof(global_reviewed_path));
+    /* Left set by an input that parked a GET_PUBLIC_KEY review, the handler refuses every
+     * later input - order-dependent coverage of exactly the kind this function exists to
+     * remove. Neither global lives in `global`, so the memset above does not reach them. */
+    global_public_key_review_pending = false;
 
     global_tx_state.currentInstruction = INSTRUCTION_NONE;
 

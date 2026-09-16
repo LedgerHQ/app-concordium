@@ -20,6 +20,8 @@
 
 accountSender_t global_account_sender;
 comparePublicKey_t global_compare_public_key;
+derivation_path_t global_reviewed_path;
+bool global_public_key_review_pending;
 
 // The CBOR major type, shown beside the value: a numeric memo and a text memo that decode to
 // the same characters are distinct signed byte strings and must not review identically.
