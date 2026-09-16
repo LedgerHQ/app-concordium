@@ -27,14 +27,11 @@ bool global_public_key_review_pending;
 /*
  * ux_run_guarded() takes a void(void) continuation, so the two that carry an argument get a
  * shim. The argument is fixed at both call sites anyway - the step that ran them had no other
- * value to pass.
+ * value to pass. The scheduled-transfer one is further down, next to the context pointer it
+ * reads.
  */
 static void send_public_key_confirm(void) {
     send_public_key(true);
-}
-
-static void processNextScheduledAmountContinue(void) {
-    processNextScheduledAmount(global.withDataBlob.signTransferWithScheduleContext.buffer);
 }
 
 // The CBOR major type, shown beside the value: a numeric memo and a text memo that decode to
@@ -1034,6 +1031,10 @@ UX_STEP_NOCB(
 const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
+
+static void processNextScheduledAmountContinue(void) {
+    processNextScheduledAmount(ctx_sign_transfer_with_schedule->buffer);
+}
 
 // UI definitions for displaying the transaction contents of the first packet for
 // verification before continuing to process the scheduled amount pairs that will be
