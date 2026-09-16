@@ -48,6 +48,10 @@ doc/latex
 # Helpers
 diff
 
+# Captured build logs, e.g. `make -n > build_dry_run_output.txt` while chasing an SDK rule
+build_dry_run_output.txt
+*_output.txt
+
 # Vscode — track udev rules (Ledger app-boilerplate style); ignore local settings
 .vscode/*
 !.vscode/20-ledger.ledgerblue.rules
@@ -66,3 +70,5 @@ tmp/
 # Local checkout, not a submodule. Committing it as a gitlink without a matching .gitmodules
 # entry breaks every CI job that clones with --recursive.
 deps/
+
+build-dy
