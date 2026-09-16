@@ -79,6 +79,7 @@ add_library(app_host STATIC
     ${APP_SRC}/helpers/sign_transfer_schedule.c
     ${APP_SRC}/helpers/time.c
     ${APP_SRC}/helpers/tx_hash.c
+    ${APP_SRC}/helpers/ux_guard.c
 )
 target_include_directories(app_host PUBLIC ${APP_INCLUDE_DIRS})
 
@@ -99,3 +100,4 @@ add_unit_test(test_cbor_data_blob)
 add_unit_test(test_time)
 add_unit_test(test_derivation_path)
 add_unit_test(test_get_public_key ${APP_SRC}/handler/get_public_key.c)
+add_unit_test(test_ux_guard)

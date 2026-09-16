@@ -64,11 +64,14 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
                                        uint32_t identity,
                                        uint32_t account,
                                        uint8_t *outputPrivateKey,
-                                       size_t outputPrivateKeySize) {
+                                       size_t outputPrivateKeySize,
+                                       uint16_t *sw) {
     uint8_t tempPrivateKey[ED25519_EXTENDED_PRIVATE_KEY_LENGTH];
 
     uint8_t keysToExport[MAX_KEYS_TO_EXPORT] = {0, 0, 0};
     uint8_t keysToExportLength = 0;
+
+    *sw = SWO_SUCCESS;
 
     uint32_t coin_type;
     switch (networkDesignation) {
@@ -79,8 +82,12 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             coin_type = NEW_TESTNET_COIN_TYPE;
             break;
         default:
+            // Reported, not thrown: the caller is a UI approval callback, and ux_run_guarded()
+            // is only the backstop for those - an argument this function rejected itself is
+            // answered here, next to the check. Nothing secret exists yet at this point.
             PRINTF("Invalid network type: %d\n", networkDesignation);
-            THROW(ERROR_INVALID_PARAM);
+            *sw = ERROR_INVALID_PARAM;
+            return 0;
     }
 
     switch (purpose) {
@@ -106,13 +113,16 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             break;
         default:
             PRINTF("Invalid purpose: %d\n", purpose);
-            THROW(ERROR_INVALID_PARAM);
+            *sw = ERROR_INVALID_PARAM;
+            return 0;
     }
 
     uint8_t tx = 0;
     // Distinguishes the success path from an unwind inside TRY. Must be volatile: it is
     // written inside TRY and read in FINALLY, i.e. potentially across a longjmp.
     volatile bool exportComplete = false;
+    // Set by CATCH_OTHER and read after END_TRY, so it must survive the longjmp too.
+    volatile uint16_t thrown = 0;
 
     BEGIN_TRY {
         TRY {
@@ -167,9 +177,17 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
             }
             exportComplete = true;
         }
-        // No CATCH clause on purpose: a THROW inside a CATCH runs after CLOSE_TRY has
-        // popped this context, so it would unwind straight past FINALLY and skip the
-        // wipes below. Letting END_TRY re-throw keeps a single cleanup path.
+        // Records the thrown value and returns normally instead of re-throwing, so the caller
+        // gets a status word to answer with rather than an unwind. ux_run_guarded() would catch
+        // one anyway - this is the function this export derives in, so the conversion stays
+        // where the wipes are and the guard stays a backstop rather than the only thing
+        // between a throw and the SDK.
+        // This CATCH never throws, so FINALLY below still runs and the single cleanup path is
+        // preserved; a system exception is re-raised after END_TRY, i.e. once the wipes have
+        // happened.
+        CATCH_OTHER(e) {
+            thrown = (uint16_t) e;
+        }
         FINALLY {
             explicit_bzero(tempPrivateKey, sizeof(tempPrivateKey));
             if (!exportComplete) {
@@ -181,6 +199,16 @@ int exportNewPathPrivateKeysForPurpose(uint8_t purpose,
         }
     }
     END_TRY;
+
+    if (thrown != 0) {
+        if ((unsigned int) thrown <= MAX_SYSTEM_EXCEPTION) {
+            // EXCEPTION_IO_RESET and friends are genuine faults the SDK has to see. Re-raised
+            // here rather than inside CATCH so the wipes above have already run.
+            THROW(thrown);
+        }
+        *sw = thrown;
+        return 0;
+    }
 
     return tx;
 }
@@ -353,6 +381,7 @@ void sendPrivateKeysNewPath(void) {
         return;
     }
 
+    uint16_t sw = SWO_SUCCESS;
     ctx->privateKeysLength =
         (uint8_t) exportNewPathPrivateKeysForPurpose(ctx->newPathPurpose,
                                                      ctx->newPathNetwork,
@@ -360,7 +389,16 @@ void sendPrivateKeysNewPath(void) {
                                                      ctx->newPathIdentity,
                                                      ctx->newPathAccount,
                                                      ctx->outputPrivateKeys,
-                                                     sizeof(ctx->outputPrivateKeys));
+                                                     sizeof(ctx->outputPrivateKeys),
+                                                     &sw);
+    if (sw != SWO_SUCCESS) {
+        // Answer the host from the callback. The output buffer was already wiped by the
+        // failing path, and letting the status word escape instead would exit the app.
+        ctx->privateKeysLength = 0;
+        send_rejection(sw);
+        ui_menu_main();
+        return;
+    }
 
     memmove(G_io_apdu_buffer, ctx->outputPrivateKeys, ctx->privateKeysLength);
     send_success(ctx->privateKeysLength);

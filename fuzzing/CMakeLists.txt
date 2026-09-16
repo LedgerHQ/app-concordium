@@ -72,6 +72,7 @@ set(SHARED_SOURCES
     ${APP_SRC}/helpers/sign_transfer_schedule.c
     ${APP_SRC}/helpers/time.c
     ${APP_SRC}/helpers/tx_hash.c
+    ${APP_SRC}/helpers/ux_guard.c
 )
 
 # ---------------------------------------------------------------------------

@@ -57,6 +57,11 @@
  * instruction, so doing the same here is what the device actually does.
  */
 static inline void fuzz_reset_app_state(void) {
+    /* The previous input may have thrown out to the harness with TRY blocks still open, which
+     * leaves this pointing at frames that no longer exist; the next THROW would longjmp into
+     * one. See the note in stubs/ledger/exceptions.h. */
+    g_try_context = NULL;
+
     memset(&global, 0, sizeof(global));
     memset(&global_tx_state, 0, sizeof(global_tx_state));
     memset(&global_derivation_path, 0, sizeof(global_derivation_path));

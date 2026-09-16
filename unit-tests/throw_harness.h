@@ -21,9 +21,17 @@
 
 #include "ledger/exceptions.h"
 
+/*
+ * Both macros clear g_try_context first. A statement that threw past an open TRY block left it
+ * pointing at a frame that has since returned, and the next THROW would longjmp into that frame
+ * - see the note in fuzzing/stubs/ledger/exceptions.h. Clearing it is what the device gets for
+ * free by ending the application instead.
+ */
+
 /** Run `stmt`, failing the test if it THROWs. */
 #define ASSERT_NO_THROW(stmt)                                            \
     do {                                                                 \
+        g_try_context = NULL;                                            \
         int _thrown = setjmp(g_fuzzer_jmp_buf);                          \
         if (_thrown == 0) {                                              \
             stmt;                                                        \
@@ -35,6 +43,7 @@
 /** Run `stmt`, failing the test unless it THROWs `expected_sw`. */
 #define ASSERT_THROWS(stmt, expected_sw)                                      \
     do {                                                                      \
+        g_try_context = NULL;                                                 \
         int _thrown = setjmp(g_fuzzer_jmp_buf);                               \
         if (_thrown == 0) {                                                   \
             stmt;                                                             \

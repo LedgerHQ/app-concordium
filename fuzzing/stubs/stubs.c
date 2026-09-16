@@ -55,11 +55,13 @@
 #include "helpers/concordium_crypto.h"
 #include "helpers/base58check.h"
 #include "ui/display.h"
+#include "helpers/ux_guard.h"
 #include "handler/set_trusted_name.h"
 #include "handler/sign_configure_baker.h"
 
 /* ── THROW jump buffer and last-throw site (see stubs/ledger/exceptions.h) ── */
 jmp_buf g_fuzzer_jmp_buf;
+try_context_t *g_try_context = NULL;
 const char *g_fuzz_throw_file = NULL;
 int g_fuzz_throw_line = 0;
 unsigned int g_fuzz_throw_sw = 0;
@@ -590,6 +592,22 @@ static void fuzz_reject_staged_review(void) {
     send_user_rejection();
 }
 
+/*
+ * The two continuations that carry an argument, as void(void) for ux_run_guarded() - the same
+ * shims display_bagl.c and display_nbgl.c define, over the same fixed argument.
+ */
+static void fuzz_next_scheduled_amount(void) {
+    if (processNextScheduledAmount) {
+        processNextScheduledAmount(global.withDataBlob.signTransferWithScheduleContext.buffer);
+    }
+}
+
+static void fuzz_send_public_key_confirm(void) {
+    if (send_public_key) {
+        send_public_key(true);
+    }
+}
+
 void fuzz_answer_pending_ui(bool approve) {
     fuzz_ui_action_t action = g_fuzz_pending_ui_action;
     g_fuzz_pending_ui_action = FUZZ_UI_NONE;
@@ -602,7 +620,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (buildAndSignTransactionHash) {
-                buildAndSignTransactionHash();
+                ux_run_guarded(buildAndSignTransactionHash);
             }
             return;
 
@@ -610,7 +628,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmInitialScheduledTransfer) {
-                confirmInitialScheduledTransfer();
+                ux_run_guarded(confirmInitialScheduledTransfer);
             }
             return;
 
@@ -618,8 +636,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (processNextScheduledAmount) {
-                processNextScheduledAmount(
-                    global.withDataBlob.signTransferWithScheduleContext.buffer);
+                ux_run_guarded(fuzz_next_scheduled_amount);
             }
             return;
 
@@ -635,7 +652,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 fuzz_reject_staged_review();
             } else if (confirmConfigureBakerStage) {
-                confirmConfigureBakerStage();
+                ux_run_guarded(confirmConfigureBakerStage);
             }
             return;
 
@@ -643,7 +660,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 fuzz_reject_staged_review();
             } else if (processNextVerificationKey) {
-                processNextVerificationKey();
+                ux_run_guarded(processNextVerificationKey);
             }
             return;
 
@@ -651,7 +668,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmAddedCredential) {
-                confirmAddedCredential();
+                ux_run_guarded(confirmAddedCredential);
             }
             return;
 
@@ -659,7 +676,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmCredentialAttribute) {
-                confirmCredentialAttribute();
+                ux_run_guarded(confirmCredentialAttribute);
             }
             return;
 
@@ -667,7 +684,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (exportPrivateKey) {
-                exportPrivateKey();
+                ux_run_guarded(exportPrivateKey);
             }
             return;
 
@@ -675,10 +692,10 @@ void fuzz_answer_pending_ui(bool approve) {
             /* The reject side wipes derived key material, so it is the interesting half. */
             if (!approve) {
                 if (rejectPrivateKeysNewPath) {
-                    rejectPrivateKeysNewPath();
+                    ux_run_guarded(rejectPrivateKeysNewPath);
                 }
             } else if (sendPrivateKeysNewPath) {
-                sendPrivateKeysNewPath();
+                ux_run_guarded(sendPrivateKeysNewPath);
             }
             return;
 
@@ -694,7 +711,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (send_public_key) {
-                send_public_key(true);
+                ux_run_guarded(fuzz_send_public_key_confirm);
             }
             return;
     }

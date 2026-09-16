@@ -14,6 +14,7 @@
 #include "sign_credential_deployment.h"
 #include "sign_transfer_schedule.h"
 #include "tx_hash.h"
+#include "ux_guard.h"
 
 #include "menu_nbgl.h"
 
@@ -26,6 +27,19 @@ bool global_public_key_review_pending;
 static nbgl_contentTagValue_t pairs[MAX_REVIEW_PAIRS];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
+
+/*
+ * ux_run_guarded() takes a void(void) continuation, so the two that carry an argument get a
+ * shim. The argument is fixed at both call sites anyway - the screen that ran them had no other
+ * value to pass.
+ */
+static void send_public_key_confirm(void) {
+    send_public_key(true);
+}
+
+static void processNextScheduledAmountContinue(void) {
+    processNextScheduledAmount(ctx_sign_transfer_with_schedule->buffer);
+}
 
 /**
  * Writes the account header pairs that open every account-transaction review: the paying sender,
@@ -62,7 +76,7 @@ static void review_choice(bool confirm) {
 static void review_public_key_choice(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
-        send_public_key(true);
+        ux_run_guarded(send_public_key_confirm);
     } else {
         send_user_rejection();
     }
@@ -81,7 +95,7 @@ static void review_verify_address(bool confirm) {
 static void review_export_private_key(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
-        exportPrivateKey();
+        ux_run_guarded(exportPrivateKey);
     } else {
         send_user_rejection();
     }
@@ -90,16 +104,16 @@ static void review_export_private_key(bool confirm) {
 static void review_export_private_key_new_path(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
-        sendPrivateKeysNewPath();
+        ux_run_guarded(sendPrivateKeysNewPath);
     } else {
-        rejectPrivateKeysNewPath();
+        ux_run_guarded(rejectPrivateKeysNewPath);
     }
 }
 
 static void review_choice_sign(bool confirm) {
     // Answer, display a status page and go back to main
     if (confirm) {
-        buildAndSignTransactionHash();
+        ux_run_guarded(buildAndSignTransactionHash);
     } else {
         send_user_rejection();
     }
@@ -107,7 +121,7 @@ static void review_choice_sign(bool confirm) {
 
 static void confirm_initial_scheduled_transfer_callback(bool confirm) {
     if (confirm) {
-        confirmInitialScheduledTransfer();
+        ux_run_guarded(confirmInitialScheduledTransfer);
     } else {
         send_user_rejection();
     }
@@ -140,7 +154,7 @@ static void confirmConfigureBakerStageCallback(bool confirm) {
         rejectStagedReview();
         return;
     }
-    confirmConfigureBakerStage();
+    ux_run_guarded(confirmConfigureBakerStage);
 }
 
 static void processNextVerificationKeyNoIdleCallback(bool confirm) {
@@ -148,12 +162,12 @@ static void processNextVerificationKeyNoIdleCallback(bool confirm) {
         rejectStagedReview();
         return;
     }
-    processNextVerificationKey();
+    ux_run_guarded(processNextVerificationKey);
 }
 
 static void review_added_credential(bool confirm) {
     if (confirm) {
-        confirmAddedCredential();
+        ux_run_guarded(confirmAddedCredential);
     } else {
         send_user_rejection();
     }
@@ -161,7 +175,7 @@ static void review_added_credential(bool confirm) {
 
 static void review_credential_attribute(bool confirm) {
     if (confirm) {
-        confirmAttribute();
+        ux_run_guarded(confirmAttribute);
     } else {
         send_user_rejection();
     }
@@ -1279,7 +1293,7 @@ void uiSignTransferToPublicDisplay(volatile unsigned int *flags) {
 // Add this wrapper function before uiSignScheduledTransferPairFlowDisplay
 static void processNextScheduledAmountWrapper(bool choice) {
     if (choice) {
-        processNextScheduledAmount(ctx_sign_transfer_with_schedule->buffer);
+        ux_run_guarded(processNextScheduledAmountContinue);
     } else {
         send_user_rejection();
     }
