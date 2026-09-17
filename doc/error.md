@@ -35,7 +35,7 @@ This document lists all error codes that can be returned by the Concordium Ledge
 | `0x6B09` | `ERROR_INVALID_MODULE_REF` | Invalid module reference |
 | `0x6B0A` | `ERROR_INVALID_NAME_LENGTH` | Invalid name length |
 | `0x6B0B` | `ERROR_INVALID_PARAMS_LENGTH` | Invalid parameters length |
-| `0x6B0C` | `ERROR_INVALID_COININFO`   | Invalid coin information |
+| `0x6B0C` | `ERROR_TRUSTED_NAME_MISMATCH` | A trusted-name descriptor does not bind to the account, network or path being reviewed (`VERIFY_ADDRESS`) |
 
 ### Device State Errors
 
@@ -43,18 +43,32 @@ This document lists all error codes that can be returned by the Concordium Ledge
 |--------|-------------------|-------------|
 | `0x530C` | `ERROR_DEVICE_LOCKED` | Device is locked |
 
-### BIP32 Display Errors
+## Refusals of undisplayable text
 
-| Code   | Name                        | Description |
-|--------|----------------------------|-------------|
-| `0xB001` | `SW_DISPLAY_BIP32_PATH_FAIL` | Failed to convert BIP32 path to string |
-| `0xB002` | `SW_DISPLAY_ADDRESS_FAIL`    | Failed to convert address to string |
-| `0xB003` | `SW_DISPLAY_AMOUNT_FAIL`     | Failed to convert amount to string |
-| `0xB004` | `SW_WRONG_TX_LENGTH`         | Wrong raw transaction length |
-| `0xB005` | `SW_TX_PARSING_FAIL`         | Failed to parse raw transaction |
-| `0xB006` | `SW_TX_HASH_FAIL`            | Failed to compute transaction hash |
-| `0xB007` | `SW_BAD_STATE`               | Security issue with bad state |
-| `0xB008` | `SW_SIGNATURE_FAIL`          | Failed to sign raw transaction |
+Several fields are hashed into the signed transaction in full but rendered on screen as a C
+string. An embedded NUL would end the display while the signature still covered everything after
+it, and the remaining C0 controls and DEL have no faithful rendering either. Those bytes are
+refused rather than drawn as something they are not, so the reviewed text and the signed text are
+always the same thing.
+
+Each chunk of a multi-packet field is checked as it arrives, before the bytes are hashed or copied
+into a display buffer, so the refusal happens on the packet that carries the offending byte.
+
+| Field | Instruction | Status word |
+| ----- | ----------- | ----------- |
+| Contract name | `INIT_CONTRACT` (`0x07`) | `0x6B04` `ERROR_INVALID_TRANSACTION` |
+| Receive name | `UPDATE_CONTRACT` (`0x08`) | `0x6B04` `ERROR_INVALID_TRANSACTION` |
+| Validator metadata URL | `CONFIGURE_BAKER` (`0x18`) | `0x6B04` `ERROR_INVALID_TRANSACTION` |
+| CBOR memo text | `SIGN_TRANSFER_WITH_MEMO` (`0x32`), `SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO` (`0x34`) | `0x6B04` `ERROR_INVALID_TRANSACTION` |
+| Registered data | `REGISTER_DATA` (`0x35`) | `0x6B04` `ERROR_INVALID_TRANSACTION` |
+
+A memo or registered-data payload whose CBOR encoding is ambiguous or unsupported is refused with
+`0x6B05` `ERROR_UNSUPPORTED_CBOR` instead.
+
+These are returned through `send_rejection()`, which differs from a thrown status word in one way
+that matters to a host: it releases the instruction latch as well as replying, so the refused flow
+is over and the next APDU may start a different instruction. A host must not resend the remaining
+packets of the refused transaction.
 
 
 ## Error Handling Guidelines

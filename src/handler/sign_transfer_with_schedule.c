@@ -6,6 +6,7 @@
 #include <parser.h>
 #include <status_words.h>
 
+#include "apdu/apdu_response.h"
 #include "concordium_crypto.h"
 #include "display.h"
 #include "fee_display.h"
@@ -21,6 +22,11 @@ static tx_state_t *tx_state = &global_tx_state;
 
 #define P1_INITIAL_PACKET           0x00
 #define P1_SCHEDULED_TRANSFER_PAIRS 0x01
+
+void confirmInitialScheduledTransfer(void) {
+    ctx->state = TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS;
+    send_success_no_idle();
+}
 
 void handle_sign_transfer_with_schedule(const command_t *cmd,
                                         volatile unsigned int *flags,
@@ -62,7 +68,7 @@ void handle_sign_transfer_with_schedule(const command_t *cmd,
                                   cdata + 1);
         }
 
-        ctx->state = TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS;
+        ctx->state = TX_TRANSFER_WITH_SCHEDULE_AWAITING_INITIAL_CONFIRM;
         startInitialScheduledTransferDisplay(false);
         *flags |= IO_ASYNCH_REPLY;
     } else if (p1 == P1_SCHEDULED_TRANSFER_PAIRS &&

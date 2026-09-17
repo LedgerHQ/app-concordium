@@ -8,6 +8,7 @@
 #include <parser.h>
 #include <status_words.h>
 
+#include "apdu/apdu_response.h"
 #include "apdu/helpers.h"
 #include "concordium_crypto.h"
 #include "app_sizes.h"
@@ -122,21 +123,19 @@ end:
  * @param derivation_path Output buffer for the parsed derivation path. Path is not hardened.
  * @param cred_counter    Output credential counter (legacy / new path).
  *
- * @throws SWO_WRONG_P1_P2 if p1/p2 combination is invalid
+ * @return SWO_SUCCESS, or the status word the command must be refused with.
  */
-static void parse_key_path(uint8_t *cdata,
-                           uint8_t p1,
-                           uint8_t p2,
-                           uint8_t lc,
-                           derivation_path_t *derivation_path,
-                           uint32_t *cred_counter) {
-    bool p2_is_valid = true;
-
+static uint16_t parse_key_path(uint8_t *cdata,
+                               uint8_t p1,
+                               uint8_t p2,
+                               uint8_t lc,
+                               derivation_path_t *derivation_path,
+                               uint32_t *cred_counter) {
     switch (p1) {
         case P1_LEGACY_PATH:
-            p2_is_valid = (p2 == P2_MAINNET_DEFAULT);
-            if (p2_is_valid) parse_derivation_path_legacy(lc, cdata, derivation_path, cred_counter);
-            break;
+            if (p2 != P2_MAINNET_DEFAULT) return SWO_WRONG_P1_P2;
+            parse_derivation_path_legacy(lc, cdata, derivation_path, cred_counter);
+            return SWO_SUCCESS;
 
         case P1_NEW_PATH:
             if (p2 == P2_MAINNET_DEFAULT) {
@@ -144,40 +143,86 @@ static void parse_key_path(uint8_t *cdata,
             } else if (p2 == P2_TESTNET) {
                 parse_derivation_path_new(lc, cdata, TESTNET, derivation_path, cred_counter);
             } else {
-                p2_is_valid = false;
+                return SWO_WRONG_P1_P2;
             }
-            break;
+            return SWO_SUCCESS;
 
         case P1_FULL_PATH:
-            p2_is_valid = (p2 == P2_MAINNET_DEFAULT);
-            if (p2_is_valid) parse_derivation_path_full(lc, cdata, derivation_path);
-            break;
+            if (p2 != P2_MAINNET_DEFAULT) return SWO_WRONG_P1_P2;
+            parse_derivation_path_full(lc, cdata, derivation_path);
+            /* The parser only bounds depth and buffer length, so a zero-node path would otherwise
+             * derive from the master key and review as an all-zero label. Everything else the host
+             * sends is accepted, but the review renders the whole path (see path_display_full), so
+             * no node can change the address behind an unchanged screen. */
+            if (derivation_path->len == 0) return ERROR_INVALID_PATH;
+            return SWO_SUCCESS;
 
         default:
-            p2_is_valid = false;
-            break;
+            return SWO_WRONG_P1_P2;
     }
-
-    if (!p2_is_valid) THROW(SWO_WRONG_P1_P2);
 }
 
 /**
- * PKI lane: require tag 0x22 == derived Ed25519, copy tag 0x20 into ctx->address (no UI).
+ * PKI lane: prove the signed descriptor describes exactly the account being reviewed.
+ *
+ * Three independent bindings, all required. The descriptor's PKI signature is trusted, so none of
+ * these can be forged; what they add is that a *valid* descriptor cannot be presented against a
+ * different account than the one it was issued for.
+ *
+ *  - tag 0x23 (chain id) must match the network of the reviewed path, so a testnet descriptor
+ *    cannot be shown for a mainnet address or vice versa;
+ *  - tag 0x22 must be the Ed25519 public key of the reviewed path, which is the pre-existing
+ *    owner-key binding, but is identity-level and shared by every credential counter;
+ *  - tag 0x20 must equal the base58 account address this device derived for the reviewed
+ *    credential counter, which is what makes the binding account-specific.
+ *
+ * @return SWO_SUCCESS, or the status word the command must be refused with.
  */
-static void pki_bind_descriptor(const uint8_t *derived_ed25519_pub) {
+static uint16_t pki_bind_descriptor(const uint8_t *derived_ed25519_pub,
+                                    derivation_path_network_t network) {
+    uint64_t expected_chain_id;
+    switch (network) {
+        case DERIVATION_PATH_NETWORK_MAINNET:
+            expected_chain_id = CCD_CHAIN_ID_MAINNET;
+            break;
+        case DERIVATION_PATH_NETWORK_TESTNET:
+            expected_chain_id = CCD_CHAIN_ID_TESTNET;
+            break;
+        default:
+            /* The legacy subtree carries no coin type and a custom path may carry an unknown one,
+             * so the descriptor's authenticated network cannot be tied to the path. Refuse rather
+             * than assume a network on the user's behalf. */
+            PRINTF("Path has no network to bind the descriptor chain id to\n");
+            return ERROR_TRUSTED_NAME_MISMATCH;
+    }
+    if (g_trusted_chain_id != expected_chain_id) {
+        PRINTF("Descriptor chain id does not match the reviewed network\n");
+        return ERROR_TRUSTED_NAME_MISMATCH;
+    }
     if (g_trusted_address_len != KEY_LENGTH) {
-        THROW(ERROR_TRUSTED_NAME_MISMATCH);
+        return ERROR_TRUSTED_NAME_MISMATCH;
     }
     if (memcmp(derived_ed25519_pub, g_trusted_address, KEY_LENGTH) != 0) {
-        THROW(ERROR_TRUSTED_NAME_MISMATCH);
+        PRINTF("Descriptor tag 0x22 is not the owner key of the reviewed path\n");
+        return ERROR_TRUSTED_NAME_MISMATCH;
     }
+    /* Both are NUL-terminated: g_trusted_name by SET_TRUSTED_NAME, ctx->address by
+     * bls_compute_address, which has already run for this credential counter. */
+    if (strncmp(g_trusted_name, ctx->address, sizeof(ctx->address)) != 0) {
+        PRINTF("Descriptor tag 0x20 is not the address derived for this credential counter\n");
+        return ERROR_TRUSTED_NAME_MISMATCH;
+    }
+    return SWO_SUCCESS;
+}
 
-    /* g_trusted_name is always NUL-terminated by SET_TRUSTED_NAME (max TRUSTED_NAME_MAX_LEN). */
-    size_t cert_len = strlen(g_trusted_name);
-    if (cert_len >= sizeof(ctx->address)) {
-        THROW(ERROR_BUFFER_OVERFLOW);
+/** Set the label of the path row; `label` is a compile-time constant that fits the buffer. */
+static void set_path_display_label(const char *label) {
+    size_t length = strlen(label);
+    if (length >= sizeof(ctx->display_label)) {
+        length = sizeof(ctx->display_label) - 1;
     }
-    memmove(ctx->address, g_trusted_name, cert_len + 1);
+    explicit_bzero(ctx->display_label, sizeof(ctx->display_label));
+    memmove(ctx->display_label, label, length);
 }
 
 /**
@@ -228,50 +273,71 @@ void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
     uint32_t cred_counter = 0;
 
     explicit_bzero(ctx->address, sizeof(ctx->address));
+    explicit_bzero(ctx->display, sizeof(ctx->display));
 
-    parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
+    uint16_t sw = parse_key_path(cdata, p1, p2, lc, derivation_path, &cred_counter);
+    if (sw != SWO_SUCCESS) {
+        send_rejection(sw);
+        return;
+    }
+
+    /* P2 (or the coin-type node of a full path) picks the network, and the network changes the
+     * derived key, so it belongs on the review next to the address it produced. */
+    derivation_path_network_t network = derivation_path_network(derivation_path);
+    path_display_network(ctx->network, sizeof(ctx->network), derivation_path);
 
     switch (derivation_path->variant) {
         case DERIVATION_PATH_VARIANT_NEW:
+            set_path_display_label("Identity");
             path_display_new(ctx->display,
                              sizeof(ctx->display),
-                             derivation_path->nodes[2],
-                             derivation_path->nodes[3],
+                             derivation_path->nodes[PATH_INDEX_IDENTITY_PROVIDER],
+                             derivation_path->nodes[PATH_INDEX_IDENTITY],
                              cred_counter);
             break;
 
         case DERIVATION_PATH_VARIANT_LEGACY:
+            set_path_display_label("Identity");
             path_display_legacy(ctx->display,
                                 sizeof(ctx->display),
-                                derivation_path->nodes[4],
+                                derivation_path->nodes[PATH_INDEX_IDENTITY_LEGACY],
                                 cred_counter);
             break;
 
         case DERIVATION_PATH_VARIANT_FULL:
-            unharden_derivation_path(derivation_path);
-            path_display_new(ctx->display,
-                             sizeof(ctx->display),
-                             derivation_path->nodes[2],
-                             derivation_path->nodes[3],
-                             derivation_path->nodes[4]);
-
+            /* The host chooses the depth and every node, and all of them reach key derivation, so
+             * the whole path is shown. Labelling three selected nodes "idp/identity/account" hid
+             * any suffix past node 4 and printed zeroes for nodes a short path never sent. */
+            set_path_display_label("Derivation path");
+            path_display_full(ctx->display, sizeof(ctx->display), derivation_path);
             break;
 
         default:
+            set_path_display_label("Identity");
             break;
     }
 
     /* get_bls_private_key / get_public_key expect hardened path; parsers output unhardened */
     harden_derivation_path(derivation_path);
 
+    /* Always derive the address on device, including in the trusted-name lane: it is the only
+     * value that depends on the credential counter, and it is what the descriptor is checked
+     * against instead of being allowed to replace. */
+    bls_compute_address(cred_counter);
+
     if (g_trusted_name_valid) {
         uint8_t derived_ed25519_pub[KEY_LENGTH];
-        get_public_key(derived_ed25519_pub);
-        pki_bind_descriptor(derived_ed25519_pub);
-        /* Single-use: display copy is in ctx->address; drop binding until next SET_TRUSTED_NAME. */
+        get_public_key(&global_derivation_path, derived_ed25519_pub);
+        sw = pki_bind_descriptor(derived_ed25519_pub, network);
+        explicit_bzero(derived_ed25519_pub, sizeof(derived_ed25519_pub));
+        /* Single-use either way: a descriptor refused against this path must not stay available
+         * for the host to retry against another one. */
         clear_trusted_name_binding();
-    } else {
-        bls_compute_address(cred_counter);
+        if (sw != SWO_SUCCESS) {
+            explicit_bzero(ctx->address, sizeof(ctx->address));
+            send_rejection(sw);
+            return;
+        }
     }
     uiVerifyAddress(flags);
 }

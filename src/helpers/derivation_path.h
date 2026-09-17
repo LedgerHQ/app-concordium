@@ -64,6 +64,31 @@ typedef enum {
     DERIVATION_PATH_VARIANT_INVALID
 } derivation_path_variant_t;
 
+/**
+ * Network a signing path commits to, taken from node 1 (the coin type).
+ *
+ * Both `44'/919'` (mainnet) and `44'/1'` (testnet) are authorized prefixes, so the network is
+ * chosen by the host. Concordium encodes mainnet and testnet account addresses with the same
+ * version byte, so the addresses on screen do not reveal which one it is.
+ */
+typedef enum {
+    /** m/44'/919'/... */
+    DERIVATION_PATH_NETWORK_MAINNET,
+    /** m/44'/1'/... */
+    DERIVATION_PATH_NETWORK_TESTNET,
+    /** m/1105'/0'/... — the legacy subtree has no network node, so it is neutral. */
+    DERIVATION_PATH_NETWORK_LEGACY,
+    /** Anything else: a coin type this app does not know, or a path too short to have one. */
+    DERIVATION_PATH_NETWORK_UNKNOWN
+} derivation_path_network_t;
+
+/** Review labels for derivation_path_network_t. Must all fit NETWORK_DISPLAY_SIZE. */
+#define NETWORK_DISPLAY_MAINNET "Mainnet"
+#define NETWORK_DISPLAY_TESTNET "Testnet"
+/** The legacy subtree is network-neutral, so it is labelled as such instead of guessing. */
+#define NETWORK_DISPLAY_LEGACY  "Legacy (any network)"
+#define NETWORK_DISPLAY_UNKNOWN "Unknown network"
+
 /** Derivation path with variable-length nodes and variant */
 typedef struct derivation_path {
     uint32_t nodes[DERIVATION_PATH_NODES_MAX];
@@ -172,11 +197,37 @@ void detect_derivation_path_variant(derivation_path_t *derivation_path);
  */
 size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength);
 
+/**
+ * Classify the network a parsed path commits to.
+ *
+ * Works on hardened or unhardened nodes and never fails: an unrecognized coin type or a path with
+ * no coin-type node maps to DERIVATION_PATH_NETWORK_UNKNOWN so callers can surface that instead of
+ * silently assuming a network.
+ */
+derivation_path_network_t derivation_path_network(const derivation_path_t *derivation_path);
+
+/**
+ * Write the review label for the path's network ("Mainnet", "Testnet", ...) into `dst`.
+ *
+ * Always NUL-terminates. Labels are compile-time constants that fit NETWORK_DISPLAY_SIZE; a
+ * shorter buffer truncates rather than overflowing.
+ */
+void path_display_network(uint8_t *dst, size_t dstLength, const derivation_path_t *derivation_path);
+
 /** Human-readable legacy identity/account line: "identity/account". */
 void path_display_legacy(uint8_t *dst,
                          size_t dstLength,
                          uint32_t identityIndex,
                          uint32_t accountIndex);
+
+/**
+ * Write the whole path as "44'/919'/403'/404'/8'" into `dst`, always NUL-terminated.
+ *
+ * Used where the host supplies a serialized path of its own choosing: every node reaches key
+ * derivation, so every node has to be on screen. Nodes are rendered hardened because the parsers'
+ * output is hardened before derivation regardless of how the host sent it.
+ */
+void path_display_full(uint8_t *dst, size_t dstLength, const derivation_path_t *derivation_path);
 
 /** Human-readable new-path line: "idp/identity/account". */
 void path_display_new(uint8_t *dst,

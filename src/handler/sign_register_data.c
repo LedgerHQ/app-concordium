@@ -74,14 +74,26 @@ void handle_sign_register_data(const command_t *cmd,
         switch (ctx->state) {
             case TX_REGISTER_DATA_PAYLOAD_START:
                 ctx->state = TX_REGISTER_DATA_PAYLOAD;
-                readCborInitial(cdata, dataLength);
-                break;
+                {
+                    uint16_t cborSw = readCborInitial(cdata, dataLength);
+                    if (cborSw != SWO_SUCCESS) {
+                        send_rejection(cborSw);
+                        return;
+                    }
+                    break;
+                }
             case TX_REGISTER_DATA_PAYLOAD:
                 if (ctx->dataLength != 0) {
                     THROW(ERROR_INVALID_STATE);
                 }
-                readCborContent(cdata, dataLength);
-                break;
+                {
+                    uint16_t cborSw = readCborContent(cdata, dataLength);
+                    if (cborSw != SWO_SUCCESS) {
+                        send_rejection(cborSw);
+                        return;
+                    }
+                    break;
+                }
             default:
                 THROW(ERROR_INVALID_STATE);
         }

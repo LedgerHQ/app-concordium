@@ -13,16 +13,27 @@ on:
       - develop
   pull_request:
 
+# A pull request from a fork can reach this workflow, and the third-party action below runs
+# with whatever token the job holds. Nothing here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   misspell:
     name: Check misspellings
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Clone
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          # No later step needs git authentication, so do not leave a usable token in .git/config
+          # where the third-party action below could read it.
+          persist-credentials: false
 
       - name: Check misspellings
-        uses: codespell-project/actions-codespell@v2
+        # Pinned to a full commit SHA: a mutable tag lets the upstream owner change what runs here.
+        uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579  # v2
         with:
           builtin: clear,rare
           check_filenames: true

@@ -26,13 +26,16 @@ void uiExportPrivateKey(volatile unsigned int *flags);
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags);
 void exportPrivateKey(void);
 void sendPrivateKeysNewPath(void);
+/** Wipes any derived key material before rejecting, so a rejected export leaves nothing in RAM. */
+void rejectPrivateKeysNewPath(void);
 
 #ifdef HAVE_BAGL
 // Define the dynamic UI elements. These are required as the majority of
 // the transaction elements are optional, so the UI has to be dynamically set.
-extern const ux_flow_step_t *ux_sign_configure_baker_first[10];
-extern const ux_flow_step_t *ux_sign_configure_baker_url[6];
-extern const ux_flow_step_t *ux_sign_configure_baker_commission[9];
+// Sizes must match the definitions in display_bagl.c, which document each worst case.
+extern const ux_flow_step_t *ux_sign_configure_baker_first[12];
+extern const ux_flow_step_t *ux_sign_configure_baker_url[8];
+extern const ux_flow_step_t *ux_sign_configure_baker_commission[11];
 #endif
 
 void startConfigureBakerCommissionDisplay(void);
@@ -45,6 +48,10 @@ void startConfigureDelegationDisplay(void);
 void uiSignUpdateCredentialInitialDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialIdDisplay(volatile unsigned int *flags);
 void uiSignUpdateCredentialThresholdDisplay(volatile unsigned int *flags);
+/** Mandatory review of one added credential in an update-credential transaction. */
+void uiSignUpdateCredentialAddedCredentialDisplay(volatile unsigned int *flags);
+/** Mandatory review of one revealed identity attribute (name and value). */
+void uiSignCredentialDeploymentAttributeDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentVerificationKeyFlowDisplay(volatile unsigned int *flags);
 void uiSignCredentialDeploymentNewIntroDisplay(void);
@@ -66,7 +73,7 @@ void uiRegisterDataPayloadDisplay(volatile unsigned int *flags);
 
 // Sign Transfer
 #ifdef HAVE_BAGL
-extern const ux_flow_step_t *ux_sign_amount_transfer[10];
+extern const ux_flow_step_t *ux_sign_amount_transfer[12];
 #endif
 
 void startTransferDisplay(bool displayMemo, volatile unsigned int *flags);

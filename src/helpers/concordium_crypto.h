@@ -33,13 +33,20 @@ void get_extended_private_key(const derivation_path_t *path,
                               uint8_t *chainCode,
                               size_t chainCodeSize);
 
-/**
- * Public key for global_derivation_path (32 bytes, Concordium format).
+/*
+ * These two used to read global_derivation_path themselves, which meant an operation could not
+ * be bound to a particular path: whoever wrote that global last decided which key was used, and
+ * nothing at the call site said so. The path is a parameter so a caller that has shown a path to
+ * the user can derive against exactly that one - see global_reviewed_path in tx_state.h.
  */
-void get_public_key(uint8_t *publicKeyArray);
 
-/** Ed25519 sign over KEY_LENGTH-byte message. Uses global_derivation_path. */
-void sign(uint8_t *input, uint8_t *signatureOnInput);
+/**
+ * Public key for `path` (32 bytes, Concordium format).
+ */
+void get_public_key(const derivation_path_t *path, uint8_t *publicKeyArray);
+
+/** Ed25519 sign over a KEY_LENGTH-byte message with the key at `path`. */
+void sign(const derivation_path_t *path, uint8_t *input, uint8_t *signatureOnInput);
 
 void hash(cx_hash_t *hash,
           uint32_t mode,

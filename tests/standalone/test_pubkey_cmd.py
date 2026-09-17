@@ -188,3 +188,53 @@ def test_get_public_key_confirm_refused(
     # Assert that we have received a refusal
     assert e.value.status == StatusWords.SWO_CONDITIONS_NOT_SATISFIED
     assert len(e.value.data) == 0
+
+
+# handle_get_public_key() refuses a second request while a review of it is unanswered, so that a
+# host cannot swap the path under the user's finger. The claim that makes it refuse is released
+# on the way back to the idle screen (menu_bagl.c / menu_nbgl.c) for a rejection and in
+# send_public_key() for an approval. If either release is missing, one refused review answers
+# every later GET_PUBLIC_KEY with ERROR_INVALID_STATE and the app is wedged until it restarts.
+#
+# This is the half of that guard a device test can reach: the refusal itself is unreachable here,
+# because the SDK does not deliver an APDU while a reply is pending. Asserting it through Ragger
+# would be asserting os_io_handle_ux_event_reject_apdu, not this app - the app-level half is
+# unit-tests/test_get_public_key.c. No snapshot comparison: the screens are already covered by
+# the accept and refuse tests above, and what is under test is the status word afterwards.
+@pytest.mark.active_test_scope
+def test_public_key_review_claim_is_released_after_a_refusal(backend, navigator):
+    client = CommandSender(backend)
+    # The path test_get_signed_new_public_key_confirm_accepted uses, so the key asserted below
+    # is that test's constant rather than a new one.
+    path = "m/44/919/0/0/0"
+    if backend.device.is_nano:
+        refuse, accept = nano_refuse_instructions, nano_accept_instructions
+    else:
+        refuse, accept = wallet_refuse_instructions, wallet_accept_instructions
+
+    with pytest.raises(ExceptionRAPDU) as e:
+        with client.get_public_key_with_confirmation(path=path):
+            navigator.navigate(
+                refuse,
+                screen_change_before_first_instruction=True,
+                screen_change_after_last_instruction=False,
+            )
+    assert e.value.status == StatusWords.SWO_CONDITIONS_NOT_SATISFIED
+
+    # The claim is gone: this request gets its own review rather than an immediate refusal.
+    with client.get_public_key_with_confirmation(path=path):
+        navigator.navigate(
+            accept,
+            screen_change_before_first_instruction=True,
+            screen_change_after_last_instruction=False,
+        )
+
+    response = client.get_async_response()
+    assert response.status == StatusWords.SWO_SUCCESS
+    # And it exports the key for the path it just reviewed - the first 32 bytes of
+    # test_get_signed_new_public_key_confirm_accepted's response, which is the same key without
+    # the signature this request did not ask for.
+    assert (
+        response.data.hex()
+        == "e31d69e500b0f83983fb6080aaa46129cf7c70e27d59b1aae9820b1d03f98402"
+    )

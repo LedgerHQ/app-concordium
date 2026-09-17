@@ -32,6 +32,69 @@
  */
 #define CLA 0xE0
 
+/**
+ * Run one dispatch, converting a thrown status word into a reply instead of an app exit.
+ *
+ * Handlers report attacker-controlled input errors with THROW(...) - an unknown instruction,
+ * a bad path, a length that does not add up. THROW is os_longjmp, and the only handler above
+ * this point is the SDK's own in standalone_app_main(), which *exits the application*. So a
+ * single malformed APDU used to drop the user to the dashboard, and repeating it kept the app
+ * unavailable and aborted any signing flow in progress (finding V-006).
+ *
+ * Catching here rather than converting each THROW is deliberate: a fuzz run over the real
+ * parser and dispatcher reached 70 distinct THROW sites in 20 files within 90 seconds, out of
+ * 282 in the tree, so no per-site conversion closes this while any THROW remains reachable.
+ * This guard closes it for every THROW reachable from a dispatch at once.
+ *
+ * SCOPE: dispatch only. This wraps apdu_dispatcher() and nothing else, so it does not cover the
+ * UI approval callbacks - those are invoked from the BOLOS UX loop, long after END_TRY below has
+ * popped this context, and a THROW from one of them unwinds straight to the SDK handler in
+ * standalone_app_main() and exits the app, the same failure reached from the approve button
+ * instead of from an APDU. Nearly every continuation can get there, so the two display backends
+ * run them through ux_run_guarded() (helpers/ux_guard.c), which is this function's counterpart
+ * for that side and ends a caught flow the same way. Between the two the guarantee is global:
+ * no status word thrown anywhere in the app exits it.
+ *
+ * Converting a THROW at its site stays the preferred style for new code where the answer is
+ * local - readCborInitial, readCborContent, send_rejection, and
+ * exportNewPathPrivateKeysForPurpose(), which returns the status word its derivation threw
+ * rather than leaning on the catch above it.
+ *
+ * A caught exception ends the flow: the instruction is released and the context union wiped, so
+ * a host cannot resume a half-parsed transaction with the next packet, and no partially parsed
+ * material stays in RAM. That mirrors what send_rejection() does for a handler-level refusal.
+ */
+static void dispatch_guarded(const command_t *cmd,
+                             volatile unsigned int *flags,
+                             bool isInitialCall) {
+    /* Written inside TRY and read after it, so both must survive the longjmp. */
+    volatile uint16_t sw = 0;
+
+    BEGIN_TRY {
+        TRY {
+            (void) apdu_dispatcher(cmd, flags, isInitialCall);
+        }
+        CATCH_OTHER(e) {
+            if ((unsigned int) e <= MAX_SYSTEM_EXCEPTION) {
+                /* EXCEPTION_IO_RESET and friends: the SDK has to see these. */
+                THROW(e);
+            }
+            sw = (uint16_t) e;
+        }
+        FINALLY {
+        }
+    }
+    END_TRY;
+
+    if (sw != 0) {
+        PRINTF("=> handler threw %04X, replying instead of exiting\n", sw);
+        explicit_bzero(&global, sizeof(global));
+        global_tx_state.currentInstruction = INSTRUCTION_NONE;
+        *flags = 0;
+        io_send_sw(sw);
+    }
+}
+
 // Main entry of application that listens for APDU commands that will be received from the
 // computer. The APDU commands control what flow is activated, i.e. which control flow is initiated.
 void app_main() {
@@ -80,10 +143,8 @@ void app_main() {
             isInitialCall = true;
         }
 
-        // Dispatch structured APDU command
-        if (apdu_dispatcher(&cmd, &flags, isInitialCall) < 0) {
-            PRINTF("=> apdu_dispatcher failure\n");
-            return;
-        }
+        // Dispatch structured APDU command. A thrown status word is answered and the loop
+        // continues; only a BOLOS system exception still leaves this function.
+        dispatch_guarded(&cmd, &flags, isInitialCall);
     }
 }

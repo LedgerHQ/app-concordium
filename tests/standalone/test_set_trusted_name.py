@@ -43,6 +43,12 @@ from trusted_name_helper import (
     TAG_DER_SIGNATURE,
     SIGNER_KEY_ID_TEST,
     SIGNER_ALGO_ECDSA_SHA256,
+    CCD_SPEC_VERSION,
+    CCD_NAME_TYPE_CONTEXT_ADDRESS,
+    CCD_NAME_SOURCE_DYNAMIC_RESOLVER,
+    CCD_CHAIN_ID_MAINNET,
+    CCD_CHAIN_ID_TESTNET,
+    semver,
 )
 
 SW_INVALID_PARAM = 0x6B03
@@ -164,13 +170,14 @@ def test_set_trusted_name_rejects_missing_challenge(backend):
     _load_pki(backend, client)
     client.get_challenge()
 
+    # Every other field is valid, so the missing challenge is the only reason to reject.
     msg = b"".join([
         _tlv(TAG_STRUCTURE_TYPE, bytes([STRUCTURE_TYPE_TRUSTED_NAME])),
-        _tlv(TAG_VERSION, bytes([0x01])),
-        _tlv(TAG_TRUSTED_NAME_TYPE, bytes([0x05])),
-        _tlv(TAG_TRUSTED_NAME_SOURCE, bytes([0x01])),
+        _tlv(TAG_VERSION, bytes([CCD_SPEC_VERSION])),
+        _tlv(TAG_TRUSTED_NAME_TYPE, bytes([CCD_NAME_TYPE_CONTEXT_ADDRESS])),
+        _tlv(TAG_TRUSTED_NAME_SOURCE, bytes([CCD_NAME_SOURCE_DYNAMIC_RESOLVER])),
         _tlv(TAG_TRUSTED_NAME, b"test"),
-        _tlv(TAG_CHAIN_ID, bytes([0x01])),
+        _tlv(TAG_CHAIN_ID, bytes([CCD_CHAIN_ID_TESTNET])),
         _tlv(TAG_ADDRESS, b"\x00" * 32),
         _tlv(TAG_SIGNER_KEY_ID, bytes([SIGNER_KEY_ID_TEST])),
         _tlv(TAG_SIGNER_ALGORITHM, bytes([SIGNER_ALGO_ECDSA_SHA256])),
@@ -237,7 +244,118 @@ def test_set_trusted_name_rejects_without_get_challenge(backend):
     builder = TrustedNameTlvBuilder(
         name="test",
         address=b"\x00" * 32,
-        chain_id=1,
+        chain_id=CCD_CHAIN_ID_TESTNET,
         challenge=0,
     )
     _expect_set_trusted_name_sw(client, builder.build_signed())
+
+
+# ── Semantic authorization of the signed descriptor ──────────────────────────
+#
+# Each descriptor below is correctly signed with the test PKI key and carries the current
+# challenge, so it passes signature and freshness verification. It must still be refused, because
+# a valid Ledger signature does not say the descriptor was issued for *this* use case.
+
+
+def _expect_rejected_descriptor(backend, client: CommandSender, **builder_kwargs) -> None:
+    challenge = _load_pki_and_get_challenge(backend, client)
+    builder = TrustedNameTlvBuilder(challenge=challenge, **builder_kwargs)
+    _expect_set_trusted_name_sw(client, builder.build_signed())
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_unsupported_version(backend):
+    """A future or superseded serialization version must not be parsed as the current one."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, version=CCD_SPEC_VERSION + 1)
+
+
+@pytest.mark.active_test_scope
+@pytest.mark.parametrize(
+    "name_type",
+    [
+        pytest.param(0x01, id="eoa"),
+        pytest.param(0x02, id="smart_contract"),
+        pytest.param(0x03, id="collection"),
+        pytest.param(0x04, id="token"),
+        pytest.param(0x05, id="wallet_label"),
+        # 0x06 is the generic SDK CONTEXT_ADDRESS, i.e. another chain's context address. ADR 001
+        # pins Concordium to 0x07, so a 0x06 descriptor was issued for a different use case.
+        pytest.param(0x06, id="sdk_context_address"),
+        pytest.param(0x08, id="undefined"),
+    ],
+)
+def test_set_trusted_name_rejects_non_context_address_type(backend, name_type):
+    """Only ccd_context_address (0x07) names a Concordium account; every other type is refused."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, name_type=name_type)
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_accepts_ccd_context_address_type(backend):
+    """The one type ADR 001 specifies for this descriptor (0x07) is accepted."""
+    client = CommandSender(backend)
+    challenge = _load_pki_and_get_challenge(backend, client)
+    builder = TrustedNameTlvBuilder(
+        challenge=challenge,
+        name_type=CCD_NAME_TYPE_CONTEXT_ADDRESS,
+    )
+    _assert_set_trusted_name_ok(client, builder.build_signed())
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_foreign_name_source(backend):
+    """Only the backend's dynamic resolver may name a Concordium account (0x02 is ENS)."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, name_source=0x02)
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_unknown_chain_id(backend):
+    """Chain ids other than Concordium mainnet/testnet are not networks this app derives for."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, chain_id=137)
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_nft_id_tag(backend):
+    """Tag 0x72 means the descriptor describes an NFT, not a plain account address."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, nft_id=bytes.fromhex("0102"))
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_source_contract_tag(backend):
+    """Tag 0x73 likewise belongs to a contract-scoped descriptor."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, source_contract=bytes(20))
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_malformed_not_valid_after(backend):
+    """Tag 0x10 must be exactly four bytes (major || minor || patch16)."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, not_valid_after=bytes([9, 9, 9]))
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_rejects_revoked_not_valid_after(backend):
+    """A cutoff this app version is already past revokes the descriptor."""
+    client = CommandSender(backend)
+    _expect_rejected_descriptor(backend, client, not_valid_after=semver(0, 0, 1))
+
+
+@pytest.mark.active_test_scope
+def test_set_trusted_name_accepts_future_not_valid_after(backend):
+    """A cutoff beyond this app version leaves the descriptor valid."""
+    client = CommandSender(backend)
+    challenge = _load_pki_and_get_challenge(backend, client)
+
+    builder = TrustedNameTlvBuilder(
+        name="TestAccount.ccd",
+        address=bytes.fromhex("ab" * 32),
+        chain_id=CCD_CHAIN_ID_MAINNET,
+        challenge=challenge,
+        not_valid_after=semver(255, 255, 0xFFFF),
+    )
+    _assert_set_trusted_name_ok(client, builder.build_signed())
