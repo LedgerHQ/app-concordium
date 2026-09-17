@@ -244,6 +244,71 @@ def test_verify_address_trusted_name_full_flow_accepted(
     assert client.get_async_response().status == StatusWords.SWO_SUCCESS
 
 
+@pytest.mark.active_test_scope
+def test_verify_address_trusted_name_full_path_accepted(
+    backend,
+    scenario_navigator: NavigateWithScenario,
+    test_name: str,
+    default_screenshot_path: str,
+):
+    """PKI → GET_PUBLIC_KEY → GET_CHALLENGE → SET_TRUSTED_NAME → VERIFY_ADDRESS (full path).
+
+    This is the lane Ledger Live actually uses: it addresses an account by its 6-node signing path
+    m/44'/coin'/idp'/identity'/0'/credCounter' rather than the compact idp/identity/counter form.
+    Tag 0x22 is the key of that signing path, so it already names one credential counter and the
+    review shows the certified tag 0x20 address -- no PRF-derived address is involved, which is why
+    the name below is deliberately not an address this device would derive.
+
+    Regression test: the two halves of this flow were each covered (a full path with no descriptor,
+    and a descriptor on a new path) but never together, and the combination always failed 0x6B0C.
+
+    GET_PUBLIC_KEY must run *before* GET_CHALLENGE, for the reason given in
+    test_verify_address_trusted_name_full_flow_accepted.
+    """
+    _requires_speculos_pki(backend)
+    client = CommandSender(backend)
+
+    _load_pki_certificate_only(backend, client)
+
+    HARDENED = 0x80000000
+    # m/44'/919'/0'/0'/0'/0': idp 0, identity 0, account-credential role 0', credential counter 0.
+    # Mainnet coin type because Speculos fails on 1' for these paths (see module header).
+    path_nodes = [
+        HARDENED | 44,
+        HARDENED | 919,
+        HARDENED | 0,
+        HARDENED | 0,
+        HARDENED | 0,
+        HARDENED | 0,
+    ]
+    path_cdata = bytes([len(path_nodes)]) + b"".join(
+        n.to_bytes(4, "big") for n in path_nodes
+    )
+    pubkey = _get_ed25519_pubkey_32(client, path_cdata)
+
+    resp = client.get_challenge()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 8
+    challenge = int.from_bytes(resp.data, "big")
+
+    builder = TrustedNameTlvBuilder(
+        name=OTHER_ACCOUNT_ADDRESS,
+        address=pubkey,
+        chain_id=REAL_DESCRIPTOR_CHAIN_ID_MAINNET,
+        challenge=challenge,
+        name_type=REAL_DESCRIPTOR_NAME_TYPE,
+        name_source=REAL_DESCRIPTOR_NAME_SOURCE,
+        version=REAL_DESCRIPTOR_TLV_VERSION,
+    )
+    rapdu = client.set_trusted_name(builder.build_signed())
+    assert rapdu.status == StatusWords.SWO_SUCCESS
+
+    with client.verify_address_full_path(path_nodes):
+        scenario_navigator.address_review_approve()
+
+    assert client.get_async_response().status == StatusWords.SWO_SUCCESS
+
+
 # ── Binding the descriptor to the account under review ───────────────────────
 
 

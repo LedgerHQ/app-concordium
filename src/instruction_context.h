@@ -249,8 +249,10 @@ typedef struct {
     /** Network the reviewed path commits to. Host-chosen (P2, or the coin-type node of a full
      * path) and it changes the derived key, so it is part of the review. */
     uint8_t network[NETWORK_DISPLAY_SIZE];
-    /** Base58 account address derived on-device from the reviewed path and credential counter. A
-     * trusted-name descriptor never replaces it; it must match it (see pki_bind_descriptor). */
+    /** Base58 account address shown on the review. Derived on-device from the reviewed path and
+     * credential counter, except in the full-path trusted-name lane, where the signing path's own
+     * key binds the descriptor to the account and the certified address is shown instead (see
+     * pki_bind_descriptor). */
     char address[TRUSTED_NAME_MAX_LEN + 1];
 } verifyAddressContext_t;
 
