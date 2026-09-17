@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.7.0] - 2026-08-20
+## [5.7.0] - 2026-09-17
 
 ### Added
 - PLT (Protocol Level Token) clear signing via INS `0x27`. The device shows token ID, operation name, decimal-adjusted amount, recipient/target address, and (if present) memo — all in human-readable form — before producing a 64-byte Ed25519 signature. Supported CIS-7 operations: `transfer`, `mint`, `burn`, `addAllowList`, `removeAllowList`, `addDenyList`, `removeDenyList`, `pause`, `unpause`.
@@ -13,12 +13,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - INIT P2=`0x01` fee display mode for PLT: host may append an 8-byte µCCD fee to the INIT frame; the device shows a "Max fees" screen formatted as CCD. Send `0xFFFFFFFFFFFFFFFF` to use P2=`0x01` without showing the fee line.
 - `plt_amount_to_display()` in `numberHelpers`: formats a CIS-7 decimal-fraction amount (CBOR tag 4, `[exponent, significand]`) into a human-readable string appended with the token ID (e.g. `"1.5 MYTOKEN"`).
 - Standalone LibFuzzer target for PLT CBOR parsing (`fuzzing/src/standalone_sign_plt_fuzzer.c`).
+- Unit-test CI workflow with host tests gating the parsing helpers (V-116).
+- Fuzz harnesses covering the real parser, dispatcher, TLV schema and approval callbacks (V-034, V-043, V-096, V-098, V-099, V-102, V-103, V-108, V-113, V-114).
+- `CODEOWNERS`; third-party CI actions and container images are pinned (V-026, V-042, V-110, V-115, V-118).
 
 ### Changed
 - `apdu_dispatcher` call in `app_main` is now wrapped in `BEGIN_TRY / CATCH_OTHER` so any unhandled `THROW` inside a handler is returned to the host as a proper error status word instead of causing an unrecoverable state.
+- UI approval callbacks are guarded the same way, so a status word thrown while confirming replies to the host instead of exiting the app (V-006).
+- `get_public_key` and `sign` take the derivation path as a parameter instead of reading a global, so an operation derives with exactly the path that was shown to the user.
+
+### Security
+
+Findings from the security audit (`V-xxx` keys):
+
+- Trusted-name descriptors are authorized before use and bound to the account under review: the PKI certificate is verified, the descriptor's chain ID must match the network of the reviewed path, and tag `0x22` must be the Ed25519 key of that path. A descriptor is single-use — one refused against a path is dropped rather than left available for the host to retry against another (V-019, V-048, V-053, V-069, V-085).
+- Only trusted-name type `0x07` (context address) is accepted.
+- Bytes that cannot be rendered exactly as they are signed are refused rather than shown partially: memo and registered-data payloads, baker URLs (V-004, V-025) and contract names.
+- Every account transaction shows the signed max energy, and the host-supplied fee is labelled an estimate (V-001, V-084).
+- `deploy module`, `init contract` and `update contract` show the module hash, contract name and a payload digest before signing (V-016, V-018, V-047).
+- `configure baker` shows a digest of the validator keys and holds each stage until its review is accepted (V-008, V-050).
+- Transaction reviews show the signing network and name the operation being reviewed (V-057, V-093, V-095).
+- Credential deployment digests the whole anonymity-revoker list, honours staged rejections, and signs only complete URLs (V-011, V-074, V-107).
+- The U2F transport is disabled, and verification-key state is held until approval (V-119).
+- An approved key export whose reviewed parameters were cleared is refused.
+- Ambiguous CBOR encodings are refused (V-070, V-077, V-100, V-104).
+- The public-key comparison is drawn from a snapshot held outside the instruction-context union (V-012).
 
 ### Fixed
 - `sign_transfer_with_memo` and `sign_transfer_with_schedule_and_memo`: intermediate CONT APDUs (memo split across more than two packets) now return `SW_OK` (`0x9000`) immediately instead of incorrectly throwing `ERROR_INVALID_STATE`.
+- `VERIFY_ADDRESS` in the full derivation-path format (`P1 = 0x02`) always failed with `ERROR_TRUSTED_NAME_MISMATCH` (`0x6B0C`) when a trusted-name descriptor was loaded — the combination Ledger Live uses, which made clear-signed address verification unusable. A full path is the account's signing path `m/44'/coin'/idp'/identity'/0'/credCounter'`, so its tag `0x22` key already identifies one credential counter and the certified address is shown. The compact formats still require tag `0x20` to equal the device-derived address, because the PRF path they review is shared by every credential counter.
+- Timestamp display appended milliseconds past the string terminator instead of at the end of the timestamp (V-070).
 
 ## [5.6.3] - 2026-08-13
 
