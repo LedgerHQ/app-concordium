@@ -24,6 +24,7 @@
 #include "instruction_context.h"
 #include "helpers/app_sizes.h"
 #include "handler/sign_plt.h"
+#include "stub_probes.h"
 
 /* ── Constants ────────────────────────────────────────────────────────────── */
 
@@ -69,6 +70,35 @@ static int per_test_setup(void **state) {
 }
 
 /*
+ * Run the handler and report how it refused, whichever way it refused.
+ *
+ * The handler has two: most checks THROW, but the two CONT length checks answer the host with
+ * io_send_sw() and return (sign_plt.c, "lc == 0" and the overflow guard). Both are refusals a
+ * test wants to name by status word, so both come back the same way here - otherwise a
+ * non-throwing refusal is indistinguishable from success, which is what made
+ * test_cont_empty_chunk and test_cont_overflow_by_one fail against a handler that was behaving
+ * correctly.
+ *
+ * g_try_context is cleared for the same reason throw_harness.h clears it: a previous statement
+ * that threw past an open TRY leaves it pointing at a frame that has since returned.
+ */
+static int run_handler(command_t *cmd, bool isInitialCall) {
+    volatile unsigned int flags = 0;
+
+    g_try_context = NULL;
+    stub_probes_reset();
+
+    int rc = setjmp(g_fuzzer_jmp_buf);
+    if (rc == 0) {
+        handle_sign_plt(cmd, &flags, isInitialCall);
+        if (g_stub_send_sw_called) {
+            rc = (int) g_stub_last_sw;
+        }
+    }
+    return rc;
+}
+
+/*
  * Build a PLT INIT APDU and call handle_sign_plt with isInitialCall=true.
  *
  * The token_id_len_byte is placed literally in the APDU (may be 0 or > 128 to
@@ -77,7 +107,7 @@ static int per_test_setup(void **state) {
  * success cases; may be 0 for error-path tests where the handler throws before
  * reading the token data).
  *
- * Returns the THROW value, or 0 if handle_sign_plt returned normally.
+ * Returns the status word the handler refused with, or 0 if it returned normally.
  */
 static int call_init(uint8_t token_id_len_byte,
                      uint8_t actual_token_id_bytes,
@@ -104,34 +134,24 @@ static int call_init(uint8_t token_id_len_byte,
     buf[off++] = (uint8_t)((cbor_total >> 8) & 0xFF);
     buf[off++] = (uint8_t)(cbor_total & 0xFF);
 
-    volatile unsigned int flags = 0;
     command_t cmd;
     cmd.p1   = 0x00; /* PLT_P1_INIT */
     cmd.p2   = 0x00;
     cmd.lc   = (uint8_t)off;
     cmd.data = buf;
 
-    int rc = setjmp(g_fuzzer_jmp_buf);
-    if (rc == 0) {
-        handle_sign_plt(&cmd, &flags, /*isInitialCall=*/true);
-    }
-    return rc;
+    return run_handler(&cmd, /*isInitialCall=*/true);
 }
 
-/* Send one CONT frame (P1=0x01) with the given data; returns THROW value or 0. */
+/* Send one CONT frame (P1=0x01) with the given data; returns the status word, or 0 on success. */
 static int call_cont(const uint8_t *data, uint8_t lc, bool is_initial) {
-    volatile unsigned int flags = 0;
     command_t cmd;
     cmd.p1   = 0x01; /* PLT_P1_CONT */
     cmd.p2   = 0x00;
     cmd.lc   = lc;
     cmd.data = (uint8_t *)data;
 
-    int rc = setjmp(g_fuzzer_jmp_buf);
-    if (rc == 0) {
-        handle_sign_plt(&cmd, &flags, is_initial);
-    }
-    return rc;
+    return run_handler(&cmd, is_initial);
 }
 
 /* ── Token-ID length boundary tests ──────────────────────────────────────── */
