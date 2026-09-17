@@ -23,6 +23,7 @@
 #include "ledger/cx.h"
 #include "ledger/exceptions.h"
 #include "ledger/os_utils.h"
+#include "ledger/io.h"
 #include "ledger/parser.h"
 #include "ledger/status_words.h"
 #include "buffer.h"
@@ -39,6 +40,7 @@
 #include "tlv_library.h"
 #endif
 #include "fuzz_ui.h"
+#include "stub_probes.h"
 #ifdef FUZZ_REAL_TRUSTED_NAME
 #include "ledger_pki.h"
 #endif
@@ -53,11 +55,13 @@
 #include "helpers/concordium_crypto.h"
 #include "helpers/base58check.h"
 #include "ui/display.h"
+#include "helpers/ux_guard.h"
 #include "handler/set_trusted_name.h"
 #include "handler/sign_configure_baker.h"
 
 /* ── THROW jump buffer and last-throw site (see stubs/ledger/exceptions.h) ── */
 jmp_buf g_fuzzer_jmp_buf;
+try_context_t *g_try_context = NULL;
 const char *g_fuzz_throw_file = NULL;
 int g_fuzz_throw_line = 0;
 unsigned int g_fuzz_throw_sw = 0;
@@ -68,6 +72,8 @@ tx_state_t        global_tx_state;
 instructionContext global;
 accountSender_t   global_account_sender;
 comparePublicKey_t global_compare_public_key;
+derivation_path_t global_reviewed_path;
+bool global_public_key_review_pending;
 
 /*
  * ── Trusted-name globals (replaces set_trusted_name.c definitions) ─────
@@ -331,12 +337,33 @@ bool apdu_parser(command_t *cmd, uint8_t *buf, size_t buf_len) {
 
 const uint8_t BLS_G1_ORDER[32] = {0};
 
+/* See stub_probes.h: the derived key is constant, so the path asked for is the only observable. */
+derivation_path_t g_stub_public_key_path;
+bool g_stub_public_key_called;
+derivation_path_t g_stub_sign_path;
+bool g_stub_sign_called;
+uint16_t g_stub_last_sw;
+bool g_stub_send_sw_called;
+
+void stub_probes_reset(void) {
+    memset(&g_stub_public_key_path, 0, sizeof(g_stub_public_key_path));
+    g_stub_public_key_called = false;
+    memset(&g_stub_sign_path, 0, sizeof(g_stub_sign_path));
+    g_stub_sign_called = false;
+    g_stub_last_sw = 0;
+    g_stub_send_sw_called = false;
+}
+
 void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *privateKey) {
     (void)path;
     memset(privateKey, 0, sizeof(*privateKey));
 }
 
-void get_public_key(uint8_t *publicKeyArray) {
+void get_public_key(const derivation_path_t *path, uint8_t *publicKeyArray) {
+    if (path) {
+        g_stub_public_key_path = *path;
+    }
+    g_stub_public_key_called = true;
     memset(publicKeyArray, 0, KEY_LENGTH);
 }
 
@@ -350,7 +377,11 @@ void get_extended_private_key(const derivation_path_t *path,
     memset(chainCode, 0, chainCodeSize);
 }
 
-void sign(uint8_t *input, uint8_t *signatureOnInput) {
+void sign(const derivation_path_t *path, uint8_t *input, uint8_t *signatureOnInput) {
+    if (path) {
+        g_stub_sign_path = *path;
+    }
+    g_stub_sign_called = true;
     (void)input;
     memset(signatureOnInput, 0, 64);
 }
@@ -395,7 +426,18 @@ void send_user_rejection_no_idle(void)  {}
 void send_success_no_idle(void)         {}
 void send_success_result_no_idle(uint8_t tx) { (void)tx; }
 void send_success(uint8_t tx)           { (void)tx; }
-void send_rejection(uint16_t sw)        { (void)sw; }
+
+/*
+ * Not empty like its neighbours: apdu_response.c:31-34 releases the instruction latch as well
+ * as answering, and that is exactly what separates it from io_send_sw() at a call site. A
+ * refusal issued while a review is unanswered must not release the latch - a free latch has
+ * app_main() zero `global` for the next command, under a screen that still reads it - so a stub
+ * that dropped the difference would let that regression pass.
+ */
+void send_rejection(uint16_t sw) {
+    global_tx_state.currentInstruction = INSTRUCTION_NONE;
+    io_send_sw(sw);
+}
 
 /*
  * io_send_sw / io_send_response_pointer are reached only through the real dispatcher and the
@@ -404,7 +446,8 @@ void send_rejection(uint16_t sw)        { (void)sw; }
  * out-of-bounds or uninitialised buffer must be reported, and production would transmit it.
  */
 int io_send_sw(uint16_t sw) {
-    (void)sw;
+    g_stub_last_sw = sw;
+    g_stub_send_sw_called = true;
     return 0;
 }
 
@@ -437,8 +480,17 @@ static void fuzz_park(fuzz_ui_action_t action) {
     g_fuzz_pending_ui_action = action;
 }
 
+/*
+ * Return to the idle screen. Stubbed rather than parked: it is not an approval point, it is
+ * where a finished or refused flow leaves the UI. sendPrivateKeysNewPath() calls it when it
+ * refuses to derive from a cleared context, which is the only reference to it from a source
+ * file these targets compile - the apdu_response.c senders that normally call it are
+ * themselves stubbed below.
+ */
+void ui_menu_main(void)                                { }
+
 void uiComparePubkey(void)                             { fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
-void uiGeneratePubkey(volatile unsigned int *flags)    { (void)flags; fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
+void uiGeneratePubkey(volatile unsigned int *flags)    { (void)flags; fuzz_park(FUZZ_UI_PUBLIC_KEY_CONFIRM); }
 void uiExportPrivateKey(volatile unsigned int *flags)  { (void)flags; fuzz_park(FUZZ_UI_EXPORT_PRIVATE_KEY); }
 void uiExportPrivateKeysNewPath(volatile unsigned int *flags) {
     (void)flags;
@@ -533,6 +585,7 @@ extern void confirmCredentialAttribute(void)         __attribute__((weak));
 extern void exportPrivateKey(void)                   __attribute__((weak));
 extern void sendPrivateKeysNewPath(void)             __attribute__((weak));
 extern void rejectPrivateKeysNewPath(void)           __attribute__((weak));
+extern void send_public_key(bool compare)            __attribute__((weak));
 
 /*
  * display_nbgl.c:121 - a rejection on an intermediate screen must end the whole flow, or a
@@ -541,6 +594,22 @@ extern void rejectPrivateKeysNewPath(void)           __attribute__((weak));
 static void fuzz_reject_staged_review(void) {
     global_tx_state.currentInstruction = INSTRUCTION_NONE;
     send_user_rejection();
+}
+
+/*
+ * The two continuations that carry an argument, as void(void) for ux_run_guarded() - the same
+ * shims display_bagl.c and display_nbgl.c define, over the same fixed argument.
+ */
+static void fuzz_next_scheduled_amount(void) {
+    if (processNextScheduledAmount) {
+        processNextScheduledAmount(global.withDataBlob.signTransferWithScheduleContext.buffer);
+    }
+}
+
+static void fuzz_send_public_key_confirm(void) {
+    if (send_public_key) {
+        send_public_key(true);
+    }
 }
 
 void fuzz_answer_pending_ui(bool approve) {
@@ -555,7 +624,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (buildAndSignTransactionHash) {
-                buildAndSignTransactionHash();
+                ux_run_guarded(buildAndSignTransactionHash);
             }
             return;
 
@@ -563,7 +632,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmInitialScheduledTransfer) {
-                confirmInitialScheduledTransfer();
+                ux_run_guarded(confirmInitialScheduledTransfer);
             }
             return;
 
@@ -571,8 +640,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (processNextScheduledAmount) {
-                processNextScheduledAmount(
-                    global.withDataBlob.signTransferWithScheduleContext.buffer);
+                ux_run_guarded(fuzz_next_scheduled_amount);
             }
             return;
 
@@ -588,7 +656,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 fuzz_reject_staged_review();
             } else if (confirmConfigureBakerStage) {
-                confirmConfigureBakerStage();
+                ux_run_guarded(confirmConfigureBakerStage);
             }
             return;
 
@@ -596,7 +664,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 fuzz_reject_staged_review();
             } else if (processNextVerificationKey) {
-                processNextVerificationKey();
+                ux_run_guarded(processNextVerificationKey);
             }
             return;
 
@@ -604,7 +672,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmAddedCredential) {
-                confirmAddedCredential();
+                ux_run_guarded(confirmAddedCredential);
             }
             return;
 
@@ -612,7 +680,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (confirmCredentialAttribute) {
-                confirmCredentialAttribute();
+                ux_run_guarded(confirmCredentialAttribute);
             }
             return;
 
@@ -620,7 +688,7 @@ void fuzz_answer_pending_ui(bool approve) {
             if (!approve) {
                 send_user_rejection();
             } else if (exportPrivateKey) {
-                exportPrivateKey();
+                ux_run_guarded(exportPrivateKey);
             }
             return;
 
@@ -628,10 +696,10 @@ void fuzz_answer_pending_ui(bool approve) {
             /* The reject side wipes derived key material, so it is the interesting half. */
             if (!approve) {
                 if (rejectPrivateKeysNewPath) {
-                    rejectPrivateKeysNewPath();
+                    ux_run_guarded(rejectPrivateKeysNewPath);
                 }
             } else if (sendPrivateKeysNewPath) {
-                sendPrivateKeysNewPath();
+                ux_run_guarded(sendPrivateKeysNewPath);
             }
             return;
 
@@ -640,6 +708,14 @@ void fuzz_answer_pending_ui(bool approve) {
                 send_user_rejection();
             } else {
                 send_success_no_idle();
+            }
+            return;
+
+        case FUZZ_UI_PUBLIC_KEY_CONFIRM: /* review_public_key_choice */
+            if (!approve) {
+                send_user_rejection();
+            } else if (send_public_key) {
+                ux_run_guarded(fuzz_send_public_key_confirm);
             }
             return;
     }

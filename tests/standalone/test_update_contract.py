@@ -84,3 +84,54 @@ def test_update_contract(
     assert response.data == bytes.fromhex(
         "79fc02f2d8afcb292bbcc3516db304b7ac628fe9b16379d75a0287eed7dc6909602782f25b02d4be44165bb2ea00ab5f4473b10847469f04ec9867f4e421b00a"
     )
+
+
+# The entrypoint name is hashed into the signed transaction but rendered as a C string. Same
+# gate as init_contract and the baker metadata URL; see test_init_contract.py for the reasoning.
+SW_INVALID_TRANSACTION = 0x6B04
+
+_NAME_TEST_PATH = "m/1105/0/0/0/0/2/0/0"
+_NAME_TEST_HEADER = bytes.fromhex(
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    "000000000000000a0000000000000064000000290000000063de5da702"
+)
+
+
+def _expect_update_contract_refused(client: CommandSender, name: bytes) -> None:
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.update_contract(
+            path=_NAME_TEST_PATH,
+            header_and_type=_NAME_TEST_HEADER,
+            amount=1,
+            index=bytes.fromhex("00000000000004d2"),
+            sub_index=bytes.fromhex("000000000000162e"),
+            name=name,
+            params=bytes.fromhex("0102"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_update_contract_rejects_name_with_embedded_nul(backend):
+    """``transfer\\0<more>`` would review as ``transfer`` while the signature covered the rest.
+
+    This is the entrypoint being invoked, so a disguised name is a disguised method call.
+    """
+    client = CommandSender(backend)
+    _expect_update_contract_refused(client, b"transfer\x00_drain_wallet")
+
+
+@pytest.mark.active_test_scope
+def test_update_contract_rejects_name_with_control_character(backend):
+    """C0 controls have no faithful rendering either, so they are refused, not drawn."""
+    client = CommandSender(backend)
+    _expect_update_contract_refused(client, b"transfer\x0b_drain_wallet")
+
+
+@pytest.mark.active_test_scope
+def test_update_contract_rejects_nul_in_a_later_name_chunk(backend):
+    """The multi-packet case a strlen() write cursor got wrong; see test_init_contract.py."""
+    client = CommandSender(backend)
+    name = b"transfer_" + b"a" * 250 + b"\x00" + b"b" * 50
+    _expect_update_contract_refused(client, name)

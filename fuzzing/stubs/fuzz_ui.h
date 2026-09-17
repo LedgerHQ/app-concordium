@@ -47,8 +47,15 @@ typedef enum {
     FUZZ_UI_EXPORT_PRIVATE_KEY,
     /* review_export_private_key_new_path */
     FUZZ_UI_EXPORT_PRIVATE_KEYS_NEW_PATH,
-    /* review_public_key_choice / review_choice / review_verify_address: reply only. */
+    /* review_choice / review_verify_address: reply only. */
     FUZZ_UI_CONFIRM_ONLY,
+    /*
+     * review_public_key_choice (display_nbgl.c:65) / ux_generate_public_flow_accept_step
+     * (display_bagl.c:96): send_public_key(true). Not CONFIRM_ONLY, because approving this one
+     * runs a derivation and, with P2_SIGN_PUBLIC_KEY, a signature and a response bounds check -
+     * and it does so from the path the review pinned, which is the property worth reaching.
+     */
+    FUZZ_UI_PUBLIC_KEY_CONFIRM,
 } fuzz_ui_action_t;
 
 /** Set by the UI stubs; read and cleared by fuzz_answer_pending_ui(). */

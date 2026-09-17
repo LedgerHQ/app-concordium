@@ -15,6 +15,19 @@ extern tx_state_t global_tx_state;
 /** Sentinel for no active instruction (before first command) */
 #define INSTRUCTION_NONE -1
 
+/**
+ * Largest value a BOLOS system exception takes (errors.h: EXCEPTION .. EXCEPTION_CORRUPT are
+ * 0x01..0x14). Every status word this app throws is far above it - the ISO 6xxx range, plus
+ * ERROR_DEVICE_LOCKED at 0x530C - so the two are told apart by magnitude alone. A system
+ * exception is a genuine fault and must keep propagating; a status word is input validation and
+ * must not.
+ *
+ * Shared because every place that converts a thrown value into a reply has to make the same
+ * distinction: dispatch_guarded() in app_main.c for a dispatch, and
+ * exportNewPathPrivateKeysForPurpose() for the one derivation that runs from a UI callback.
+ */
+#define MAX_SYSTEM_EXCEPTION 0x00FF
+
 /*
  * Concordium-specific status words (0x6B01–0x6B0C, 0x530C). ISO7816 reserves 6Bxx for
  * proprietary use; Ledger's status_words.h only defines SWO_WRONG_P1_P2 (0x6B00) in that range.

@@ -93,12 +93,14 @@ add_library(app_host STATIC
     ${APP_SRC}/helpers/sign_transfer_schedule.c
     ${APP_SRC}/helpers/time.c
     ${APP_SRC}/helpers/tx_hash.c
+    ${APP_SRC}/helpers/ux_guard.c
 )
 target_include_directories(app_host PUBLIC ${APP_INCLUDE_DIRS})
 
 # ---------------------------------------------------------------------------
 # One executable per test file, registered with CTest.
-# Extra sources (a handler the test drives directly) may follow the name.
+# Usage: add_unit_test(<name> [extra_source ...]) - pass a handler .c to test it, the way
+# fuzzing/CMakeLists.txt does. app_host carries only what every test needs.
 # ---------------------------------------------------------------------------
 function(add_unit_test NAME)
     add_executable(${NAME} ${NAME}.c ${ARGN})
@@ -111,5 +113,7 @@ add_unit_test(test_display_text)
 add_unit_test(test_cbor_data_blob)
 add_unit_test(test_time)
 add_unit_test(test_derivation_path)
+add_unit_test(test_get_public_key ${APP_SRC}/handler/get_public_key.c)
+add_unit_test(test_ux_guard)
 # sign_plt.c is not part of app_host: only this test drives the PLT handler.
 add_unit_test(test_sign_plt ${APP_SRC}/handler/sign_plt.c)

@@ -13,6 +13,7 @@
 #include "sign_credential_deployment.h"
 #include "sign_transfer_schedule.h"
 #include "tx_hash.h"
+#include "ux_guard.h"
 
 #include "display.h"
 #include "display_bagl.h"
@@ -20,6 +21,18 @@
 
 accountSender_t global_account_sender;
 comparePublicKey_t global_compare_public_key;
+derivation_path_t global_reviewed_path;
+bool global_public_key_review_pending;
+
+/*
+ * ux_run_guarded() takes a void(void) continuation, so the two that carry an argument get a
+ * shim. The argument is fixed at both call sites anyway - the step that ran them had no other
+ * value to pass. The scheduled-transfer one is further down, next to the context pointer it
+ * reads.
+ */
+static void send_public_key_confirm(void) {
+    send_public_key(true);
+}
 
 // The CBOR major type, shown beside the value: a numeric memo and a text memo that decode to
 // the same characters are distinct signed byte strings and must not review identically.
@@ -91,7 +104,7 @@ UX_STEP_NOCB(ux_generate_public_flow_pubkey_step,
              {.title = "Public key", .text = (char *) global.exportPublicKeyContext.publicKey});
 UX_STEP_VALID(ux_generate_public_flow_accept_step,
               pb,
-              send_public_key(true),
+              ux_run_guarded(send_public_key_confirm),
               {&C_icon_validate_14, "Accept"});
 UX_FLOW(ux_generate_public_flow,
         &ux_generate_public_flow_identity_step,
@@ -168,7 +181,7 @@ UX_STEP_NOCB(ux_sign_flow_review_update_contract, nn, {"Review transaction to", 
 // the caller).
 UX_STEP_CB(ux_sign_flow_shared_sign,
            pnn,
-           buildAndSignTransactionHash(),
+           ux_run_guarded(buildAndSignTransactionHash),
            {&C_icon_validate_14, "Sign", "transaction"});
 UX_STEP_CB(ux_sign_flow_shared_decline,
            pnn,
@@ -202,7 +215,7 @@ UX_STEP_NOCB(ux_export_private_key_warning_step,
              {&C_icon_crossmark, "Secrets leave", "this Ledger"});
 UX_STEP_CB(ux_export_private_key_accept_step,
            pb,
-           exportPrivateKey(),
+           ux_run_guarded(exportPrivateKey),
            {&C_icon_validate_14, (char *) global.exportPrivateKeyContext.display_sign});
 UX_STEP_CB(ux_export_private_key_decline_step,
            pb,
@@ -237,14 +250,14 @@ UX_STEP_NOCB(ux_export_private_key_new_path_credid_step,
              });
 UX_STEP_CB(ux_export_private_key_new_path_approve_step,
            pb,
-           sendPrivateKeysNewPath(),
+           ux_run_guarded(sendPrivateKeysNewPath),
            {
                &C_icon_validate_14,
                (char *) global.exportPrivateKeyContext.display_sign,
            });
 UX_STEP_CB(ux_export_private_key_new_path_reject_step,
            pb,
-           rejectPrivateKeysNewPath(),
+           ux_run_guarded(rejectPrivateKeysNewPath),
            {
                &C_icon_crossmark,
                "Reject operation",
@@ -304,7 +317,7 @@ UX_STEP_NOCB(ux_sign_configure_baker_keys_hash_step,
 
 UX_STEP_CB(ux_sign_configure_baker_url_cb_step,
            bnnn_paging,
-           confirmConfigureBakerStage(),
+           ux_run_guarded(confirmConfigureBakerStage),
            {.title = "URL", .text = (char *) global.signConfigureBaker.url.urlDisplay});
 
 UX_STEP_NOCB(ux_sign_configure_baker_url_step,
@@ -313,7 +326,7 @@ UX_STEP_NOCB(ux_sign_configure_baker_url_step,
 
 UX_STEP_CB(ux_sign_configure_baker_continue,
            nn,
-           confirmConfigureBakerStage(),
+           ux_run_guarded(confirmConfigureBakerStage),
            {"Continue", "with transaction"});
 
 UX_STEP_NOCB(ux_sign_configure_baker_empty_url_step, bn, {"Empty URL", ""});
@@ -601,7 +614,7 @@ UX_STEP_NOCB(ux_credential_deployment_verification_key_flow_0_step,
 
 UX_STEP_CB(ux_credential_deployment_verification_key_flow_1_step,
            nn,
-           processNextVerificationKey(),
+           ux_run_guarded(processNextVerificationKey),
            {"Continue", "with transaction"});
 
 UX_FLOW(ux_credential_deployment_verification_key_flow,
@@ -645,7 +658,7 @@ UX_STEP_NOCB(ux_sign_credential_deployment_3_step,
 
 UX_STEP_CB(ux_sign_credential_deployment_approve_step,
            pnn,
-           buildAndSignTransactionHash(),
+           ux_run_guarded(buildAndSignTransactionHash),
            {&C_icon_validate_14, "Sign", "details"});
 UX_STEP_CB(ux_sign_credential_deployment_reject_step,
            pnn,
@@ -660,7 +673,7 @@ UX_STEP_NOCB(ux_credential_attribute_step,
               .text = (char *) global.signCredentialDeploymentContext.attributeValue});
 UX_STEP_CB(ux_credential_attribute_confirm_step,
            nn,
-           confirmAttribute(),
+           ux_run_guarded(confirmAttribute),
            {"Continue", "with transaction"});
 UX_FLOW(ux_credential_attribute,
         &ux_credential_attribute_step,
@@ -675,7 +688,7 @@ UX_STEP_NOCB(ux_added_credential_ar_threshold_step,
               (char *) global.signCredentialDeploymentContext.anonymityRevocationThreshold});
 UX_STEP_CB(ux_added_credential_approve_step,
            pnn,
-           confirmAddedCredential(),
+           ux_run_guarded(confirmAddedCredential),
            {&C_icon_validate_14, "Confirm added", "credential"});
 
 UX_FLOW(ux_sign_update_credential_added_credential,
@@ -745,7 +758,7 @@ UX_STEP_NOCB(ux_sign_credential_update_threshold_0_step,
               .text = (char *) global.signCredentialDeploymentContext.threshold});
 UX_STEP_CB(ux_sign_credential_update_threshold_1_step,
            pnn,
-           buildAndSignTransactionHash(),
+           ux_run_guarded(buildAndSignTransactionHash),
            {&C_icon_validate_14, "Sign", "transaction"});
 UX_STEP_CB(ux_sign_credential_update_threshold_2_step,
            pnn,
@@ -838,7 +851,7 @@ UX_STEP_CB(ux_sign_public_info_review,
 
 UX_STEP_CB(ux_sign_public_info_for_ip_sign,
            pnn,
-           buildAndSignTransactionHash(),
+           ux_run_guarded(buildAndSignTransactionHash),
            {&C_icon_validate_14, "Sign identity", "provider info"});
 
 UX_STEP_CB(ux_sign_public_info_for_ip_decline,
@@ -1019,6 +1032,10 @@ const ux_flow_step_t *ux_sign_scheduled_amount_transfer[10];
 static signTransferWithScheduleContext_t *ctx_sign_transfer_with_schedule =
     &global.withDataBlob.signTransferWithScheduleContext;
 
+static void processNextScheduledAmountContinue(void) {
+    processNextScheduledAmount(ctx_sign_transfer_with_schedule->buffer);
+}
+
 // UI definitions for displaying the transaction contents of the first packet for
 // verification before continuing to process the scheduled amount pairs that will be
 // received in separate packets.
@@ -1028,7 +1045,7 @@ UX_STEP_NOCB(ux_scheduled_transfer_initial_flow_1_step,
               .text = (char *) global.withDataBlob.signTransferWithScheduleContext.displayStr});
 UX_STEP_VALID(ux_scheduled_transfer_initial_flow_2_step,
               nn,
-              confirmInitialScheduledTransfer(),
+              ux_run_guarded(confirmInitialScheduledTransfer),
               {"Continue", "with transaction"});
 
 // UI definitions for displaying a timestamp and an amount of a scheduled transfer.
@@ -1042,7 +1059,7 @@ UX_STEP_NOCB(ux_sign_scheduled_transfer_pair_flow_1_step,
               (char *) global.withDataBlob.signTransferWithScheduleContext.displayAmount});
 UX_STEP_CB(ux_sign_scheduled_transfer_pair_flow_2_step,
            nn,
-           processNextScheduledAmount(ctx_sign_transfer_with_schedule->buffer),
+           ux_run_guarded(processNextScheduledAmountContinue),
            {"Show", "next release"});
 UX_FLOW(ux_sign_scheduled_transfer_pair_flow,
         &ux_sign_scheduled_transfer_pair_flow_0_step,

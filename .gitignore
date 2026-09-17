@@ -45,22 +45,26 @@ doc/latex
 # macOS
 .DS_Store
 
-# JetBrains
-.idea/
-
 # Helpers
 diff
+
+# Captured build logs, e.g. `make -n > build_dry_run_output.txt` while chasing an SDK rule
+build_dry_run_output.txt
+*_output.txt
 
 # Vscode — track udev rules (Ledger app-boilerplate style); ignore local settings
 .vscode/*
 !.vscode/20-ledger.ledgerblue.rules
+
+# JetBrains IDEs (CLion, PyCharm) — per-developer project settings
+.idea/
 
 # clangd (language server index; may appear under fuzzing/ or repo root)
 .cache/
 
 # folder to store local helper scripts
 scripts_local/
-
-# local scratch / notes
 tmp/
 .claude/
+
+build-dy

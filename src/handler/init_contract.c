@@ -13,6 +13,7 @@
 #include "concordium_crypto.h"
 #include "derivation_path.h"
 #include "display.h"
+#include "display_text.h"
 #include "numberHelpers.h"
 #include "tx_hash.h"
 
@@ -105,6 +106,13 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
         } else if (ctx_init_contract->remainingNameLength < lc) {
             THROW(ERROR_INVALID_NAME_LENGTH);
         }
+        // The name is hashed in full but rendered as a C string, so a chunk carrying bytes that
+        // cannot be drawn is refused before any of it is hashed or displayed. Without this an
+        // embedded NUL would show "transfer" while the signature covered "transfer\0<more>".
+        if (lc > nameOffset && !is_displayable_text(cdata + nameOffset, lc - nameOffset)) {
+            send_rejection(ERROR_INVALID_TRANSACTION);
+            return;
+        }
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
         // Digest the name alongside the parameters, so the signed name is always represented
@@ -114,9 +122,11 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
                         cdata + nameOffset,
                         lc - nameOffset);
             if (ctx_init_contract->nameLength < sizeof(ctx_init_contract->nameDisplay)) {
-                size_t used = strlen(ctx_init_contract->nameDisplay);
+                size_t used = ctx_init_contract->nameDisplayUsed;
                 memmove(ctx_init_contract->nameDisplay + used, cdata + nameOffset, lc - nameOffset);
-                ctx_init_contract->nameDisplay[used + (lc - nameOffset)] = '\0';
+                used += lc - nameOffset;
+                ctx_init_contract->nameDisplay[used] = '\0';
+                ctx_init_contract->nameDisplayUsed = used;
             }
         }
         // subtract the length of the chunk from the remaining name length

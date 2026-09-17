@@ -25,8 +25,29 @@ void handle_get_public_key(const command_t *cmd, volatile unsigned int *flags) {
     uint8_t p2 = cmd->p2;
     uint8_t lc = cmd->lc;
 
+    /* A review of this instruction is on screen and unanswered. Re-entering would repin the
+     * path below and redraw the screen, swapping what the user is about to consent to for
+     * something the host chose afterwards - display and signature would still agree, so the
+     * pin cannot catch it; only refusing can. Unreachable while the SDK withholds APDUs during
+     * a pending reply (os_io_handle_ux_event_reject_apdu), which is why it is cheap to keep. */
+    if (global_public_key_review_pending) {
+        PRINTF("GET_PUBLIC_KEY refused: a review of it is waiting for the user\n");
+        /* io_send_sw, not send_rejection: that one also drops the instruction latch, and the
+         * pending review is what the latch is holding. A free latch makes app_main() zero
+         * `global` before the next command, so another instruction would own the union that
+         * this review still reads its on-screen text and `signPublicKey` from. Refusing must
+         * leave the review owning its state. */
+        io_send_sw(ERROR_INVALID_STATE);
+        return;
+    }
+
     parse_derivation_path(cdata, lc);
     derivation_path_t *dp = &global_derivation_path;
+
+    /* Pin the path this request is about, before anything can parse over it. Every derivation
+     * below - the key drawn on screen and the key sent on Accept - reads the pin, so the
+     * reviewed path and the derived path are one object rather than two reads of a global. */
+    memmove(&global_reviewed_path, dp, sizeof(global_reviewed_path));
 
     // If P2 == P2_SIGN_PUBLIC_KEY, then the public-key is signed by its corresponding private key,
     // and appended to the returned public-key. This is used when it is needed to provide
@@ -93,9 +114,11 @@ void handle_get_public_key(const command_t *cmd, volatile unsigned int *flags) {
     harden_derivation_path(dp);
 
     uint8_t publicKey[KEY_LENGTH];
-    get_public_key(publicKey);
+    get_public_key(&global_reviewed_path, publicKey);
     to_paginated_hex(publicKey, sizeof(publicKey), ctx->publicKey, sizeof(ctx->publicKey));
 
+    // Claim the review before drawing it; send_public_key() releases it once answered.
+    global_public_key_review_pending = true;
     uiGeneratePubkey(flags);
 }
 
@@ -104,8 +127,15 @@ void handle_get_public_key(const command_t *cmd, volatile unsigned int *flags) {
  * the APDU buffer to be returned to the caller.
  */
 void send_public_key(bool compare) {
+    /* Answering the review releases it. Done here rather than only on the way back to the idle
+     * screen because the compare branch below deliberately leaves its screen up and lets new
+     * instructions run; holding the claim until then would block them. */
+    global_public_key_review_pending = false;
+
+    /* The pinned path, not global_derivation_path: this runs from the approval callback, so the
+     * global may have been parsed over since the review was drawn. */
     uint8_t publicKey[KEY_LENGTH];
-    get_public_key(publicKey);
+    get_public_key(&global_reviewed_path, publicKey);
 
     // tx is holding the offset in the buffer we have written to. It is a convention to call this tx
     // for Ledger apps.
@@ -119,7 +149,7 @@ void send_public_key(bool compare) {
 
     if (ctx->signPublicKey) {
         uint8_t signedPublicKey[ED25519_SIGNATURE_LENGTH];
-        sign(publicKey, signedPublicKey);
+        sign(&global_reviewed_path, publicKey, signedPublicKey);
         if (sizeof(signedPublicKey) > sizeof(G_io_apdu_buffer) - tx) {
             THROW(ERROR_BUFFER_OVERFLOW);
         }

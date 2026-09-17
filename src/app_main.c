@@ -33,15 +33,6 @@
 #define CLA 0xE0
 
 /**
- * Largest value a BOLOS system exception takes (errors.h: EXCEPTION .. EXCEPTION_CORRUPT are
- * 0x01..0x14). Every status word this app throws is far above it - the ISO 6xxx range, plus
- * ERROR_DEVICE_LOCKED at 0x530C - so the two are told apart by magnitude alone. A system
- * exception is a genuine fault and must keep propagating; a status word is input validation and
- * must not.
- */
-#define MAX_SYSTEM_EXCEPTION 0x00FF
-
-/**
  * Run one dispatch, converting a thrown status word into a reply instead of an app exit.
  *
  * Handlers report attacker-controlled input errors with THROW(...) - an unknown instruction,
@@ -53,8 +44,21 @@
  * Catching here rather than converting each THROW is deliberate: a fuzz run over the real
  * parser and dispatcher reached 70 distinct THROW sites in 20 files within 90 seconds, out of
  * 282 in the tree, so no per-site conversion closes this while any THROW remains reachable.
- * This guard closes it for all of them at once, and the conversions already done (readCborInitial,
- * readCborContent, send_rejection) stay the preferred style for new code.
+ * This guard closes it for every THROW reachable from a dispatch at once.
+ *
+ * SCOPE: dispatch only. This wraps apdu_dispatcher() and nothing else, so it does not cover the
+ * UI approval callbacks - those are invoked from the BOLOS UX loop, long after END_TRY below has
+ * popped this context, and a THROW from one of them unwinds straight to the SDK handler in
+ * standalone_app_main() and exits the app, the same failure reached from the approve button
+ * instead of from an APDU. Nearly every continuation can get there, so the two display backends
+ * run them through ux_run_guarded() (helpers/ux_guard.c), which is this function's counterpart
+ * for that side and ends a caught flow the same way. Between the two the guarantee is global:
+ * no status word thrown anywhere in the app exits it.
+ *
+ * Converting a THROW at its site stays the preferred style for new code where the answer is
+ * local - readCborInitial, readCborContent, send_rejection, and
+ * exportNewPathPrivateKeysForPurpose(), which returns the status word its derivation threw
+ * rather than leaning on the catch above it.
  *
  * A caught exception ends the flow: the instruction is released and the context union wiped, so
  * a host cannot resume a half-parsed transaction with the next packet, and no partially parsed
