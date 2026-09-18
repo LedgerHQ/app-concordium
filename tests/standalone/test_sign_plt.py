@@ -513,6 +513,76 @@ def test_sign_plt_amount_255_decimals_rejected(backend):
 
 
 # ------------------------------------------------------------------ #
+# Containers must use definite-length encoding                        #
+# ------------------------------------------------------------------ #
+
+
+def _indef_array(items) -> bytes:
+    """Indefinite-length array: 0x9F <items> 0xFF."""
+    return bytes([0x9F]) + b"".join(items) + bytes([0xFF])
+
+
+def _indef_map(pairs) -> bytes:
+    """Indefinite-length map: 0xBF <pairs> 0xFF."""
+    return bytes([0xBF]) + b"".join(k + v for k, v in pairs) + bytes([0xFF])
+
+
+def _pause_op() -> bytes:
+    return _map([(_tstr("pause"), _map([]))])
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_outer_array(backend):
+    """A well-formed indefinite-length outer array must return 0x6B0D.
+
+    test_plt_malformed_cbor only sends a bare 0x9F with no break byte, so the
+    accepted case was never exercised.  Two encodings of one operation must not
+    both be signable — the same rule the parser already applies to strings.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _indef_array([_pause_op()])) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_op_map(backend):
+    """An indefinite-length operation map must return 0x6B0D."""
+    cbor = _array([_indef_map([(_tstr("pause"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_field_map(backend):
+    """An indefinite-length field map must return 0x6B0D."""
+    fields = _indef_map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ])
+    cbor = _array([_map([(_tstr("transfer"), fields)])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_address_map(backend):
+    """An indefinite-length tag-40307 address map must return 0x6B0D."""
+    addr = _tag(40307, _indef_map([(_uint(3), _bstr(bytes(32)))]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), addr),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_amount_array(backend):
+    """An indefinite-length tag-4 amount array must return 0x6B0D."""
+    amount = _tag(4, _indef_array([_negint(-6), _uint(100)]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
 # Single operation per transaction                                    #
 # ------------------------------------------------------------------ #
 

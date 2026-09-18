@@ -50,6 +50,10 @@ The outer structure must be a **one-element array** containing a **single-key ma
 [ { "<opName>": { <fieldMap> } } ]
 ```
 
+- Every container — the outer array, both maps, the tag-4 amount array and the tag-40307 address
+  map — must use **definite-length** encoding, as must every string. An indefinite-length
+  encoding is a second set of bytes for the same operation, and both would be signable.
+  Rejected with `ERROR_PLT_CBOR_ERROR` (`0x6B0D`).
 - Arrays with more than one element are rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`), as is an op
   map holding more than one key.
 - Unknown op names are rejected.
@@ -213,6 +217,7 @@ The following are explicitly not supported in the v1 app and are rejected:
 | ------------------------------- | ------------------------------------------------------ |
 | Multi-operation arrays, or an op map with more than one key | `ERROR_PLT_MULTI_OP` (`0x6B10`)    |
 | Unknown field name inside a recognised op map | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)        |
+| Indefinite-length container or string         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)        |
 | CBOR payload > 512 bytes        | `ERROR_PLT_BUFFER_ERROR` (`0x6B0E`)                    |
 | Token ID > 128 bytes            | `ERROR_PLT_DATA_ERROR` (`0x6B0F`)                      |
 | Unknown operation names         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) via parse failure    |

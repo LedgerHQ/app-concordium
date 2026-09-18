@@ -44,6 +44,10 @@ Supported operations and their required fields:
 - **recipient / target** — CBOR tag 40307 wrapping a map: `{? 1: 40305({1: 919}), 3: bstr .size 32}`. Key `3` (the raw account address) is mandatory; the coininfo field under key `1` is optional but, when present, must be `40305({1: 919})`. See [plt_cbor_fields.md](plt_cbor_fields.md#address-encoding).
 - **memo** — must be a tag-24 byte string (`CborMemo::Cbor`) whose content is a single definite-length CBOR text string filling the whole byte string, with every byte renderable. The decoded text is displayed in full. The untagged `CborMemo::Raw` variant and any other tag-24 content are rejected with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) — a memo the review cannot show is never signed. See [plt_cbor_fields.md](plt_cbor_fields.md#memo-encoding).
 
+Every container and string in the payload must use definite-length encoding; an indefinite-length
+one is rejected with `ERROR_PLT_CBOR_ERROR` (`0x6B0D`). See
+[plt_cbor_fields.md](plt_cbor_fields.md#cbor-payload-structure).
+
 More than one operation — either a second element in the outer array or a second key in the
 operation map — is rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`). A field name inside an operation
 map that is not listed above is rejected with `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) rather than

@@ -93,7 +93,7 @@ static bool parse_amount_value(CborValue *it) {
      */
     if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_array(it)) return false;
+    if (!cbor_value_is_array(it) || !cbor_value_is_length_known(it)) return false;
 
     CborValue arr;
     if (cbor_value_enter_container(it, &arr) != CborNoError) return false;
@@ -161,7 +161,7 @@ static bool parse_coininfo_value(CborValue *it) {
     /* Skip the tag header (same reasoning as parse_amount_value above). */
     if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_map(it)) return false;
+    if (!cbor_value_is_map(it) || !cbor_value_is_length_known(it)) return false;
 
     CborValue info;
     if (cbor_value_enter_container(it, &info) != CborNoError) return false;
@@ -209,7 +209,7 @@ static bool parse_address_value(CborValue *it) {
     /* Skip the tag header (same reasoning as parse_amount_value above). */
     if (cbor_value_advance_fixed(it) != CborNoError) return false;
 
-    if (!cbor_value_is_map(it)) return false;
+    if (!cbor_value_is_map(it) || !cbor_value_is_length_known(it)) return false;
 
     CborValue addr;
     if (cbor_value_enter_container(it, &addr) != CborNoError) return false;
@@ -377,9 +377,13 @@ static uint16_t parse_plt_cbor(void) {
         return ERROR_PLT_CBOR_ERROR;
     }
 
-    /* Outer array: [ single-op ] */
-    if (!cbor_value_is_array(&it)) {
-        PRINTF("DBG: parse_plt: not array\n");
+    /*
+     * Outer array: [ single-op ].  Definite length only, for the reason
+     * cbor_string_bytes_in_place gives for strings: an indefinite-length container is a second
+     * byte encoding of the same operation, and both would be signable.
+     */
+    if (!cbor_value_is_array(&it) || !cbor_value_is_length_known(&it)) {
+        PRINTF("DBG: parse_plt: not a definite-length array\n");
         return ERROR_PLT_CBOR_ERROR;
     }
     CborValue arr;
@@ -393,8 +397,8 @@ static uint16_t parse_plt_cbor(void) {
     }
 
     /* Single op: a map { "opName": { ...fields... } } */
-    if (!cbor_value_is_map(&arr)) {
-        PRINTF("DBG: parse_plt: first item not map\n");
+    if (!cbor_value_is_map(&arr) || !cbor_value_is_length_known(&arr)) {
+        PRINTF("DBG: parse_plt: first item not a definite-length map\n");
         return ERROR_PLT_CBOR_ERROR;
     }
     CborValue op_map;
@@ -431,7 +435,9 @@ static uint16_t parse_plt_cbor(void) {
         return ERROR_PLT_CBOR_ERROR; /* unknown operation */
 
     /* Parse fields map (order not guaranteed by CIS-7). */
-    if (!cbor_value_is_map(&op_map)) return ERROR_PLT_CBOR_ERROR;
+    if (!cbor_value_is_map(&op_map) || !cbor_value_is_length_known(&op_map)) {
+        return ERROR_PLT_CBOR_ERROR;
+    }
     CborValue inner;
     if (cbor_value_enter_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
