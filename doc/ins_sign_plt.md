@@ -44,7 +44,10 @@ Supported operations and their required fields:
 - **recipient / target** — CBOR tag 40307 wrapping a map: `{? 1: 40305({1: 919}), 3: bstr .size 32}`. Key `3` (the raw account address) is mandatory; the coininfo field under key `1` is optional but, when present, must be `40305({1: 919})`. See [plt_cbor_fields.md](plt_cbor_fields.md#address-encoding).
 - **memo** — must be a tag-24 byte string (`CborMemo::Cbor`) whose content is a single definite-length CBOR text string filling the whole byte string, with every byte renderable. The decoded text is displayed in full. The untagged `CborMemo::Raw` variant and any other tag-24 content are rejected with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) — a memo the review cannot show is never signed. See [plt_cbor_fields.md](plt_cbor_fields.md#memo-encoding).
 
-More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`).
+More than one operation — either a second element in the outer array or a second key in the
+operation map — is rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`). A field name inside an operation
+map that is not listed above is rejected with `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) rather than
+skipped: its bytes are signed, so it must not pass unseen.
 
 ## Error status words
 
@@ -55,7 +58,7 @@ More than one operation in the outer array is rejected with `ERROR_PLT_MULTI_OP`
 | `0x6B03` | `ERROR_INVALID_PARAM`      | P1 is neither `0x00` nor `0x01`                                                                        |
 | `0x6B04` | `ERROR_INVALID_TRANSACTION`| `transaction_kind` ≠ `0x1B`                                                                            |
 | `0x6A80` | `SWO_INCORRECT_DATA`       | INIT: trailing bytes when P2=`0x00`, or byte count after `cbor_total_length` ≠ 8 when P2=`0x01`       |
-| `0x6B0D` | `ERROR_PLT_CBOR_ERROR`     | CONT chunk is empty, or its length would exceed the declared `cbor_total_length`; or the final CONT carries CBOR that is structurally invalid or is missing a required field for the declared operation type |
+| `0x6B0D` | `ERROR_PLT_CBOR_ERROR`     | CONT chunk is empty, or its length would exceed the declared `cbor_total_length`; or the final CONT carries CBOR that is structurally invalid, carries an unknown field name, is missing a required field for the declared operation type, or is followed by bytes the parser never reaches |
 | `0x6B0E` | `ERROR_PLT_BUFFER_ERROR`   | `cbor_total_length` is 0 or exceeds `APP_PLT_CBOR_MAX` (512)                                          |
 | `0x6B0F` | `ERROR_PLT_DATA_ERROR`     | `token_id_length` is 0 or > 128                                                                        |
 | `0x6B10` | `ERROR_PLT_MULTI_OP`       | CBOR outer array contains more than one operation                                                      |

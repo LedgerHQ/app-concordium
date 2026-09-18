@@ -50,9 +50,13 @@ The outer structure must be a **one-element array** containing a **single-key ma
 [ { "<opName>": { <fieldMap> } } ]
 ```
 
-- Arrays with more than one element are rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`).
+- Arrays with more than one element are rejected with `ERROR_PLT_MULTI_OP` (`0x6B10`), as is an op
+  map holding more than one key.
 - Unknown op names are rejected.
-- Unknown field names within a recognized op map are silently skipped.
+- Unknown field names within a recognized op map are rejected with `ERROR_PLT_CBOR_ERROR`
+  (`0x6B0D`). Skipping one would leave its bytes in the signature with nothing on screen, and an
+  unrecognised key can change what the operation means — the same argument the address map makes
+  for BCR key `2`.
 
 ---
 
@@ -207,7 +211,8 @@ The following are explicitly not supported in the v1 app and are rejected:
 
 | Item                            | Rejection behaviour                                    |
 | ------------------------------- | ------------------------------------------------------ |
-| Multi-operation arrays          | `ERROR_PLT_MULTI_OP` (`0x6B10`)                        |
+| Multi-operation arrays, or an op map with more than one key | `ERROR_PLT_MULTI_OP` (`0x6B10`)    |
+| Unknown field name inside a recognised op map | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)        |
 | CBOR payload > 512 bytes        | `ERROR_PLT_BUFFER_ERROR` (`0x6B0E`)                    |
 | Token ID > 128 bytes            | `ERROR_PLT_DATA_ERROR` (`0x6B0F`)                      |
 | Unknown operation names         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) via parse failure    |

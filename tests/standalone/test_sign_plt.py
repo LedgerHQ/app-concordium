@@ -456,6 +456,31 @@ def test_sign_plt_add_allow_list_missing_target(backend):
     assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
 
 
+@pytest.mark.active_test_scope
+def test_sign_plt_unknown_field_rejected(backend):
+    """An unrecognised field in an op map must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Its bytes are hashed, so skipping it would sign a field no screen ever showed.
+    """
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+        (_tstr("anythingElse"), _uint(1)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_overlong_field_name_rejected(backend):
+    """A field name longer than the parser's buffer is refused, not skipped (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+        (_tstr("a" * 64), _uint(1)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
 # ------------------------------------------------------------------ #
 # Decimal-count enforcement (app limit: exponent magnitude ≤ 18)     #
 # ------------------------------------------------------------------ #

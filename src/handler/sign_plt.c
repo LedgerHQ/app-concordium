@@ -442,13 +442,11 @@ static uint16_t parse_plt_cbor(void) {
         if (!cbor_value_is_text_string(&inner)) return ERROR_PLT_CBOR_ERROR;
         char fieldName[PLT_OP_NAME_MAX + 1];
         size_t fieldLen = sizeof(fieldName) - 1u;
-        CborError fieldErr = cbor_value_copy_text_string(&inner, fieldName, &fieldLen, &inner);
-        if (fieldErr == CborErrorDataTooLarge) {
-            /* Field name too long to be any known CIS-7 key — skip its value. */
-            if (cbor_value_advance(&inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
-            continue;
+        /* A name too long for fieldName cannot be a known CIS-7 key; tinycbor reports
+         * CborErrorOutOfMemory and it is refused here with every other unknown field. */
+        if (cbor_value_copy_text_string(&inner, fieldName, &fieldLen, &inner) != CborNoError) {
+            return ERROR_PLT_CBOR_ERROR;
         }
-        if (fieldErr != CborNoError) return ERROR_PLT_CBOR_ERROR;
         fieldName[fieldLen] = '\0';
 
         if (strcmp(fieldName, "amount") == 0) {
@@ -465,8 +463,10 @@ static uint16_t parse_plt_cbor(void) {
              * payload and permanent on chain, so it must never be approved unseen. */
             if (!parse_memo_value(&inner)) return ERROR_PLT_UNSUPPORTED_MEMO;
         } else {
-            /* Unknown field — skip its value. */
-            if (cbor_value_advance(&inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+            /* Skipping would put the field's bytes in the signature with no screen, and an
+             * unknown key could change what the operation means — reject, do not skip.  Same
+             * rule as the address map (parse_address_value). */
+            return ERROR_PLT_CBOR_ERROR;
         }
     }
 
