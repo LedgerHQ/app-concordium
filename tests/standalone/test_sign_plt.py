@@ -488,6 +488,25 @@ def test_sign_plt_amount_255_decimals_rejected(backend):
 
 
 # ------------------------------------------------------------------ #
+# Amount structure (tag 4 holds exactly [exponent, significand])      #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_array_three_items(backend):
+    """tag 4([-6, 1500000, 99]) must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Only the first two items reach the screen; a third would be hashed unseen.
+    """
+    amount = _tag(4, _array([_negint(-6), _uint(1_500_000), _uint(99)]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
 # Payload must be consumed in full (bytes past the array are hashed)  #
 # ------------------------------------------------------------------ #
 

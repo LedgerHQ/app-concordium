@@ -137,6 +137,9 @@ static bool parse_amount_value(CborValue *it) {
         return false;
     }
 
+    /* CIS-7 tag 4 is exactly [exponent, significand]; a third item is hashed but never shown. */
+    if (!cbor_value_at_end(&arr)) return false;
+
     if (cbor_value_leave_container(it, &arr) != CborNoError) return false;
 
     ctx->amountSignificand = sig;
