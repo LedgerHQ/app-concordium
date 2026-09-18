@@ -485,3 +485,19 @@ def test_sign_plt_amount_19_decimals_rejected(backend):
 def test_sign_plt_amount_255_decimals_rejected(backend):
     """Exponent -127 (maximum int8_t magnitude, chain-legal) is also rejected (0x6B11)."""
     assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-127)) == 0x6B11
+
+
+# ------------------------------------------------------------------ #
+# Payload must be consumed in full (bytes past the array are hashed)  #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_trailing_bytes_after_outer_array(backend):
+    """Junk after the outer array must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Every CONT byte is hashed into the transaction, so bytes the parser never reaches
+    would be signed while the review shows only the operation.
+    """
+    cbor = _plt_pause() + b"\x00"
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D

@@ -499,6 +499,15 @@ static uint16_t parse_plt_cbor(void) {
         return ERROR_PLT_MULTI_OP;
     }
 
+    if (cbor_value_leave_container(&it, &arr) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+
+    /* Every buffered byte is hashed, so bytes past the array would be signed unseen.
+     * (cbor_value_at_end cannot serve here: remaining is always 0 for a top-level item.) */
+    if (cbor_value_get_next_byte(&it) != ctx->cborBuf + ctx->cborReceived) {
+        PRINTF("DBG: parse_plt: trailing bytes after outer array\n");
+        return ERROR_PLT_CBOR_ERROR;
+    }
+
     PRINTF("DBG: parse_plt: success opType=%d\n", ctx->opType);
     return 0;
 }
