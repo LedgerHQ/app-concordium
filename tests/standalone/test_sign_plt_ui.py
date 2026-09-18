@@ -195,16 +195,23 @@ def _navigate_reject(backend, navigator, default_screenshot_path, test_name):
             backend, navigator, "Reject", default_screenshot_path, test_name
         )
     else:
-        # navigate_until_text_and_compare only supports one confirm instruction,
-        # so use the ragger navigator directly with the two-step rejection list.
-        navigator.navigate_until_text_and_compare(
-            NavInsID.SWIPE_CENTER_TO_LEFT,
-            [NavInsID.USE_CASE_REVIEW_REJECT, NavInsID.USE_CASE_CHOICE_CONFIRM],
-            "Sign",
+        # Spelled out per device rather than swiping until "Sign" is found: the page count is
+        # part of what the review looks like, so a page appearing or disappearing should fail
+        # here instead of being absorbed by a search loop. stax fits the transfer in one page
+        # fewer than flex and apex_p. Keys are backend.device.name, which is also what the
+        # snapshot directories are named after, so an unlisted device fails loudly.
+        swipes_to_sign = {"stax": 3, "flex": 4, "apex_p": 4}[backend.device.name]
+        navigator.navigate_and_compare(
             default_screenshot_path,
             test_name,
+            [NavInsID.SWIPE_CENTER_TO_LEFT] * swipes_to_sign
+            + [NavInsID.USE_CASE_REVIEW_REJECT, NavInsID.USE_CASE_CHOICE_CONFIRM],
             screen_change_before_first_instruction=True,
-            screen_change_after_last_instruction=True,
+            # navigate_and_compare captures the first screen, then one per instruction except
+            # the last when this is False - so swipes_to_sign + 2 snapshots, ending on the
+            # "Reject transaction?" dialog. USE_CASE_CHOICE_CONFIRM then returns to the
+            # dashboard, which no device has a golden for, so it must not be captured.
+            screen_change_after_last_instruction=False,
         )
 
 
