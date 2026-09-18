@@ -488,6 +488,37 @@ def test_sign_plt_amount_255_decimals_rejected(backend):
 
 
 # ------------------------------------------------------------------ #
+# Single operation per transaction                                    #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_op_map_two_keys(backend):
+    """A two-key operation map must return ERROR_PLT_MULTI_OP (0x6B10).
+
+    Only the first key reaches the screen; the second would be signed unseen.
+    """
+    transfer = _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ])
+    burn = _map([(_tstr("amount"), _cis7_amount(-6, 999))])
+    cbor = _array([_map([(_tstr("transfer"), transfer), (_tstr("burn"), burn)])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B10
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_outer_array_two_operations(backend):
+    """Two elements in the outer array must return ERROR_PLT_MULTI_OP (0x6B10)."""
+    transfer = _map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])
+    cbor = _array([transfer, _map([(_tstr("pause"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B10
+
+
+# ------------------------------------------------------------------ #
 # Amount structure (tag 4 holds exactly [exponent, significand])      #
 # ------------------------------------------------------------------ #
 

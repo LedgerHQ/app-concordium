@@ -471,6 +471,12 @@ static uint16_t parse_plt_cbor(void) {
     }
 
     if (cbor_value_leave_container(&op_map, &inner) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+
+    /* One operation per map. A second key would otherwise be signed without a screen: leaving
+     * op_map part-read moves `arr` onto that key and zeroes its count, so the multi-op guard
+     * below sees an exhausted array. */
+    if (!cbor_value_at_end(&op_map)) return ERROR_PLT_MULTI_OP;
+
     if (cbor_value_leave_container(&arr, &op_map) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     /* Validate required fields per operation type. Missing fields would cause the display
