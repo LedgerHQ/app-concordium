@@ -44,6 +44,14 @@ Findings from the security audit (`V-xxx` keys):
 - `VERIFY_ADDRESS` in the full derivation-path format (`P1 = 0x02`) always failed with `ERROR_TRUSTED_NAME_MISMATCH` (`0x6B0C`) when a trusted-name descriptor was loaded — the combination Ledger Live uses, which made clear-signed address verification unusable. A full path is the account's signing path `m/44'/coin'/idp'/identity'/0'/credCounter'`, so its tag `0x22` key already identifies one credential counter and the certified address is shown. The device checks that shape — 6 nodes, purpose `44'`, key role `0'` — before trusting the descriptor's address, because `P1 = 0x02` is the host's choice and says nothing about what it actually sent; a full path of any other shape is refused with `ERROR_TRUSTED_NAME_MISMATCH`. Without that check the 5-node PRF path could be sent under `P1 = 0x02`, where tag `0x22` is identity-level and shared by every credential counter, and the host's unverified address would have been displayed as certified. The compact formats still require tag `0x20` to equal the device-derived address, because the PRF path they review is shared by every credential counter.
 - Timestamp display appended milliseconds past the string terminator instead of at the end of the timestamp (V-070).
 
+## [5.6.4] - 2026-08-26
+
+### Changed
+- Commitment Randomness export (`INS 0x37`, `P1 = 0x01` and `P1 = 0x04`, both networks) returns an **extended** Ed25519 key: the 32-byte private key followed by its 32-byte chain code, so the host can derive SLIP-10 child keys from it. Previously only the 32-byte private key was returned, so the response for those two `P1` values grows from 32 to 64 bytes and a host that assumes the old length has to be updated (PR #40).
+
+### Security
+- The new-path key export wipes key material on every exit path. The output buffer was cleared only on success, so a `THROW` partway through an export could leave plaintext BLS or Ed25519 key bytes in RAM. The wipes now run from a `FINALLY` block with no `CATCH` clause — a `THROW` inside `CATCH` runs after the context has been popped and would unwind past `FINALLY`, skipping them.
+
 ## [5.6.3] - 2026-08-13
 
 ### Changed
