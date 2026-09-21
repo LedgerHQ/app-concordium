@@ -361,8 +361,11 @@ static bool parse_memo_value(CborValue *it) {
 
 /*
  * Parse the fully-accumulated CBOR in ctx->cborBuf.
- * Returns false on structural errors; THROW(ERROR_PLT_MULTI_OP) when the
- * outer array contains more than one operation.
+ * Throws nothing: returns 0 on success, otherwise the status word to answer with —
+ * ERROR_PLT_MULTI_OP when the outer array or the operation map holds more than one
+ * operation, ERROR_PLT_UNSUPPORTED_DECIMALS for an exponent the display cannot carry,
+ * ERROR_PLT_UNSUPPORTED_MEMO for a memo that is not renderable tag-24 text, and
+ * ERROR_PLT_CBOR_ERROR for every structural failure.
  * On success populates ctx->opType, ctx->amountSignificand/Exponent,
  * ctx->address, ctx->hasMemo, and ctx->displayMemo.
  */
