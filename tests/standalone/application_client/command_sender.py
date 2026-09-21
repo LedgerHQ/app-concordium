@@ -365,6 +365,20 @@ class CommandSender:
             data=data,
         )
 
+    def sign_tx_with_schedule_and_memo_memo_chunk(self, memo_chunk: bytes) -> RAPDU:
+        """One memo frame, synchronously.
+
+        Only the frame that completes the memo opens the review; an earlier one answers
+        0x9000 straight away, so it cannot go through the async part_2 below.
+        """
+        return self.backend.exchange(
+            cla=CLA,
+            ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
+            p1=P1.P1_MEMO_SCHEDULED_TRANSFER,
+            p2=P2.P2_NONE,
+            data=memo_chunk,
+        )
+
     @contextmanager
     def sign_tx_with_schedule_and_memo_part_2(
         self, memo_chunk: bytes
