@@ -222,7 +222,10 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             }
             handle_update_contract(cmd, isInitialCall);
             break;
-        /* PLT (Protocol Level Token) blind-signing flow: INIT then one or more CONT chunks.
+        /* PLT (Protocol Level Token) clear-signing flow: INIT then one or more CONT chunks.
+         * The whole CIS-7 payload is decoded and shown before the signature is produced
+         * (doc/ins_sign_plt.md), so this is not blind signing and the settings flag
+         * EMBEDDED.instructions.md requires for that does not apply.
          * CONT (P1=0x01) with Lc=0 is allowed through so the handler can return the
          * protocol-correct ERROR_PLT_CBOR_ERROR; only INIT (P1=0x00) requires data. */
         case INS_SIGN_PLT:
