@@ -5,10 +5,10 @@
  */
 #define KEY_LENGTH 32
 
-#define COMMON_SIGNATURE_SIZE      64
-#define COMMON_HASH_SIZE           KEY_LENGTH
+#define COMMON_SIGNATURE_SIZE 64
+#define COMMON_HASH_SIZE      KEY_LENGTH
 /* Raw account address, before base58check: SHA-256 over the credential id. */
-#define ADDRESS_LENGTH             COMMON_HASH_SIZE
+#define ADDRESS_LENGTH COMMON_HASH_SIZE
 /* base58check account address string; the encoding spaces every 10th character, so 55 chars. */
 #define COMMON_ADDRESS_SIZE        57
 #define COMMON_AMOUNT_DISPLAY_SIZE 30

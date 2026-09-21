@@ -68,8 +68,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     while (offset < size && global.signPlt.state == TX_PLT_CBOR) {
         size_t cont_avail = size - offset;
-        volatile uint8_t chunk = (uint8_t) (cont_avail > MAX_CDATA_LENGTH ? MAX_CDATA_LENGTH
-                                                                          : cont_avail);
+        volatile uint8_t chunk =
+            (uint8_t) (cont_avail > MAX_CDATA_LENGTH ? MAX_CDATA_LENGTH : cont_avail);
 
         cmd.p1 = 0x01; /* PLT_P1_CONT */
         cmd.p2 = 0x00;

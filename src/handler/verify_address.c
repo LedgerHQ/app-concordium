@@ -283,10 +283,10 @@ static void bls_compute_address(uint32_t cred_counter) {
 
 /* Shape of the account signing path m/44'/coin'/idp'/identity'/0'/credCounter'.
  * Node 4 is the key-role selector, 0' being the signing role; node 5 is the credential counter. */
-#define SIGNING_PATH_LEN             6
-#define SIGNING_PATH_INDEX_PURPOSE   0
-#define SIGNING_PATH_INDEX_KEY_ROLE  4
-#define SIGNING_PATH_KEY_ROLE_SIGN   0
+#define SIGNING_PATH_LEN            6
+#define SIGNING_PATH_INDEX_PURPOSE  0
+#define SIGNING_PATH_INDEX_KEY_ROLE 4
+#define SIGNING_PATH_KEY_ROLE_SIGN  0
 
 /*
  * Does this full path have the shape that lets tag 0x22 name a single account?

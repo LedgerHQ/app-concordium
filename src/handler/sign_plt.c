@@ -81,7 +81,7 @@ _Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_T
  * So -18..0 is accepted, -128..-19 is ERROR_PLT_UNSUPPORTED_DECIMALS, and anything beyond
  * -128 is ERROR_PLT_CBOR_ERROR. The chain itself allows 0-255 decimals.
  */
-#define PLT_AMOUNT_EXPONENT_RAW_MAX 127u  /* raw 127 encodes -128, the int8_t floor */
+#define PLT_AMOUNT_EXPONENT_RAW_MAX 127u /* raw 127 encodes -128, the int8_t floor */
 #define PLT_AMOUNT_MIN_EXPONENT     (-18)
 
 static signPltContext_t *ctx = &global.signPlt;
@@ -526,11 +526,11 @@ static void format_plt_display(void) {
  * copies the label and terminates it with no runtime length scan. The assert is what makes
  * that safe: sizeof being compile-time does not bound it against the destination, so without
  * it a longer label would silently overrun displayOp. */
-#define COPY_OP_NAME(str)                                                    \
-    do {                                                                     \
-        _Static_assert(sizeof(str) <= PLT_OP_LABEL_SIZE,                     \
-                       "PLT operation label does not fit displayOp");        \
-        memmove(ctx->displayOp, str, sizeof(str));                           \
+#define COPY_OP_NAME(str)                                             \
+    do {                                                              \
+        _Static_assert(sizeof(str) <= PLT_OP_LABEL_SIZE,              \
+                       "PLT operation label does not fit displayOp"); \
+        memmove(ctx->displayOp, str, sizeof(str));                    \
     } while (0)
     switch (ctx->opType) {
         case PLT_OP_TRANSFER:

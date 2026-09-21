@@ -478,8 +478,8 @@ typedef struct {
 
     /* Parsed from CBOR — valid after cborReceived == cborTotalLength: */
     pltOpType_t opType;
-    uint64_t amountSignificand; /* tag-4 significand; used for transfer/mint/burn */
-    int8_t amountExponent;      /* tag-4 exponent (≤ 0); absolute value = decimal places */
+    uint64_t amountSignificand;      /* tag-4 significand; used for transfer/mint/burn */
+    int8_t amountExponent;           /* tag-4 exponent (≤ 0); absolute value = decimal places */
     uint8_t address[ADDRESS_LENGTH]; /* recipient (transfer) or target (allow/deny list ops) */
     bool hasMemo;                    /* transfer only */
 
