@@ -339,6 +339,22 @@ def _verify_address_new_path_sw(
     return rapdu.status
 
 
+def _verify_address_full_path_sw(client: CommandSender, path_nodes: list[int]) -> int:
+    """Synchronous VERIFY_ADDRESS (full path); returns the status word without any UI."""
+    data = bytes([len(path_nodes)]) + b"".join(n.to_bytes(4, "big") for n in path_nodes)
+    try:
+        rapdu = client.backend.exchange(
+            cla=CLA,
+            ins=InsType.VERIFY_ADDRESS,
+            p1=P1.P1_VERIFY_ADDRESS_FULL_PATH,
+            p2=P2.P2_MAINNET,
+            data=data,
+        )
+    except ExceptionRAPDU as e:
+        return e.status
+    return rapdu.status
+
+
 def _set_trusted_name_for_mainnet_path(
     backend, client: CommandSender, *, name: str, chain_id: int = CCD_CHAIN_ID_MAINNET
 ) -> None:
@@ -360,6 +376,65 @@ def _set_trusted_name_for_mainnet_path(
     )
     rapdu = client.set_trusted_name(builder.build_signed())
     assert rapdu.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_non_signing_full_path_with_descriptor(backend):
+    """A full path must have the signing shape before the descriptor's address is trusted.
+
+    P1 = 0x02 is the host's choice: parse_derivation_path_from_buffer stamps every full path
+    DERIVATION_PATH_VARIANT_FULL without inspecting it. So the 5-node PRF path can be sent down
+    the full-path lane, where the device used to skip bls_compute_address entirely. Tag 0x22
+    then matches -- it is the key of the path under review, and at identity level every
+    credential counter shares it -- and the host's tag 0x20 address would be shown as certified
+    without ever being derived.
+
+    This is the same hole the compact lane refuses in
+    test_verify_address_rejects_descriptor_for_another_credential_counter; the descriptor here is
+    genuine and correctly signed for this very path, which is precisely why only the path shape
+    can catch it.
+    """
+    client = CommandSender(backend)
+    # Descriptor is built over m/44'/919'/0'/0'/3' -- the PRF path, 5 nodes, key role 3'.
+    _set_trusted_name_for_mainnet_path(
+        backend, client, name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0
+    )
+
+    hardened = 0x80000000
+    prf_path_nodes = [
+        hardened | 44,
+        hardened | 919,
+        hardened | 0,
+        hardened | 0,
+        hardened | 3,
+    ]
+    sw = _verify_address_full_path_sw(client, prf_path_nodes)
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_wrong_key_role_full_path_with_descriptor(backend):
+    """Six nodes are not enough: node 4 must be the signing role 0'.
+
+    m/44'/919'/0'/0'/2'/0' has the right length and purpose but selects idCredSec, not the
+    account signing key. Without the node-4 check it would take the trusted lane too.
+    """
+    client = CommandSender(backend)
+    _set_trusted_name_for_mainnet_path(
+        backend, client, name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0
+    )
+
+    hardened = 0x80000000
+    wrong_role_nodes = [
+        hardened | 44,
+        hardened | 919,
+        hardened | 0,
+        hardened | 0,
+        hardened | 2,  # idCredSec role, not the signing role 0'
+        hardened | 0,
+    ]
+    sw = _verify_address_full_path_sw(client, wrong_role_nodes)
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
 
 
 @pytest.mark.active_test_scope

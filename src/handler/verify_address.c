@@ -176,9 +176,11 @@ static uint16_t parse_key_path(uint8_t *cdata,
  * What pins the descriptor to a single account then depends on which path the host sent, because
  * tag 0x22 is the key of whatever path is under review:
  *
- *  - a full path is the account's signing path m/44'/coin'/idp'/identity'/0'/credCounter', so the
- *    credential counter is node 5 and tag 0x22 already differs per account. Nothing further is
- *    needed and the review shows the certified address.
+ *  - a full path *of the signing shape* m/44'/coin'/idp'/identity'/0'/credCounter' puts the
+ *    credential counter at node 5, so tag 0x22 already differs per account. Nothing further is
+ *    needed and the review shows the certified address. The shape is checked by
+ *    full_path_names_one_account; a full path of any other shape is refused, because the host
+ *    picks P1 and the variant alone proves nothing about what it sent.
  *  - the compact formats review the identity-level PRF path, whose key every credential counter
  *    shares. There the derived address is the only value that tells them apart, so tag 0x20 has to
  *    equal it.
@@ -279,6 +281,33 @@ static void bls_compute_address(uint32_t cred_counter) {
     ctx->address[BASE58_ADDRESS_LENGTH] = '\0';
 }
 
+/* Shape of the account signing path m/44'/coin'/idp'/identity'/0'/credCounter'.
+ * Node 4 is the key-role selector, 0' being the signing role; node 5 is the credential counter. */
+#define SIGNING_PATH_LEN             6
+#define SIGNING_PATH_INDEX_PURPOSE   0
+#define SIGNING_PATH_INDEX_KEY_ROLE  4
+#define SIGNING_PATH_KEY_ROLE_SIGN   0
+
+/*
+ * Does this full path have the shape that lets tag 0x22 name a single account?
+ *
+ * parse_derivation_path_from_buffer stamps every full path DERIVATION_PATH_VARIANT_FULL without
+ * inspecting it (derivation_path.c:33), so the variant on its own means only that the host chose
+ * P1 = 0x02. The argument for trusting the descriptor's address holds for the signing path and
+ * nothing else: send the 5-node PRF path under P1_FULL_PATH instead and tag 0x22 becomes the
+ * identity-level key that every credential counter shares, so a descriptor issued for counter 0
+ * would match while the address on screen is the host's, never derived and never checked.
+ *
+ * Called after harden_derivation_path, hence the masks. The coin-type node needs no check here:
+ * an unknown one leaves the path with no network, which pki_bind_descriptor already refuses.
+ */
+static bool full_path_names_one_account(const derivation_path_t *derivation_path) {
+    return derivation_path->len == SIGNING_PATH_LEN &&
+           (derivation_path->nodes[SIGNING_PATH_INDEX_PURPOSE] & ~HARDENED_BIT) == NEW_PURPOSE &&
+           (derivation_path->nodes[SIGNING_PATH_INDEX_KEY_ROLE] & ~HARDENED_BIT) ==
+               SIGNING_PATH_KEY_ROLE_SIGN;
+}
+
 void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
     uint8_t *cdata = cmd->data;
     uint8_t p1 = cmd->p1;
@@ -345,6 +374,19 @@ void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
      * what tells them apart and it is the review. */
     bool descriptor_names_account =
         g_trusted_name_valid && derivation_path->variant == DERIVATION_PATH_VARIANT_FULL;
+
+    /* The shape has to be checked, not assumed, and a full path that fails the check has to be
+     * refused rather than fall through to the derive-and-compare lane: that lane would run
+     * get_bls_private_key over a path that is not a PRF path, with cred_counter fixed at 0 --
+     * producing counter 0's address for a PRF path sent here (so a counter-0 descriptor would
+     * match) and a meaningless address for anything else. Neither is something to show. */
+    if (descriptor_names_account && !full_path_names_one_account(derivation_path)) {
+        PRINTF("Full path is not an account signing path; descriptor cannot name an account\n");
+        clear_trusted_name_binding();
+        explicit_bzero(ctx->address, sizeof(ctx->address));
+        send_rejection(ERROR_TRUSTED_NAME_MISMATCH);
+        return;
+    }
 
     if (!descriptor_names_account) {
         bls_compute_address(cred_counter);
