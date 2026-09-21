@@ -503,10 +503,8 @@ static uint16_t parse_plt_cbor(void) {
  * Called after parse_plt_cbor() succeeds.
  */
 static void format_plt_display(void) {
-/* Copying string literals with sizeof avoids strlen — which can fault on
- * Cortex-M0 when the literal lives at an unaligned flash address, because
- * some strlen implementations use word-aligned loads.  sizeof(literal)
- * is a compile-time constant so no runtime load is needed. */
+/* sizeof on a string literal is a compile-time constant and counts the NUL, so one
+ * memmove copies the label and terminates it with no runtime length scan. */
 #define COPY_OP_NAME(str) memmove(ctx->displayOp, str, sizeof(str))
     switch (ctx->opType) {
         case PLT_OP_TRANSFER:
