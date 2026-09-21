@@ -103,39 +103,23 @@ static bool parse_amount_value(CborValue *it) {
     if (cbor_value_is_negative_integer(&arr)) {
         uint64_t raw = 0;
         cbor_value_get_raw_integer(&arr, &raw);
-        if (raw > 127u) {
-            cbor_value_leave_container(it, &arr);
-            return false;
-        }
+        if (raw > 127u) return false;
         exponent = (int8_t) (-(int64_t) (raw + 1u));
     } else if (cbor_value_is_unsigned_integer(&arr)) {
         uint64_t v = 0;
         cbor_value_get_uint64(&arr, &v);
-        if (v != 0u) {
-            cbor_value_leave_container(it, &arr);
-            return false; /* CIS-7: exponent ≤ 0 */
-        }
+        if (v != 0u) return false; /* CIS-7: exponent ≤ 0 */
         exponent = 0;
     } else {
-        cbor_value_leave_container(it, &arr);
         return false;
     }
-    if (cbor_value_advance(&arr) != CborNoError) {
-        cbor_value_leave_container(it, &arr);
-        return false;
-    }
+    if (cbor_value_advance(&arr) != CborNoError) return false;
 
     /* Significand: unsigned 64-bit integer. */
-    if (!cbor_value_is_unsigned_integer(&arr)) {
-        cbor_value_leave_container(it, &arr);
-        return false;
-    }
+    if (!cbor_value_is_unsigned_integer(&arr)) return false;
     uint64_t sig = 0;
     cbor_value_get_uint64(&arr, &sig);
-    if (cbor_value_advance(&arr) != CborNoError) {
-        cbor_value_leave_container(it, &arr);
-        return false;
-    }
+    if (cbor_value_advance(&arr) != CborNoError) return false;
 
     /* CIS-7 tag 4 is exactly [exponent, significand]; a third item is hashed but never shown. */
     if (!cbor_value_at_end(&arr)) return false;
