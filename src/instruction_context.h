@@ -542,6 +542,18 @@ _Static_assert(sizeof(transferWithScheduleState_t) == 1,
 _Static_assert(sizeof(protocolState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
 _Static_assert(sizeof(configureBakerState_t) == 1,
                "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(initContractState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateContractState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(publicInfoForIpState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateCredentialState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(transferToPublicState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(pltState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+/* Not a state enum, but stored in signPltContext_t, so it moves offsets the same way. */
+_Static_assert(sizeof(pltOpType_t) == 1, "state enums must be byte-sized (-fshort-enums)");
 _Static_assert((char) 0xFF > 0, "char must be unsigned (-funsigned-char)");
 
 /* ----- Union ----- */
