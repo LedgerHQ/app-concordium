@@ -367,13 +367,9 @@ static bool parse_memo_value(CborValue *it) {
  * ctx->address, ctx->hasMemo, and ctx->displayMemo.
  */
 static uint16_t parse_plt_cbor(void) {
-    PRINTF("DBG: parse_plt entry len=%u buf[0]=%02x\n",
-           (unsigned) ctx->cborReceived,
-           (unsigned) (ctx->cborReceived > 0 ? ctx->cborBuf[0] : 0xff));
     CborParser parser;
     CborValue it;
     if (cbor_parser_init(ctx->cborBuf, ctx->cborReceived, 0, &parser, &it) != CborNoError) {
-        PRINTF("DBG: parse_plt: cbor_parser_init fail\n");
         return ERROR_PLT_CBOR_ERROR;
     }
 
@@ -383,22 +379,14 @@ static uint16_t parse_plt_cbor(void) {
      * byte encoding of the same operation, and both would be signable.
      */
     if (!cbor_value_is_array(&it) || !cbor_value_is_length_known(&it)) {
-        PRINTF("DBG: parse_plt: not a definite-length array\n");
         return ERROR_PLT_CBOR_ERROR;
     }
     CborValue arr;
-    if (cbor_value_enter_container(&it, &arr) != CborNoError) {
-        PRINTF("DBG: parse_plt: enter arr fail\n");
-        return ERROR_PLT_CBOR_ERROR;
-    }
-    if (cbor_value_at_end(&arr)) {
-        PRINTF("DBG: parse_plt: arr empty\n");
-        return ERROR_PLT_CBOR_ERROR;
-    }
+    if (cbor_value_enter_container(&it, &arr) != CborNoError) return ERROR_PLT_CBOR_ERROR;
+    if (cbor_value_at_end(&arr)) return ERROR_PLT_CBOR_ERROR;
 
     /* Single op: a map { "opName": { ...fields... } } */
     if (!cbor_value_is_map(&arr) || !cbor_value_is_length_known(&arr)) {
-        PRINTF("DBG: parse_plt: first item not a definite-length map\n");
         return ERROR_PLT_CBOR_ERROR;
     }
     CborValue op_map;
@@ -506,24 +494,16 @@ static uint16_t parse_plt_cbor(void) {
     }
 
     /* Multi-op guard: outer array must be exhausted after the first op. */
-    PRINTF("DBG: parse_plt: arr.remaining=%u at_end=%d\n",
-           (unsigned) arr.remaining,
-           (int) cbor_value_at_end(&arr));
-    if (!cbor_value_at_end(&arr)) {
-        PRINTF("DBG: parse_plt: multi-op rejected\n");
-        return ERROR_PLT_MULTI_OP;
-    }
+    if (!cbor_value_at_end(&arr)) return ERROR_PLT_MULTI_OP;
 
     if (cbor_value_leave_container(&it, &arr) != CborNoError) return ERROR_PLT_CBOR_ERROR;
 
     /* Every buffered byte is hashed, so bytes past the array would be signed unseen.
      * (cbor_value_at_end cannot serve here: remaining is always 0 for a top-level item.) */
     if (cbor_value_get_next_byte(&it) != ctx->cborBuf + ctx->cborReceived) {
-        PRINTF("DBG: parse_plt: trailing bytes after outer array\n");
         return ERROR_PLT_CBOR_ERROR;
     }
 
-    PRINTF("DBG: parse_plt: success opType=%d\n", ctx->opType);
     return 0;
 }
 
@@ -536,8 +516,6 @@ static uint16_t parse_plt_cbor(void) {
  * Called after parse_plt_cbor() succeeds.
  */
 static void format_plt_display(void) {
-    PRINTF("DBG: fmt entry opType=%d\n", ctx->opType);
-
 /* Copying string literals with sizeof avoids strlen — which can fault on
  * Cortex-M0 when the literal lives at an unaligned flash address, because
  * some strlen implementations use word-aligned loads.  sizeof(literal)
@@ -576,43 +554,34 @@ static void format_plt_display(void) {
             break;
     }
 #undef COPY_OP_NAME
-    PRINTF("DBG: displayOp=%s\n", ctx->displayOp);
 
     /* Amount — for transfer, mint, burn. */
     if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_MINT ||
         ctx->opType == PLT_OP_BURN) {
-        PRINTF("DBG: calling plt_amount_to_display sig=%llu exp=%d\n",
-               (unsigned long long) ctx->amountSignificand,
-               ctx->amountExponent);
         plt_amount_to_display(ctx->displayAmount,
                               sizeof(ctx->displayAmount),
                               ctx->amountSignificand,
                               ctx->amountExponent,
                               (const char *) ctx->tokenId,
                               ctx->tokenIdLength);
-        PRINTF("DBG: amount=%s\n", ctx->displayAmount);
     }
 
     /* Address — for transfer (recipient) and allow/deny list ops (target). */
     if (ctx->opType == PLT_OP_TRANSFER || ctx->opType == PLT_OP_ADD_ALLOW_LIST ||
         ctx->opType == PLT_OP_REM_ALLOW_LIST || ctx->opType == PLT_OP_ADD_DENY_LIST ||
         ctx->opType == PLT_OP_REM_DENY_LIST) {
-        PRINTF("DBG: calling base58check_encode addr[0]=%02x\n", ctx->address[0]);
         size_t addrOutLen = sizeof(ctx->displayAddress);
         int b58ret = base58check_encode(ctx->address,
                                         ADDRESS_LENGTH,
                                         (unsigned char *) ctx->displayAddress,
                                         &addrOutLen);
-        PRINTF("DBG: b58ret=%d addrOutLen=%u\n", b58ret, (unsigned) addrOutLen);
         if (b58ret <= 0) {
             ctx->displayAddress[0] = '?';
             ctx->displayAddress[1] = '\0';
         } else {
             ctx->displayAddress[b58ret] = '\0';
         }
-        PRINTF("DBG: addr=%s\n", ctx->displayAddress);
     }
-    PRINTF("DBG: fmt done\n");
 }
 
 /* ------------------------------------------------------------------ */
@@ -715,18 +684,14 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
 
         if (ctx->cborReceived == ctx->cborTotalLength) {
             /* All CBOR received: parse, format display strings, show UI. */
-            PRINTF("DBG: calling parse_plt_cbor\n");
             uint16_t parseErr = parse_plt_cbor();
             if (parseErr != 0) {
                 ctx->state = TX_PLT_INITIAL;
                 io_send_sw(parseErr);
                 return;
             }
-            PRINTF("DBG: parse_plt_cbor OK, opType=%d\n", ctx->opType);
             format_plt_display();
-            PRINTF("DBG: format_plt_display OK\n");
             startPltDisplay(flags);
-            PRINTF("DBG: startPltDisplay OK\n");
             *flags |= IO_ASYNCH_REPLY;
         } else {
             send_success_no_idle();

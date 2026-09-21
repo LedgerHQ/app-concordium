@@ -9,7 +9,11 @@
  * P1=0x00 (INIT): parse derivation path + 60-byte account transaction header (kind must be
  *   PLT=27) + token-id + 4-byte CBOR total length (BE).
  * P1=0x01 (CONT): supply next raw CBOR slice; device hashes and buffers until
- *   received == cbor_total_length, then parses fields to the debug log and signs.
+ *   received == cbor_total_length, then parses the CIS-7 fields, shows them on the
+ *   review screen, and signs once the user approves.
+ *
+ * The final CONT answers asynchronously: the handler sets IO_ASYNCH_REPLY and the
+ * signature is sent from the approval callback, so a host must wait for the review.
  *
  * isInitialCall resets internal state on the first APDU of a new instruction sequence.
  */
