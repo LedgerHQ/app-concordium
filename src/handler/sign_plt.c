@@ -573,6 +573,22 @@ static void format_plt_display(void) {
 /* APDU handler                                                        */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Refuse the current frame: drop what has been parsed, release the instruction, answer.
+ *
+ * Every refusal below used to THROW, and the dispatch guard turned that into exactly this
+ * (app_main.c:89-94: explicit_bzero of the context union, INSTRUCTION_NONE, then the status
+ * word).  Answering with a bare io_send_sw would instead leave the half-parsed token id and
+ * the stale state behind, so the conversion goes through here to keep what the throw gave.
+ *
+ * The wipe zeroes state, which is not a valid pltState_t, hence the explicit reset after it.
+ */
+static void plt_refuse(uint16_t sw) {
+    explicit_bzero(ctx, sizeof(*ctx));
+    ctx->state = TX_PLT_INITIAL;
+    send_rejection(sw);
+}
+
 void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool isInitialCall) {
     uint8_t *cdata = cmd->data;
     uint8_t p1 = cmd->p1;
@@ -584,32 +600,52 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
 
     /* ---- P1=0x00 INIT ---- */
     if (p1 == PLT_P1_INIT) {
-        if (ctx->state != TX_PLT_INITIAL) THROW(ERROR_INVALID_STATE);
-        if (cmd->p2 != P2_SIGN_TX_DEFAULT && cmd->p2 != P2_SIGN_TX_FEE_DISPLAY)
-            THROW(SWO_WRONG_P1_P2);
+        if (ctx->state != TX_PLT_INITIAL) {
+            plt_refuse(ERROR_INVALID_STATE);
+            return;
+        }
+        if (cmd->p2 != P2_SIGN_TX_DEFAULT && cmd->p2 != P2_SIGN_TX_FEE_DISPLAY) {
+            plt_refuse(SWO_WRONG_P1_P2);
+            return;
+        }
 
         size_t pathLen = parse_derivation_path(cdata, lc);
         cdata += pathLen;
         uint8_t remaining = lc - (uint8_t) pathLen;
 
-        if (cx_sha256_init(&tx_state->hash) != CX_SHA256) THROW(ERROR_FAILED_CX_OPERATION);
+        if (cx_sha256_init(&tx_state->hash) != CX_SHA256) {
+            plt_refuse(ERROR_FAILED_CX_OPERATION);
+            return;
+        }
         int headerAndKind = hashAccountTransactionHeaderAndKind(cdata, remaining, (uint8_t) PLT);
         cdata += headerAndKind;
         remaining -= (uint8_t) headerAndKind;
 
         /* token_id_length[1] */
-        if (remaining < 1u) THROW(ERROR_PLT_DATA_ERROR);
+        if (remaining < 1u) {
+            plt_refuse(ERROR_PLT_DATA_ERROR);
+            return;
+        }
         uint8_t tokenIdLen = cdata[0];
-        if (tokenIdLen < 1u || tokenIdLen > PLT_TOKEN_ID_MAX) THROW(ERROR_PLT_DATA_ERROR);
+        if (tokenIdLen < 1u || tokenIdLen > PLT_TOKEN_ID_MAX) {
+            plt_refuse(ERROR_PLT_DATA_ERROR);
+            return;
+        }
         cdata += 1;
         remaining -= 1;
 
-        /* token_id[tokenIdLen] + cbor_total_length[4] */
-        if (remaining < (uint8_t) (tokenIdLen + 4u)) THROW(ERROR_PLT_DATA_ERROR);
+        /* token_id[tokenIdLen] + cbor_total_length[PLT_CBOR_TOTAL_LEN_SIZE] */
+        if (remaining < (uint8_t) (tokenIdLen + PLT_CBOR_TOTAL_LEN_SIZE)) {
+            plt_refuse(ERROR_PLT_DATA_ERROR);
+            return;
+        }
         /* The id is hashed in full but displayed as a C string, on its own row and as the
          * ticker inside the amount — an embedded NUL would truncate both while the signature
          * still covers every byte. Same rule every other host-supplied text row applies. */
-        if (!is_displayable_text(cdata, tokenIdLen)) THROW(ERROR_PLT_DATA_ERROR);
+        if (!is_displayable_text(cdata, tokenIdLen)) {
+            plt_refuse(ERROR_PLT_DATA_ERROR);
+            return;
+        }
         update_hash((cx_hash_t *) &tx_state->hash,
                     cdata - 1, /* include the length byte in the hash */
                     1u + tokenIdLen);
@@ -619,17 +655,23 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
         cdata += tokenIdLen;
         remaining -= tokenIdLen;
 
-        /* cbor_total_length[4] big-endian */
+        /* cbor_total_length[PLT_CBOR_TOTAL_LEN_SIZE] big-endian */
         uint32_t cborTotal = U4BE(cdata, 0);
-        if (cborTotal == 0u || cborTotal > APP_PLT_CBOR_MAX) THROW(ERROR_PLT_BUFFER_ERROR);
-        update_hash((cx_hash_t *) &tx_state->hash, cdata, 4u);
-        cdata += 4u;
-        remaining -= 4u;
+        if (cborTotal == 0u || cborTotal > APP_PLT_CBOR_MAX) {
+            plt_refuse(ERROR_PLT_BUFFER_ERROR);
+            return;
+        }
+        update_hash((cx_hash_t *) &tx_state->hash, cdata, PLT_CBOR_TOTAL_LEN_SIZE);
+        cdata += PLT_CBOR_TOTAL_LEN_SIZE;
+        remaining -= PLT_CBOR_TOTAL_LEN_SIZE;
 
         ctx->hasFeeDisplay = false;
         explicit_bzero(ctx->displayFee, sizeof(ctx->displayFee));
         if (cmd->p2 == P2_SIGN_TX_FEE_DISPLAY) {
-            if (remaining != FEE_DISPLAY_U64_SIZE) THROW(SWO_INCORRECT_DATA);
+            if (remaining != FEE_DISPLAY_U64_SIZE) {
+                plt_refuse(SWO_INCORRECT_DATA);
+                return;
+            }
             /* displayFee is char[] so the UI layers can use it without casting;
              * fee_display_apply_u64 writes bytes, hence the cast here. */
             fee_display_apply_u64((uint8_t *) ctx->displayFee,
@@ -637,7 +679,10 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
                                   &ctx->hasFeeDisplay,
                                   cdata);
         } else {
-            if (remaining != 0u) THROW(SWO_INCORRECT_DATA);
+            if (remaining != 0u) {
+                plt_refuse(SWO_INCORRECT_DATA);
+                return;
+            }
         }
 
         ctx->cborTotalLength = cborTotal;
@@ -650,16 +695,20 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
 
     /* ---- P1=0x01 CONT ---- */
     if (p1 == PLT_P1_CONT) {
-        if (ctx->state != TX_PLT_CBOR) THROW(ERROR_INVALID_STATE);
-        if (cmd->p2 != 0x00) THROW(SWO_WRONG_P1_P2);
+        if (ctx->state != TX_PLT_CBOR) {
+            plt_refuse(ERROR_INVALID_STATE);
+            return;
+        }
+        if (cmd->p2 != 0x00) {
+            plt_refuse(SWO_WRONG_P1_P2);
+            return;
+        }
         if (lc == 0u) {
-            ctx->state = TX_PLT_INITIAL;
-            io_send_sw(ERROR_PLT_CBOR_ERROR);
+            plt_refuse(ERROR_PLT_CBOR_ERROR);
             return;
         }
         if ((uint32_t) lc > ctx->cborTotalLength - ctx->cborReceived) {
-            ctx->state = TX_PLT_INITIAL;
-            io_send_sw(ERROR_PLT_CBOR_ERROR);
+            plt_refuse(ERROR_PLT_CBOR_ERROR);
             return;
         }
 
@@ -671,8 +720,7 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
             /* All CBOR received: parse, format display strings, show UI. */
             uint16_t parseErr = parse_plt_cbor();
             if (parseErr != 0) {
-                ctx->state = TX_PLT_INITIAL;
-                io_send_sw(parseErr);
+                plt_refuse(parseErr);
                 return;
             }
             format_plt_display();
@@ -684,5 +732,5 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
         return;
     }
 
-    THROW(ERROR_INVALID_PARAM);
+    plt_refuse(ERROR_INVALID_PARAM);
 }

@@ -81,6 +81,11 @@
 /* Maximum token-id byte length (1..PLT_TOKEN_ID_MAX per CIS-7 §3). */
 #define PLT_TOKEN_ID_MAX 128
 
+/* Width of the big-endian cbor_total_length field in the PLT INIT APDU
+ * (doc/ins_sign_plt.md). Bounds the payload, so it is part of the host contract,
+ * not a property of uint32_t. */
+#define PLT_CBOR_TOTAL_LEN_SIZE 4
+
 /* Decoded PLT memo text, plus a NUL.
  * A CIS-7 memo is at most 256 bytes on the wire, and the device accepts only the tag-24 form,
  * whose byte string wraps a CBOR text string - so the text itself is always shorter than the

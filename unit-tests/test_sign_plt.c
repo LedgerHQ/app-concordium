@@ -72,12 +72,11 @@ static int per_test_setup(void **state) {
 /*
  * Run the handler and report how it refused, whichever way it refused.
  *
- * The handler has two: most checks THROW, but the two CONT length checks answer the host with
- * io_send_sw() and return (sign_plt.c, "lc == 0" and the overflow guard). Both are refusals a
- * test wants to name by status word, so both come back the same way here - otherwise a
- * non-throwing refusal is indistinguishable from success, which is what made
- * test_cont_empty_chunk and test_cont_overflow_by_one fail against a handler that was behaving
- * correctly.
+ * Every refusal now answers with io_send_sw() and returns; none throw. The setjmp stays because
+ * the handler still calls helpers that throw on their own (parse_derivation_path and
+ * hashAccountTransactionHeaderAndKind), and because a non-throwing refusal is otherwise
+ * indistinguishable from success - which is what made test_cont_empty_chunk and
+ * test_cont_overflow_by_one fail against a handler that was behaving correctly.
  *
  * g_try_context is cleared for the same reason throw_harness.h clears it: a previous statement
  * that threw past an open TRY leaves it pointing at a frame that has since returned.
@@ -285,15 +284,10 @@ static void test_state_double_init_resets(void **state) {
 
 static void test_state_p1_invalid(void **state) {
     (void)state;
-    volatile unsigned int flags = 0;
     uint8_t dummy = 0x00;
     command_t cmd = {.p1 = 0x02, .p2 = 0x00, .lc = 1, .data = &dummy};
 
-    int rc = setjmp(g_fuzzer_jmp_buf);
-    if (rc == 0) {
-        handle_sign_plt(&cmd, &flags, /*isInitialCall=*/true);
-    }
-    assert_int_equal(rc, ERROR_INVALID_PARAM);
+    assert_int_equal(run_handler(&cmd, /*isInitialCall=*/true), ERROR_INVALID_PARAM);
 }
 
 /* ── Entry point ──────────────────────────────────────────────────────────── */
