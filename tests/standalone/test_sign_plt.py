@@ -20,7 +20,8 @@ Error status words (all in 0x6Bxx range):
   0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128], or the id holds a
                                       byte that cannot be displayed (0x00-0x1F, 0x7F)
   0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
-  0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent magnitude > 18
+  0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent -19..-128 (display cap;
+                                      past -128 it is 0x6B0D, the exponent not fitting int8_t)
   0x6B12  ERROR_PLT_UNSUPPORTED_MEMO — memo is not a tag-24 CBOR text string, or is unrenderable
 """
 
@@ -503,7 +504,7 @@ def test_sign_plt_overlong_field_name_rejected(backend):
 
 
 # ------------------------------------------------------------------ #
-# Decimal-count enforcement (app limit: exponent magnitude ≤ 18)     #
+# Amount-exponent floors: -18 accepted, -19..-128 → 0x6B11, < -128 → 0x6B0D #
 # ------------------------------------------------------------------ #
 
 
@@ -528,9 +529,28 @@ def test_sign_plt_amount_19_decimals_rejected(backend):
 
 
 @pytest.mark.active_test_scope
-def test_sign_plt_amount_255_decimals_rejected(backend):
-    """Exponent -127 (maximum int8_t magnitude, chain-legal) is also rejected (0x6B11)."""
-    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-127)) == 0x6B11
+def test_sign_plt_amount_int8_floor_still_decimals_error(backend):
+    """Exponent -128 is the last value the parser can hold, and is still 0x6B11.
+
+    The old name said "255 decimals" and the body used -127; neither matched the code.
+    -128 is the real structural floor: a CBOR negative integer with raw value R encodes
+    -(R+1), and the exponent is an int8_t, so R <= 127. It is representable, so the
+    display cap is what rejects it, not the parser.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-128)) == 0x6B11
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_below_int8_floor_is_cbor_error(backend):
+    """Exponent -129 does not fit an int8_t, so it fails structurally with 0x6B0D.
+
+    One past the test above, and a different status word: the two floors are distinct.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-129)) == 0x6B0D
+
+
+# The accepting side of the boundary (-18) is pinned in unit-tests/test_sign_plt.c: a valid
+# payload reaches the review and never answers synchronously, so it cannot be asserted here.
 
 
 # ------------------------------------------------------------------ #

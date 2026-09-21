@@ -67,6 +67,23 @@ _Static_assert(sizeof(((signPltContext_t *) 0)->displayAmount) >= 40 + 1 + PLT_T
 /* Longest op-name key in the CIS-7 spec: "removeAllowList" = 15 chars. */
 #define PLT_OP_NAME_MAX 16u
 
+/*
+ * Two different exponent floors, refused with two different status words.
+ *
+ * Structural: a CBOR negative integer with raw value R encodes -(R+1), and the exponent is held
+ * in an int8_t, so R > 127 means an exponent below INT8_MIN -- it cannot be represented at all.
+ * Refused by parse_amount_value with ERROR_PLT_CBOR_ERROR.
+ *
+ * Display: plt_amount_to_display renders abs(exponent) decimal places, and past 18 it overflows
+ * its buffer and throws ERROR_BUFFER_OVERFLOW from a helper that has no APDU context to answer
+ * from. Refused earlier, here, so the host gets a dedicated status word instead.
+ *
+ * So -18..0 is accepted, -128..-19 is ERROR_PLT_UNSUPPORTED_DECIMALS, and anything beyond
+ * -128 is ERROR_PLT_CBOR_ERROR. The chain itself allows 0-255 decimals.
+ */
+#define PLT_AMOUNT_EXPONENT_RAW_MAX 127u  /* raw 127 encodes -128, the int8_t floor */
+#define PLT_AMOUNT_MIN_EXPONENT     (-18)
+
 static signPltContext_t *ctx = &global.signPlt;
 static tx_state_t *tx_state = &global_tx_state;
 
@@ -103,7 +120,7 @@ static bool parse_amount_value(CborValue *it) {
     if (cbor_value_is_negative_integer(&arr)) {
         uint64_t raw = 0;
         cbor_value_get_raw_integer(&arr, &raw);
-        if (raw > 127u) return false;
+        if (raw > PLT_AMOUNT_EXPONENT_RAW_MAX) return false;
         exponent = (int8_t) (-(int64_t) (raw + 1u));
     } else if (cbor_value_is_unsigned_integer(&arr)) {
         uint64_t v = 0;
@@ -433,9 +450,11 @@ static uint16_t parse_plt_cbor(void) {
         if (strcmp(fieldName, "amount") == 0) {
             if (!parse_amount_value(&inner)) return ERROR_PLT_CBOR_ERROR;
             amountSeen = true;
-            /* The app renders at most 18 decimal places; see doc/ins_sign_plt.md.
-             * Reject early so the host gets a dedicated SW instead of ERROR_INVALID_TRANSACTION. */
-            if (ctx->amountExponent < -18) return ERROR_PLT_UNSUPPORTED_DECIMALS;
+            /* See PLT_AMOUNT_MIN_EXPONENT: refused here so the host gets a dedicated status
+             * word rather than a buffer overflow thrown from inside the display helper. */
+            if (ctx->amountExponent < PLT_AMOUNT_MIN_EXPONENT) {
+                return ERROR_PLT_UNSUPPORTED_DECIMALS;
+            }
         } else if (strcmp(fieldName, "recipient") == 0 || strcmp(fieldName, "target") == 0) {
             if (!parse_address_value(&inner)) return ERROR_PLT_CBOR_ERROR;
             addressSeen = true;

@@ -60,6 +60,33 @@ static const uint8_t CBOR_PAUSE[9] = {
     0x81, 0xa1, 0x65, 0x70, 0x61, 0x75, 0x73, 0x65, 0xa0
 };
 
+/*
+ * [{"mint":{"amount":4([<exp>, 1])}}] with the exponent as a 1-byte-argument negative int.
+ *
+ *   0x81              array(1)
+ *   0xa1              map(1)
+ *   0x64 "mint"       text(4)
+ *   0xa1              map(1)
+ *   0x66 "amount"     text(6)
+ *   0xc4              tag(4)          decimal fraction
+ *   0x82              array(2)
+ *   0x38 <raw>        negative(raw)   encodes the value -(raw+1)
+ *   0x01              unsigned(1)     significand
+ *
+ * mint is used rather than transfer because it needs no recipient, keeping the fixture short.
+ */
+static uint8_t g_cbor_mint_exp[20] = {
+    0x81, 0xa1, 0x64, 'm', 'i', 'n', 't',  0xa1, 0x66, 'a',
+    'm',  'o',  'u',  'n', 't', 0xc4, 0x82, 0x38, 0x00, 0x01
+};
+#define CBOR_MINT_EXP_RAW_INDEX 18
+
+/* Payload for exponent -(raw+1). Returns a buffer valid until the next call. */
+static const uint8_t *cbor_mint_with_exponent_raw(uint8_t raw) {
+    g_cbor_mint_exp[CBOR_MINT_EXP_RAW_INDEX] = raw;
+    return g_cbor_mint_exp;
+}
+
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 
 static int per_test_setup(void **state) {
@@ -213,6 +240,42 @@ static void test_token_id_printable_accepted(void **state) {
     assert_int_equal(call_init_token(5, token_id, 5, 4), 0); /* accepted */
 }
 
+/* ── Amount-exponent boundary tests ──────────────────────────────────────── */
+
+/*
+ * Two floors, two status words. A CBOR negative integer with raw value R encodes -(R+1):
+ *
+ *   raw 17  -> exponent  -18   last accepted
+ *   raw 18  -> exponent  -19   ERROR_PLT_UNSUPPORTED_DECIMALS (display cap)
+ *   raw 127 -> exponent -128   still the display cap -- representable in int8_t
+ *   raw 128 -> exponent -129   ERROR_PLT_CBOR_ERROR -- does not fit int8_t at all
+ */
+static int run_mint_with_exponent_raw(uint8_t raw) {
+    const uint8_t *cbor = cbor_mint_with_exponent_raw(raw);
+    assert_int_equal(call_init(1, 1, sizeof(g_cbor_mint_exp)), 0);
+    return call_cont(cbor, (uint8_t) sizeof(g_cbor_mint_exp), false);
+}
+
+static void test_amount_exponent_18_accepted(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(17), 0); /* -18, last accepted */
+}
+
+static void test_amount_exponent_19_decimals_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(18), ERROR_PLT_UNSUPPORTED_DECIMALS);
+}
+
+static void test_amount_exponent_int8_floor_decimals_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(127), ERROR_PLT_UNSUPPORTED_DECIMALS);
+}
+
+static void test_amount_exponent_below_int8_floor_cbor_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(128), ERROR_PLT_CBOR_ERROR);
+}
+
 /* ── CBOR total-length boundary tests ────────────────────────────────────── */
 
 static void test_cbor_total_zero(void **state) {
@@ -302,6 +365,10 @@ int main(void) {
         cmocka_unit_test_setup(test_token_id_control_byte,   per_test_setup),
         cmocka_unit_test_setup(test_token_id_del_byte,       per_test_setup),
         cmocka_unit_test_setup(test_token_id_printable_accepted, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_18_accepted,      per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_19_decimals_error, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_int8_floor_decimals_error, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_below_int8_floor_cbor_error, per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_zero,         per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_one,          per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_512,          per_test_setup),

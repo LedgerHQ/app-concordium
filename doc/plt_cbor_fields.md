@@ -118,7 +118,18 @@ CIS-7 amounts use CBOR **tag 4** (decimal fraction):
 #6.4([exponent: int, significand: uint])
 ```
 
-- `exponent`: must be ≤ 0; range enforced by the app: −255 to 0. Stored as `int8_t`.
+- `exponent`: must be ≤ 0. The chain permits 0 to −255 decimals, but the app enforces two
+  narrower floors, with a different status word each:
+
+  | Exponent | Outcome |
+  | -------- | ------- |
+  | `0` to `−18` | accepted |
+  | `−19` to `−128` | `ERROR_PLT_UNSUPPORTED_DECIMALS` (`0x6B11`) — representable, but more decimal places than the amount display can render |
+  | below `−128` | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) — the exponent is held in an `int8_t`, so it cannot be represented at all |
+  | above `0` | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) |
+
+  `−128` is the last value the parser can hold: a CBOR negative integer with raw value `R`
+  encodes `−(R+1)`, so the structural limit is `R ≤ 127`.
 - `significand`: unsigned 64-bit integer (`uint64_t`).
 - Display formula: `significand × 10^exponent`, formatted with `abs(exponent)` decimal places.
 - Example: `#6.4([-6, 1500000])` → `"1.500000 UPEU"`.
@@ -221,5 +232,6 @@ The following are explicitly not supported in the v1 app and are rejected:
 | CBOR payload > 512 bytes        | `ERROR_PLT_BUFFER_ERROR` (`0x6B0E`)                    |
 | Token ID > 128 bytes, or holding a non-displayable byte | `ERROR_PLT_DATA_ERROR` (`0x6B0F`)      |
 | Unknown operation names         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) via parse failure    |
-| Amount exponent < −255 or > 0   | Parse failure → `ERROR_PLT_CBOR_ERROR`                 |
+| Amount exponent < −128 or > 0   | Parse failure → `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)      |
+| Amount exponent −19 to −128     | `ERROR_PLT_UNSUPPORTED_DECIMALS` (`0x6B11`)            |
 | Address `data` (key 3) ≠ 32 bytes, absent, or unknown key in the address / coininfo map, or coin type ≠ 919 | Parse failure → `ERROR_PLT_CBOR_ERROR` |
