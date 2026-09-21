@@ -1,11 +1,15 @@
 /*
  * Fuzzer for handle_sign_plt (INS 0x27 — PLT signing).
  *
- * Two-invocation structure to exercise both the INIT path and the CBOR CONT
- * path in a single fuzzer run:
+ * Structure of a run:
  *   1. Call with isInitialCall=true and fuzz data (exercises INIT parsing).
- *   2. If INIT succeeded (state == TX_PLT_CBOR), call again with P1=CONT and
- *      the remaining fuzz bytes (exercises CBOR accumulation and parse_plt_cbor).
+ *   2. If INIT succeeded (state == TX_PLT_CBOR), feed the remaining fuzz bytes as a
+ *      sequence of CONT frames (exercises CBOR accumulation and parse_plt_cbor).
+ *
+ * The CONT calls have to loop. A single frame is capped at 255 bytes by the APDU Lc, while
+ * APP_PLT_CBOR_MAX is 512, so one call left every payload above 255 bytes unreachable --
+ * parse_plt_cbor only runs once cborReceived == cborTotalLength -- and the accumulating
+ * memmove in the handler never ran at a non-zero offset.
  *
  * Input layout: [p1:1][p2:1][init_lc:1][init_data: init_lc bytes][cont_data: rest]
  * Keeping P1/P2 fuzzable lets the fuzzer also hit the error paths (wrong P1,
@@ -51,18 +55,32 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         handle_sign_plt(&cmd, &flags, /*isInitialCall=*/true);
     }
 
-    /* --- Second call: CONT, only if INIT set state to TX_PLT_CBOR --- */
-    if (global.signPlt.state != TX_PLT_CBOR) return 0;
-    if (init_data_end >= size) return 0;
+    /* --- CONT frames, only if INIT set state to TX_PLT_CBOR ---
+     *
+     * volatile because they are modified between one iteration's setjmp and the next
+     * longjmp; a non-volatile local would be indeterminate after the jump.
+     *
+     * The loop ends when the handler refuses (any refusal resets state to TX_PLT_INITIAL) or
+     * the input runs out. It always advances: chunk is at least 1 while offset < size. Frames
+     * past a completed payload are deliberately still sent -- the handler refuses them, which
+     * is the "extra data after the declared total" path. */
+    volatile size_t offset = init_data_end;
 
-    size_t cont_avail = size - init_data_end;
-    cmd.p1 = 0x01; /* PLT_P1_CONT */
-    cmd.p2 = 0x00;
-    cmd.lc = (uint8_t) (cont_avail > 255u ? 255u : cont_avail);
-    cmd.data = (uint8_t *) (data + init_data_end);
+    while (offset < size && global.signPlt.state == TX_PLT_CBOR) {
+        size_t cont_avail = size - offset;
+        volatile uint8_t chunk = (uint8_t) (cont_avail > MAX_CDATA_LENGTH ? MAX_CDATA_LENGTH
+                                                                          : cont_avail);
 
-    if (setjmp(g_fuzzer_jmp_buf) == 0) {
-        handle_sign_plt(&cmd, &flags, /*isInitialCall=*/false);
+        cmd.p1 = 0x01; /* PLT_P1_CONT */
+        cmd.p2 = 0x00;
+        cmd.lc = chunk;
+        cmd.data = (uint8_t *) (data + offset);
+
+        if (setjmp(g_fuzzer_jmp_buf) == 0) {
+            handle_sign_plt(&cmd, &flags, /*isInitialCall=*/false);
+        }
+
+        offset += chunk;
     }
 
     return 0;
