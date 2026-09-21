@@ -115,6 +115,7 @@ void plt_amount_to_display(char *dst,
         THROW(ERROR_BUFFER_OVERFLOW);
     }
     size_t numLen = strlen(tmp);
+    /* need: numLen + 1 (space) + tokenIdLen + 1 (NUL) */
     if (dstLen < numLen + 1u + tokenIdLen + 1u) {
         THROW(ERROR_BUFFER_OVERFLOW);
     }
