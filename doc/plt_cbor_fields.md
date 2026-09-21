@@ -33,7 +33,7 @@ Follows the account header in the INIT APDU, hashed into the transaction digest.
 | Field              | Size (bytes)       | Encoding              | Notes                                         |
 | ------------------ | ------------------ | --------------------- | --------------------------------------------- |
 | `token_id_length`  | 1                  | uint8 (1–128)         | Length of the token ID byte string that follows |
-| `token_id`         | `token_id_length`  | UTF-8 text            | Alphanumeric + `-`, `.`, `%`; shown directly on screen as the token ticker |
+| `token_id`         | `token_id_length`  | UTF-8 text            | Alphanumeric + `-`, `.`, `%` by convention; shown directly on screen as the token ticker. The device enforces the displayable subset only — a byte in `0x00`–`0x1F` or `0x7F` is refused |
 | `cbor_total_length`| 4                  | big-endian uint32 (1–512) | Total byte length of the CBOR payload delivered across all CONT frames |
 
 ### 3 — CBOR payload (across one or more CONT APDUs)
@@ -219,7 +219,7 @@ The following are explicitly not supported in the v1 app and are rejected:
 | Unknown field name inside a recognised op map | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)        |
 | Indefinite-length container or string         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`)        |
 | CBOR payload > 512 bytes        | `ERROR_PLT_BUFFER_ERROR` (`0x6B0E`)                    |
-| Token ID > 128 bytes            | `ERROR_PLT_DATA_ERROR` (`0x6B0F`)                      |
+| Token ID > 128 bytes, or holding a non-displayable byte | `ERROR_PLT_DATA_ERROR` (`0x6B0F`)      |
 | Unknown operation names         | `ERROR_PLT_CBOR_ERROR` (`0x6B0D`) via parse failure    |
 | Amount exponent < −255 or > 0   | Parse failure → `ERROR_PLT_CBOR_ERROR`                 |
 | Address `data` (key 3) ≠ 32 bytes, absent, or unknown key in the address / coininfo map, or coin type ≠ 919 | Parse failure → `ERROR_PLT_CBOR_ERROR` |

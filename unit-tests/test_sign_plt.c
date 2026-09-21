@@ -109,9 +109,10 @@ static int run_handler(command_t *cmd, bool isInitialCall) {
  *
  * Returns the status word the handler refused with, or 0 if it returned normally.
  */
-static int call_init(uint8_t token_id_len_byte,
-                     uint8_t actual_token_id_bytes,
-                     uint32_t cbor_total) {
+static int call_init_token(uint8_t token_id_len_byte,
+                           const uint8_t *token_id,
+                           uint8_t actual_token_id_bytes,
+                           uint32_t cbor_total) {
     /* Max buffer: path(33) + header(60) + kind(1) + len(1) + token(128) + cbor_total(4) */
     uint8_t buf[33 + 60 + 1 + 1 + 128 + 4];
     size_t off = 0;
@@ -125,8 +126,7 @@ static int call_init(uint8_t token_id_len_byte,
     buf[off++] = 0x1B; /* PLT transaction kind */
     buf[off++] = token_id_len_byte;
 
-    /* Fill token_id bytes with a recognisable pattern. */
-    memset(buf + off, 'T', actual_token_id_bytes);
+    memcpy(buf + off, token_id, actual_token_id_bytes);
     off += actual_token_id_bytes;
 
     buf[off++] = (uint8_t)((cbor_total >> 24) & 0xFF);
@@ -141,6 +141,16 @@ static int call_init(uint8_t token_id_len_byte,
     cmd.data = buf;
 
     return run_handler(&cmd, /*isInitialCall=*/true);
+}
+
+/* Same, with the token_id bytes filled with a recognisable displayable pattern. */
+static int call_init(uint8_t token_id_len_byte,
+                     uint8_t actual_token_id_bytes,
+                     uint32_t cbor_total) {
+    uint8_t token_id[128];
+    assert_true(actual_token_id_bytes <= sizeof(token_id));
+    memset(token_id, 'T', actual_token_id_bytes);
+    return call_init_token(token_id_len_byte, token_id, actual_token_id_bytes, cbor_total);
 }
 
 /* Send one CONT frame (P1=0x01) with the given data; returns the status word, or 0 on success. */
@@ -174,6 +184,34 @@ static void test_token_id_len_128(void **state) {
 static void test_token_id_len_129(void **state) {
     (void)state;
     assert_int_equal(call_init(129, 0, 4), ERROR_PLT_DATA_ERROR);
+}
+
+/* ── Token-ID content tests ──────────────────────────────────────────────── */
+
+/* The id is hashed in full but displayed as a C string, so a NUL would show "A"
+ * on screen while the signature covers all three bytes. */
+static void test_token_id_embedded_nul(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x00, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_control_byte(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x1B, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_del_byte(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x7F, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_printable_accepted(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'E', 'U', 'R', '.', 'e'};
+    assert_int_equal(call_init_token(5, token_id, 5, 4), 0); /* accepted */
 }
 
 /* ── CBOR total-length boundary tests ────────────────────────────────────── */
@@ -266,6 +304,10 @@ int main(void) {
         cmocka_unit_test_setup(test_token_id_len_one,        per_test_setup),
         cmocka_unit_test_setup(test_token_id_len_128,        per_test_setup),
         cmocka_unit_test_setup(test_token_id_len_129,        per_test_setup),
+        cmocka_unit_test_setup(test_token_id_embedded_nul,   per_test_setup),
+        cmocka_unit_test_setup(test_token_id_control_byte,   per_test_setup),
+        cmocka_unit_test_setup(test_token_id_del_byte,       per_test_setup),
+        cmocka_unit_test_setup(test_token_id_printable_accepted, per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_zero,         per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_one,          per_test_setup),
         cmocka_unit_test_setup(test_cbor_total_512,          per_test_setup),

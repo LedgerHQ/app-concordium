@@ -17,7 +17,8 @@ Error status words (all in 0x6Bxx range):
   0x6B04  ERROR_INVALID_TRANSACTION — wrong transaction kind byte (must be 27/0x1B)
   0x6B0D  ERROR_PLT_CBOR_ERROR      — overflow, empty chunk, or invalid CIS-7 CBOR
   0x6B0E  ERROR_PLT_BUFFER_ERROR    — cbor_total_length is 0 or > APP_PLT_CBOR_MAX (512)
-  0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128]
+  0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128], or the id holds a
+                                      byte that cannot be displayed (0x00-0x1F, 0x7F)
   0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
   0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent magnitude > 18
   0x6B12  ERROR_PLT_UNSUPPORTED_MEMO — memo is not a tag-24 CBOR text string, or is unrenderable
@@ -233,8 +234,28 @@ def test_sign_plt_token_id_length_zero(backend):
 def test_sign_plt_token_id_length_too_long(backend):
     """token_id_length > 128 must return ERROR_PLT_DATA_ERROR (0x6B0F)."""
     client = CommandSender(backend)
-    token_id = bytes(129)  # 129 bytes — one over the limit
+    # Displayable bytes, so the refusal can only come from the length check.
+    token_id = b"A" * 129  # 129 bytes — one over the limit
     resp = client.sign_plt_init(_PATH, _HEADER_60, token_id, len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_embedded_nul(backend):
+    """A NUL inside token_id must return ERROR_PLT_DATA_ERROR (0x6B0F).
+
+    The id is hashed in full but rendered as a C string, so without this check the
+    screen would show "A" while the signature covers "A\\x00B"."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A\x00B", len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_control_byte(backend):
+    """A control byte other than NUL inside token_id is refused the same way."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A\x1bB", len(_CBOR_SMALL))
     assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
 
 
@@ -399,7 +420,7 @@ def test_sign_plt_fee_display_wrong_length(backend):
 def test_sign_plt_token_id_max_length_accepted(backend):
     """128-byte token ID (PLT_TOKEN_ID_MAX) fits in the INIT APDU and is accepted."""
     client = CommandSender(backend)
-    resp = client.sign_plt_init(_PATH, _HEADER_60, bytes(128), len(_CBOR_SMALL))
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A" * 128, len(_CBOR_SMALL))
     assert resp.status == StatusWords.SWO_SUCCESS
 
 

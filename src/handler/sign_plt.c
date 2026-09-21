@@ -652,6 +652,10 @@ void handle_sign_plt(const command_t *cmd, volatile unsigned int *flags, bool is
 
         /* token_id[tokenIdLen] + cbor_total_length[4] */
         if (remaining < (uint8_t) (tokenIdLen + 4u)) THROW(ERROR_PLT_DATA_ERROR);
+        /* The id is hashed in full but displayed as a C string, on its own row and as the
+         * ticker inside the amount — an embedded NUL would truncate both while the signature
+         * still covers every byte. Same rule every other host-supplied text row applies. */
+        if (!is_displayable_text(cdata, tokenIdLen)) THROW(ERROR_PLT_DATA_ERROR);
         update_hash((cx_hash_t *) &tx_state->hash,
                     cdata - 1, /* include the length byte in the hash */
                     1u + tokenIdLen);

@@ -64,7 +64,7 @@ skipped: its bytes are signed, so it must not pass unseen.
 | `0x6A80` | `SWO_INCORRECT_DATA`       | INIT: trailing bytes when P2=`0x00`, or byte count after `cbor_total_length` ≠ 8 when P2=`0x01`       |
 | `0x6B0D` | `ERROR_PLT_CBOR_ERROR`     | CONT chunk is empty, or its length would exceed the declared `cbor_total_length`; or the final CONT carries CBOR that is structurally invalid, carries an unknown field name, is missing a required field for the declared operation type, or is followed by bytes the parser never reaches |
 | `0x6B0E` | `ERROR_PLT_BUFFER_ERROR`   | `cbor_total_length` is 0 or exceeds `APP_PLT_CBOR_MAX` (512)                                          |
-| `0x6B0F` | `ERROR_PLT_DATA_ERROR`     | `token_id_length` is 0 or > 128                                                                        |
+| `0x6B0F` | `ERROR_PLT_DATA_ERROR`     | `token_id_length` is 0 or > 128, or `token_id` holds a byte that cannot be displayed (`0x00`–`0x1F`, `0x7F`) |
 | `0x6B10` | `ERROR_PLT_MULTI_OP`       | CBOR outer array contains more than one operation                                                      |
 | `0x6B11` | `ERROR_PLT_UNSUPPORTED_DECIMALS` | Amount exponent magnitude exceeds 18 (app display limit; the chain allows 0–255 decimals)    |
 | `0x6B12` | `ERROR_PLT_UNSUPPORTED_MEMO` | Memo is not a tag-24 byte string holding one definite-length CBOR text string, or that text cannot be rendered |
