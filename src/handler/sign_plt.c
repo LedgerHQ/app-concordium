@@ -522,9 +522,16 @@ static uint16_t parse_plt_cbor(void) {
  * Called after parse_plt_cbor() succeeds.
  */
 static void format_plt_display(void) {
-/* sizeof on a string literal is a compile-time constant and counts the NUL, so one
- * memmove copies the label and terminates it with no runtime length scan. */
-#define COPY_OP_NAME(str) memmove(ctx->displayOp, str, sizeof(str))
+/* sizeof on a string literal is a compile-time constant and counts the NUL, so one memmove
+ * copies the label and terminates it with no runtime length scan. The assert is what makes
+ * that safe: sizeof being compile-time does not bound it against the destination, so without
+ * it a longer label would silently overrun displayOp. */
+#define COPY_OP_NAME(str)                                                    \
+    do {                                                                     \
+        _Static_assert(sizeof(str) <= PLT_OP_LABEL_SIZE,                     \
+                       "PLT operation label does not fit displayOp");        \
+        memmove(ctx->displayOp, str, sizeof(str));                           \
+    } while (0)
     switch (ctx->opType) {
         case PLT_OP_TRANSFER:
             COPY_OP_NAME("Transfer");

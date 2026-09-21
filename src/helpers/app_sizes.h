@@ -7,6 +7,9 @@
 
 #define COMMON_SIGNATURE_SIZE      64
 #define COMMON_HASH_SIZE           KEY_LENGTH
+/* Raw account address, before base58check: SHA-256 over the credential id. */
+#define ADDRESS_LENGTH             COMMON_HASH_SIZE
+/* base58check account address string; the encoding spaces every 10th character, so 55 chars. */
 #define COMMON_ADDRESS_SIZE        57
 #define COMMON_AMOUNT_DISPLAY_SIZE 30
 #define COMMON_URL_DISPLAY_SIZE    256
@@ -80,6 +83,14 @@
 
 /* Maximum token-id byte length (1..PLT_TOKEN_ID_MAX per CIS-7 §3). */
 #define PLT_TOKEN_ID_MAX 128
+
+/* PLT operation label shown on the review, plus a NUL. The longest of the ten CIS-7 labels is
+ * "Remove from allow list" (22 chars). Sized exactly: COPY_OP_NAME in sign_plt.c asserts every
+ * literal fits, so adding a longer label fails the build rather than overrunning.
+ * This has to stay a buffer, not a const char * into flash: BAGL's UX_STEP_NOCB puts
+ * global.signPlt.displayOp in a static initializer, where an array decays to an address
+ * constant but a pointer read is not a constant expression. */
+#define PLT_OP_LABEL_SIZE 23
 
 /* Width of the big-endian cbor_total_length field in the PLT INIT APDU
  * (doc/ins_sign_plt.md). Bounds the payload, so it is part of the host contract,

@@ -480,16 +480,16 @@ typedef struct {
     pltOpType_t opType;
     uint64_t amountSignificand; /* tag-4 significand; used for transfer/mint/burn */
     int8_t amountExponent;      /* tag-4 exponent (≤ 0); absolute value = decimal places */
-    uint8_t address[32];        /* recipient (transfer) or target (allow/deny list ops) */
-    bool hasMemo;               /* transfer only */
+    uint8_t address[ADDRESS_LENGTH]; /* recipient (transfer) or target (allow/deny list ops) */
+    bool hasMemo;                    /* transfer only */
 
     /* Formatted display strings (NUL-terminated, filled by format_plt_display): */
-    char displayOp[24];                          /* e.g. "Transfer", "Add to allow list" */
+    char displayOp[PLT_OP_LABEL_SIZE];           /* e.g. "Transfer", "Add to allow list" */
     char displayAmount[PLT_AMOUNT_DISPLAY_SIZE]; /* e.g. "1.500000 UPEU" */
-    char displayAddress[56];                     /* base58check, 55 chars + NUL */
+    char displayAddress[COMMON_ADDRESS_SIZE];    /* base58check, 55 chars + NUL */
     char displayMemo[PLT_MEMO_DISPLAY_SIZE];     /* decoded tag-24 CBOR text, NUL-terminated */
-    char displayFee[30]; /* formatted µCCD fee, e.g. "0.001 CCD"; empty if not provided */
-    bool hasFeeDisplay;  /* true if host sent a fee suffix in the INIT APDU */
+    char displayFee[COMMON_AMOUNT_DISPLAY_SIZE]; /* µCCD fee, e.g. "0.001 CCD"; empty if absent */
+    bool hasFeeDisplay;                          /* true if host sent a fee suffix in INIT */
 } signPltContext_t;
 
 typedef struct trustedNameMultiHashCtx_s {
