@@ -199,7 +199,7 @@ The node's test vectors for the bytes `01020304` give `4401020304` (Raw) and `d8
 | Network           | Signing path (node 1) | n/a    | "Network" screen       |
 | Nonce             | Account header        | yes    | not shown              |
 | Max energy        | Account header        | yes    | "Max energy" screen    |
-| Fee (µCCD)        | INIT APDU suffix (P2=0x01) | no | "Max fees" screen (optional; a host estimate outside the hash, shown in addition to "Max energy") |
+| Fee (µCCD)        | INIT APDU suffix (P2=0x01) | no | "Max fees (est.)" screen (optional; a host estimate outside the hash, shown in addition to "Max energy") |
 | Expiry            | Account header        | yes    | not shown              |
 | Token ID          | PLT prefix (after header) | yes | "Token" screen         |
 | Operation type    | CBOR payload (op key) | yes    | "Operation" screen     |

@@ -12,7 +12,7 @@ that payloads larger than a single 255-byte APDU frame are supported.
 | INS    | P1     | P2     | CDATA                                                                                                                                                                                                                                                                  | Comment                                                                                                                                                     |
 | ------ | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `0x27` | `0x00` | `0x00` | `path_length[uint8]` <br> `path[uint32 × path_length]` (each node big-endian; hardened bit `0x80000000`) <br> `sender_address[uint256]` <br> `nonce[uint64]` (big-endian) <br> `energy_amount[uint64]` (big-endian) <br> `payload_size[uint32]` (big-endian) <br> `expiry_date[uint64]` (big-endian) <br> `transaction_kind[uint8]` (must be **`0x1B`** = 27) <br> `token_id_length[uint8]` (1–128) <br> `token_id[token_id_length bytes]` <br> `cbor_total_length[uint32]` (big-endian; 1–512) | INIT frame (no fee display). Resets internal state. Response is `0x9000` with no data. All fields through `cbor_total_length` are hashed (SHA-256) into the transaction. |
-| `0x27` | `0x00` | `0x01` | *(same as P2=`0x00`)* `fee[uint64]` (big-endian µCCD) | INIT frame with fee display. Identical to P2=`0x00` except the CDATA has an extra 8-byte big-endian µCCD fee appended after `cbor_total_length`. The fee is **not hashed** and is shown as "Max fees" on the review screen. Send `0xFFFFFFFFFFFFFFFF` to omit the fee line while still using P2=`0x01`. |
+| `0x27` | `0x00` | `0x01` | *(same as P2=`0x00`)* `fee[uint64]` (big-endian µCCD) | INIT frame with fee display. Identical to P2=`0x00` except the CDATA has an extra 8-byte big-endian µCCD fee appended after `cbor_total_length`. The fee is **not hashed** and is shown as "Max fees (est.)" on the review screen. Send `0xFFFFFFFFFFFFFFFF` to omit the fee line while still using P2=`0x01`. |
 | `0x27` | `0x01` | `0x00` | `cbor_chunk[1…255 bytes]`                                                                                                                                                                                                                                              | CONT frame. Raw CBOR bytes, up to 255 per call. Repeat until exactly `cbor_total_length` bytes have been delivered in total. Each intermediate CONT returns `0x9000` with no data; the **final** CONT (when the accumulated byte count equals `cbor_total_length`) returns `0x9000` with a **64-byte Ed25519 signature** as response data. |
 
 > INIT P2 must be `0x00` (no fee) or `0x01` (fee display); any other value is rejected with `SWO_WRONG_P1_P2` (`0x6B00`).
@@ -75,15 +75,15 @@ The app performs **clear signing**: each field is shown in human-readable form b
 
 | Operation       | Screens shown (in order)                                             |
 | --------------- | -------------------------------------------------------------------- |
-| `transfer`      | Sender · Max energy · Network · Token · Operation · Amount · Recipient · [Memo] · [Max fees] · Sign/Decline |
-| `mint`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
-| `burn`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees] · Sign/Decline                       |
-| `addAllowList`  | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `removeAllowList` | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                     |
-| `addDenyList`   | Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `removeDenyList`| Sender · Max energy · Network · Token · Operation · Target · [Max fees] · Sign/Decline                       |
-| `pause`         | Sender · Max energy · Network · Token · Operation · [Max fees] · Sign/Decline                                |
-| `unpause`       | Sender · Max energy · Network · Token · Operation · [Max fees] · Sign/Decline                                |
+| `transfer`      | Sender · Max energy · Network · Token · Operation · Amount · Recipient · [Memo] · [Max fees (est.)] · Sign/Decline |
+| `mint`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees (est.)] · Sign/Decline                       |
+| `burn`          | Sender · Max energy · Network · Token · Operation · Amount · [Max fees (est.)] · Sign/Decline                       |
+| `addAllowList`  | Sender · Max energy · Network · Token · Operation · Target · [Max fees (est.)] · Sign/Decline                       |
+| `removeAllowList` | Sender · Max energy · Network · Token · Operation · Target · [Max fees (est.)] · Sign/Decline                     |
+| `addDenyList`   | Sender · Max energy · Network · Token · Operation · Target · [Max fees (est.)] · Sign/Decline                       |
+| `removeDenyList`| Sender · Max energy · Network · Token · Operation · Target · [Max fees (est.)] · Sign/Decline                       |
+| `pause`         | Sender · Max energy · Network · Token · Operation · [Max fees (est.)] · Sign/Decline                                |
+| `unpause`       | Sender · Max energy · Network · Token · Operation · [Max fees (est.)] · Sign/Decline                                |
 
 Fields in brackets `[…]` appear only when the host provides the corresponding data.
 
@@ -91,8 +91,8 @@ Fields in brackets `[…]` appear only when the host provides the corresponding 
 - **Amount** — displayed as `"<value> <tokenId>"` with the number of decimal places determined by the CBOR tag-4 exponent (e.g. `"1.500000 UPEU"`). Raw smallest units are never shown without decimal context. **App limit: the exponent magnitude must not exceed 18** (i.e. exponent ∈ [−18, 0]); tokens registered with more than 18 decimals are rejected with `ERROR_PLT_UNSUPPORTED_DECIMALS` (`0x6B11`). The chain permits 0–255 decimals; no mainnet or testnet token currently exceeds 18.
 - **Recipient / Target** — base58check-encoded 55-character Concordium address.
 - **Memo** — the decoded text of a tag-24 CBOR text string, shown in full. Anything that cannot be rendered faithfully is refused with `ERROR_PLT_UNSUPPORTED_MEMO` (`0x6B12`) rather than trimmed or hex-dumped, because the memo is part of the signed payload and permanent on chain.
-- **Max fees** — only shown when the host sends the fee suffix (P2=`0x01` on INIT); formatted as CCD with 6 decimal places (e.g. `"0.000727 CCD"`). If the host sends `0xFFFFFFFFFFFFFFFF`, the fee line is suppressed.
-- **Max energy** — the signed `energy_amount` from the transaction header, as decimal text. This is the only cost bound the signature commits to: any **Max fees** line is a host estimate that sits outside the transaction hash, so it is shown in addition to this row, never instead of it.
+- **Max fees (est.)** — only shown when the host sends the fee suffix (P2=`0x01` on INIT); formatted as CCD with 6 decimal places (e.g. `"0.000727 CCD"`). If the host sends `0xFFFFFFFFFFFFFFFF`, the fee line is suppressed.
+- **Max energy** — the signed `energy_amount` from the transaction header, as decimal text. This is the only cost bound the signature commits to: any **Max fees (est.)** line is a host estimate that sits outside the transaction hash, so it is shown in addition to this row, never instead of it.
 - **Network** — derived from node 1 of the signing path (`919'` mainnet, `1'` testnet). Concordium encodes account addresses identically on both chains, so no other row on screen tells the user which chain they are signing for.
 - Long strings are paginated on Nano (scrollable); on Stax/Flex the review uses the standard pair-list layout.
 

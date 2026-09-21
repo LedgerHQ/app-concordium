@@ -1210,7 +1210,7 @@ UX_STEP_NOCB(ux_plt_target_step,
 UX_STEP_NOCB(ux_plt_memo_step, bnnn_paging, {.title = "Memo", .text = global.signPlt.displayMemo});
 UX_STEP_NOCB(ux_plt_fee_step,
              bnnn_paging,
-             {.title = "Max fees", .text = global.signPlt.displayFee});
+             {.title = "Max fees (est.)", .text = global.signPlt.displayFee});
 
 /* Worst case is a transfer with a memo and a host fee suffix: review, sender, max energy,
  * network, token, operation, amount, recipient, memo, max fees, sign, decline, FLOW_END = 13. */

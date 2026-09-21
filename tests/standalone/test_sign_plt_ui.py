@@ -578,7 +578,10 @@ def test_plt_multi_op_rejected(backend):
 
 @pytest.mark.active_test_scope
 def test_plt_transfer_fee_display(backend, navigator, default_screenshot_path, test_name):
-    """Transfer with P2=0x01 fee suffix — 'Max fees' screen appears before Sign."""
+    """Transfer with P2=0x01 fee suffix — 'Max fees (est.)' screen appears before Sign.
+
+    The label carries the estimate marker because the fee sits outside the transaction hash,
+    unlike the signed Max energy row; every other flow labels it the same way (V-001, V-084)."""
     client = CommandSender(backend)
     cbor = _plt_transfer(-6, 1_000_000)
     # 726_675 µCCD ≈ 0.000727 CCD (typical PLT transfer fee on testnet)

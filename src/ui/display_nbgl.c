@@ -1570,7 +1570,7 @@ void startPltDisplay(volatile unsigned int *flags) {
     }
 
     if (plt->hasFeeDisplay) {
-        pairs[n].item = "Max fees";
+        pairs[n].item = "Max fees (est.)";
         pairs[n].value = plt->displayFee;
         n++;
     }
