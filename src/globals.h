@@ -46,4 +46,16 @@ extern tx_state_t global_tx_state;
 #define ERROR_INVALID_MODULE_REF    0x6B09
 #define ERROR_TRUSTED_NAME_MISMATCH 0x6B0C
 
+/* PLT-specific status words (part of host↔app contract for INS 0x27). */
+#define ERROR_PLT_CBOR_ERROR   0x6B0D
+#define ERROR_PLT_BUFFER_ERROR 0x6B0E
+#define ERROR_PLT_DATA_ERROR   0x6B0F
+#define ERROR_PLT_MULTI_OP \
+    0x6B10 /* payload has > 1 operation; rejected to prevent confirmation-blindness */
+#define ERROR_PLT_UNSUPPORTED_DECIMALS \
+    0x6B11 /* amount exponent magnitude exceeds the app's 18-decimal display limit */
+#define ERROR_PLT_UNSUPPORTED_MEMO                                                           \
+    0x6B12 /* memo is not a tag-24 byte string holding one definite-length CBOR text string, \
+            * or that text cannot be rendered — see parse_memo_value() */
+
 #define ERROR_DEVICE_LOCKED 0x530C

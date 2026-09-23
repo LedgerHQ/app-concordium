@@ -687,3 +687,201 @@ def test_sign_tx_memo_rejects_non_canonical_integer(backend):
         ):
             pass
     assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+# ------------------------------------------------------------------ #
+# Multi-packet memo: intermediate CONT frames                         #
+# ------------------------------------------------------------------ #
+#
+# This PR changed the intermediate memo frame in both memo handlers from
+# THROW(ERROR_INVALID_STATE) to send_success_no_idle(), and nothing covered it: every other
+# memo case in this file fits a single APDU, so the `cborLength != 0` branch never ran.
+#
+# The largest memo the protocol allows is MAX_CBOR_BLOB_SIZE = 257 bytes (a 2-byte CBOR
+# header plus 255 text bytes), which splits into 255 + 2 -- two frames, so exactly one
+# intermediate. Three frames are not reachable: 257 is the cap.
+#
+# These are deliberately synchronous and take no screenshots. The frame under test answers
+# 0x9000 without showing anything, so asserting it needs no navigation and adds no goldens.
+
+_MEMO_PATH = "m/1105/0/0/0/0/2/0/0"
+_MEMO_HEADER_TO_ADDRESS = bytes.fromhex(
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    "000000000000000a0000000000000064000000290000000063de5da716"
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+)
+# Same 60-byte header, but transaction kind 0x18 (transfer with schedule and memo).
+_SCHEDULE_MEMO_HEADER_TO_ADDRESS = bytes.fromhex(
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    "000000000000000a0000000000000064000000290000000063de5da718"
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+)
+
+# CBOR text string of 255 displayable bytes: 0x78 0xFF + payload. 257 bytes total, the
+# protocol maximum, so split_message yields 255 + 2.
+_MAX_MEMO = bytes([0x78, 0xFF]) + b"A" * 255
+assert len(_MAX_MEMO) == 257
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_intermediate_frame_returns_success(backend):
+    """INS 0x32: a memo split across two frames must answer 0x9000 on the first.
+
+    Before this PR the intermediate frame threw ERROR_INVALID_STATE, so any memo over
+    255 bytes was unsignable.
+    """
+    from application_client.command_sender import CLA, InsType, P2, pack_derivation_path
+
+    chunks = split_message(_MAX_MEMO, MAX_APDU_LEN)
+    assert len(chunks) == 2, f"expected 255+2, got {[len(c) for c in chunks]}"
+
+    init = (
+        pack_derivation_path(_MEMO_PATH)
+        + _MEMO_HEADER_TO_ADDRESS
+        + len(_MAX_MEMO).to_bytes(2, "big")
+    )
+    resp = backend.exchange(
+        cla=CLA, ins=InsType.SIGN_TRANSFER_WITH_MEMO, p1=0x01, p2=P2.P2_NONE, data=init
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    # The frame under test: memo incomplete, so the handler answers and waits for more.
+    resp = backend.exchange(
+        cla=CLA, ins=InsType.SIGN_TRANSFER_WITH_MEMO, p1=0x02, p2=P2.P2_NONE, data=chunks[0]
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert resp.data == b""
+
+    # Final memo frame. For INS 0x32 the review is on the amount packet, not here, so this
+    # still answers synchronously and the flow is left waiting for the amount.
+    resp = backend.exchange(
+        cla=CLA, ins=InsType.SIGN_TRANSFER_WITH_MEMO, p1=0x02, p2=P2.P2_NONE, data=chunks[1]
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_schedule_memo_intermediate_frame_returns_success(backend):
+    """INS 0x34: same intermediate memo frame, same regression, separate handler.
+
+    Only the intermediate frame is sent. The final one calls finish_memo_scheduled(), which
+    opens the memo review, so completing the flow here would need navigation and goldens for
+    no extra coverage of the line under test.
+    """
+    from application_client.command_sender import CLA, InsType, P1, P2, pack_derivation_path
+
+    chunks = split_message(_MAX_MEMO, MAX_APDU_LEN)
+
+    init = (
+        pack_derivation_path(_MEMO_PATH)
+        + _SCHEDULE_MEMO_HEADER_TO_ADDRESS
+        + bytes([1])                               # one schedule pair
+        + len(_MAX_MEMO).to_bytes(2, "big")
+    )
+    resp = backend.exchange(
+        cla=CLA,
+        ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
+        p1=P1.P1_INITIAL_SCHEDULED_TRANSFER_WITH_MEMO,
+        p2=P2.P2_NONE,
+        data=init,
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = backend.exchange(
+        cla=CLA,
+        ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
+        p1=P1.P1_MEMO_SCHEDULED_TRANSFER,
+        p2=P2.P2_NONE,
+        data=chunks[0],
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert resp.data == b""
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_memo_multi_packet_review(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """INS 0x32: a two-frame memo reviews and signs like a single-frame one.
+
+    The synchronous test above pins the intermediate frame's status word; this one proves
+    the whole flow still reaches a review and a signature once the memo spans two APDUs.
+    The review shows all 255 memo characters, so the goldens also cover the paging.
+    """
+    client = CommandSender(backend)
+
+    with client.sign_simple_transfer_with_memo(
+        path=_MEMO_PATH,
+        header_and_to_address=_MEMO_HEADER_TO_ADDRESS,
+        memo=_MAX_MEMO,
+        amount=bytes.fromhex("ffffffffffffffff"),
+    ):
+        navigate_until_text_and_compare(
+            backend, navigator, "Sign", default_screenshot_path, test_name
+        )
+
+    response = client.get_async_response().data
+    assert len(response) == 64, f"expected a 64-byte signature, got {len(response)}"
+
+
+@pytest.mark.active_test_scope
+def test_sign_tx_schedule_memo_multi_packet_review(
+    backend, navigator, default_screenshot_path, test_name
+):
+    """INS 0x34: same, for the scheduled-transfer memo handler.
+
+    Unlike INS 0x32 the memo review opens on the frame that completes the memo, so the
+    earlier frames go out synchronously and only the last one is navigated.
+    """
+    client = CommandSender(backend)
+
+    memo_chunks = split_message(_MAX_MEMO, MAX_APDU_LEN)
+    assert len(memo_chunks) == 2, f"expected 255+2, got {[len(c) for c in memo_chunks]}"
+
+    pairs = bytes.fromhex("0000017a396883d90000000005f5e100")  # one 16-byte pair
+
+    response = client.sign_tx_with_schedule_and_memo_part_1(
+        path=_MEMO_PATH,
+        header_and_to_address=_SCHEDULE_MEMO_HEADER_TO_ADDRESS,
+        num_pairs=1,
+        memo_length=len(_MAX_MEMO),
+    )
+    assert response.status == StatusWords.SWO_SUCCESS
+
+    # Memo incomplete: answers immediately, nothing on screen.
+    for chunk in memo_chunks[:-1]:
+        response = client.sign_tx_with_schedule_and_memo_memo_chunk(chunk)
+        assert response.status == StatusWords.SWO_SUCCESS
+
+    # Completing frame: opens the memo review.
+    with client.sign_tx_with_schedule_and_memo_part_2(memo_chunk=memo_chunks[-1]):
+        navigate_until_text_and_compare(
+            backend,
+            navigator,
+            "Continue",
+            default_screenshot_path,
+            test_name,
+            True,
+            False,
+            NavInsID.USE_CASE_CHOICE_CONFIRM,
+        )
+
+    # Resume numbering where the memo review left off, as the single-packet test does.
+    screenshots_so_far = screenshots_taken_so_far(
+        backend, default_screenshot_path, test_name
+    )
+    instructions = instructions_builder(2, backend, NavInsID.USE_CASE_REVIEW_CONFIRM)
+
+    with client.sign_tx_with_schedule_and_memo_part_3(data=pairs):
+        navigator.navigate_and_compare(
+            default_screenshot_path,
+            test_name,
+            instructions,
+            10,
+            True,
+            True,
+            screenshots_so_far,
+        )
+
+    response = client.get_async_response().data
+    assert len(response) == 64, f"expected a 64-byte signature, got {len(response)}"

@@ -20,8 +20,11 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 include(CTest)
 enable_testing()
 
-set(APP_SRC    ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-set(FUZZ_STUBS ${CMAKE_CURRENT_SOURCE_DIR}/../fuzzing/stubs)
+find_package(cmocka REQUIRED)
+
+set(APP_SRC      ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set(FUZZ_STUBS   ${CMAKE_CURRENT_SOURCE_DIR}/../fuzzing/stubs)
+set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src)
 
 if(DEFINED BOLOS_SDK)
     set(LEDGER_SDK_RAW ${BOLOS_SDK})
@@ -39,6 +42,11 @@ if(NOT EXISTS ${LEDGER_SDK}/lib_standard_app/format.c)
     message(FATAL_ERROR
         "ledger-secure-sdk not found at '${LEDGER_SDK}' (from '${LEDGER_SDK_RAW}'). "
         "Set BOLOS_SDK to a checkout of it.")
+endif()
+
+if(NOT EXISTS ${TINYCBOR_SRC}/cborparser.c)
+    message(FATAL_ERROR
+        "tinycbor not found at '${TINYCBOR_SRC}'. Run: git submodule update --init --recursive")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -63,8 +71,13 @@ set(APP_INCLUDE_DIRS
     ${APP_SRC}/apdu
     ${APP_SRC}/ui
     ${LEDGER_SDK}/lib_standard_app
+    ${TINYCBOR_SRC}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# cborparser.c uses intentional fall-throughs; suppress only for this file.
+set_source_files_properties(${TINYCBOR_SRC}/cborparser.c
+    PROPERTIES COMPILE_FLAGS "-Wno-implicit-fallthrough")
 
 # The same source set the fuzz targets share, so a test links exactly what CI already builds.
 add_library(app_host STATIC
@@ -72,6 +85,7 @@ add_library(app_host STATIC
     ${LEDGER_SDK}/lib_standard_app/format.c
     ${APP_SRC}/helpers/base58check.c
     ${APP_SRC}/helpers/cbor_data_blob.c
+    ${TINYCBOR_SRC}/cborparser.c
     ${APP_SRC}/helpers/derivation_path.c
     ${APP_SRC}/helpers/display_text.c
     ${APP_SRC}/helpers/fee_display.c
@@ -101,3 +115,5 @@ add_unit_test(test_time)
 add_unit_test(test_derivation_path)
 add_unit_test(test_get_public_key ${APP_SRC}/handler/get_public_key.c)
 add_unit_test(test_ux_guard)
+# sign_plt.c is not part of app_host: only this test drives the PLT handler.
+add_unit_test(test_sign_plt ${APP_SRC}/handler/sign_plt.c)

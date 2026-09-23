@@ -1,0 +1,689 @@
+"""
+Protocol-level tests for INS 0x27 — PLT (Protocol Level Token) signing.
+
+The handler validates APDU framing and CIS-7 CBOR structure, then shows UI for
+user approval.  Tests here exercise the protocol layer (framing, state machine,
+buffer management, CIS-7 rejection) using synchronous backend.exchange() calls.
+Tests that require user approval / signature output live in test_sign_plt_ui.py.
+
+APDU wire format:
+  INIT (P1=0x00, P2=0x00): path + account_tx_header[60] + kind[1]=0x1B + token_id_length[1]
+                            + token_id[1..128] + cbor_total_length[4 BE]
+  INIT (P1=0x00, P2=0x01): same as above + fee[8 BE µCCD]  (fee display mode; not hashed)
+  CONT (P1=0x01): raw CBOR chunk[1..255]
+
+Error status words (all in 0x6Bxx range):
+  0x6B01  ERROR_INVALID_STATE       — CONT before INIT
+  0x6B04  ERROR_INVALID_TRANSACTION — wrong transaction kind byte (must be 27/0x1B)
+  0x6B0D  ERROR_PLT_CBOR_ERROR      — overflow, empty chunk, or invalid CIS-7 CBOR
+  0x6B0E  ERROR_PLT_BUFFER_ERROR    — cbor_total_length is 0 or > APP_PLT_CBOR_MAX (512)
+  0x6B0F  ERROR_PLT_DATA_ERROR      — token_id_length out of range [1..128], or the id holds a
+                                      byte that cannot be displayed (0x00-0x1F, 0x7F)
+  0x6B10  ERROR_PLT_MULTI_OP        — outer CBOR array has more than one operation
+  0x6B11  ERROR_PLT_UNSUPPORTED_DECIMALS — amount exponent -19..-128 (display cap;
+                                      past -128 it is 0x6B0D, the exponent not fitting int8_t)
+  0x6B12  ERROR_PLT_UNSUPPORTED_MEMO — memo is not a tag-24 CBOR text string, or is unrenderable
+"""
+
+import pytest
+
+from ragger.error import StatusWords
+
+from application_client.command_sender import CommandSender
+
+# ------------------------------------------------------------------ #
+# Minimal CBOR encoder (CIS-7 payloads)                              #
+# ------------------------------------------------------------------ #
+
+
+def _cbor_encode_len(major: int, n: int) -> bytes:
+    major <<= 5
+    if n <= 23:
+        return bytes([major | n])
+    elif n <= 0xFF:
+        return bytes([major | 24, n])
+    elif n <= 0xFFFF:
+        return bytes([major | 25, n >> 8, n & 0xFF])
+    else:
+        return bytes([major | 26]) + n.to_bytes(4, "big")
+
+
+def _tstr(s: str) -> bytes:
+    b = s.encode("utf-8")
+    return _cbor_encode_len(3, len(b)) + b
+
+
+def _array(items) -> bytes:
+    return _cbor_encode_len(4, len(items)) + b"".join(items)
+
+
+def _map(pairs) -> bytes:
+    return _cbor_encode_len(5, len(pairs)) + b"".join(k + v for k, v in pairs)
+
+
+def _uint(n: int) -> bytes:
+    return _cbor_encode_len(0, n)
+
+
+def _negint(n: int) -> bytes:
+    """Encode a negative integer n (n must be < 0)."""
+    return _cbor_encode_len(1, -n - 1)
+
+
+def _bstr(b: bytes) -> bytes:
+    return _cbor_encode_len(2, len(b)) + b
+
+
+def _tag(t: int, v: bytes) -> bytes:
+    return _cbor_encode_len(6, t) + v
+
+
+def _plt_pause() -> bytes:
+    return _array([_map([(_tstr("pause"), _map([]))])])
+
+
+def _cis7_amount(exponent: int, significand: int) -> bytes:
+    """tag 4([exponent, significand])"""
+    exp_enc = _negint(exponent) if exponent < 0 else _uint(exponent)
+    return _tag(4, _array([exp_enc, _uint(significand)]))
+
+
+def _cis7_addr(addr: bytes = None) -> bytes:
+    """Minimal tag 40307({3: bstr[32]}) — no coininfo."""
+    if addr is None:
+        addr = bytes(32)
+    assert len(addr) == 32
+    return _tag(40307, _map([(_uint(3), _bstr(addr))]))
+
+
+# ------------------------------------------------------------------ #
+# Shared test constants                                               #
+# ------------------------------------------------------------------ #
+
+# Standard test path used across the Concordium test suite.
+_PATH = "m/1105/0/0/0/0/2/0/0"
+
+# 60-byte account transaction header:
+#   sender[32]   = well-known test account
+#   seq_num[8]   = 10
+#   energy[8]    = 100
+#   payload_size[4] = 0 (placeholder — not validated by the app)
+#   expiry[8]    = 0x63de5da7
+_HEADER_60 = bytes.fromhex(
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    "000000000000000a"
+    "0000000000000064"
+    "00000000"
+    "0000000063de5da7"
+)
+assert len(_HEADER_60) == 60
+
+# Minimal valid token ID (1 byte, the minimum allowed length).
+_TOKEN_ID_MIN = b"T"
+
+# Valid CIS-7 CBOR payloads.
+# Small: array(1) [ map(1) { "pause": map(0) } ] — 9 bytes, single CONT frame.
+_CBOR_SMALL = _plt_pause()
+
+# Large: 300 raw zero bytes (not valid CIS-7) — two CONT frames, used to test
+# buffer accumulation logic before the CIS-7 parse step.
+_CBOR_LARGE = bytes(300)
+
+# APP_PLT_CBOR_MAX constant (must match src/helpers/app_sizes.h).
+_APP_PLT_CBOR_MAX = 512
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_multi_cont_frame(backend):
+    """INIT + two CONT frames: _CBOR_LARGE is raw bytes (not CIS-7).
+    The parser rejects it with ERROR_PLT_CBOR_ERROR on the final CONT frame."""
+    client = CommandSender(backend)
+
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_LARGE))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(_CBOR_LARGE[:255])
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(_CBOR_LARGE[255:])
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_exact_cbor_max(backend):
+    """APP_PLT_CBOR_MAX bytes are buffered without overflow then rejected by CIS-7 parser."""
+    client = CommandSender(backend)
+
+    # 512 raw zero bytes — not a CIS-7 outer array, so parser returns 0x6B0D.
+    # Split into 255+255+2 because each CONT frame is limited to 255 bytes.
+    cbor = bytes(_APP_PLT_CBOR_MAX)
+    assert len(cbor) == _APP_PLT_CBOR_MAX
+
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(cbor[:255])
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(cbor[255:510])
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(cbor[510:])
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_intermediate_cont_returns_no_data(backend):
+    """Intermediate CONT frames return 0x9000 with an empty data payload."""
+    client = CommandSender(backend)
+
+    # _CBOR_LARGE is raw bytes (not CIS-7), so the final frame returns 0x6B0D.
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_LARGE))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    # First chunk (255 bytes) — intermediate: 0x9000 + no data.
+    resp = client.sign_plt_cont(_CBOR_LARGE[:255])
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert resp.data == b""
+
+    # Final chunk — raw bytes fail CIS-7 parse.
+    resp = client.sign_plt_cont(_CBOR_LARGE[255:])
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+# ------------------------------------------------------------------ #
+# Negative tests — INIT frame errors                                  #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_wrong_transaction_kind(backend):
+    """INIT with kind != 0x1B (27) must return ERROR_INVALID_TRANSACTION (0x6B04)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(
+        _PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL), kind=0x03
+    )
+    assert resp.status == 0x6B04  # ERROR_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_cbor_total_zero(backend):
+    """cbor_total_length == 0 must return ERROR_PLT_BUFFER_ERROR (0x6B0E)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, 0)
+    assert resp.status == 0x6B0E  # ERROR_PLT_BUFFER_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_cbor_total_exceeds_max(backend):
+    """cbor_total_length > APP_PLT_CBOR_MAX must return ERROR_PLT_BUFFER_ERROR (0x6B0E)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, _APP_PLT_CBOR_MAX + 1)
+    assert resp.status == 0x6B0E  # ERROR_PLT_BUFFER_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_length_zero(backend):
+    """token_id_length == 0 must return ERROR_PLT_DATA_ERROR (0x6B0F)."""
+    client = CommandSender(backend)
+    # Pass an empty bytes object — results in token_id_length byte = 0x00 in the APDU.
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"", len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_length_too_long(backend):
+    """token_id_length > 128 must return ERROR_PLT_DATA_ERROR (0x6B0F)."""
+    client = CommandSender(backend)
+    # Displayable bytes, so the refusal can only come from the length check.
+    token_id = b"A" * 129  # 129 bytes — one over the limit
+    resp = client.sign_plt_init(_PATH, _HEADER_60, token_id, len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_embedded_nul(backend):
+    """A NUL inside token_id must return ERROR_PLT_DATA_ERROR (0x6B0F).
+
+    The id is hashed in full but rendered as a C string, so without this check the
+    screen would show "A" while the signature covers "A\\x00B"."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A\x00B", len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_control_byte(backend):
+    """A control byte other than NUL inside token_id is refused the same way."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A\x1bB", len(_CBOR_SMALL))
+    assert resp.status == 0x6B0F  # ERROR_PLT_DATA_ERROR
+
+
+# ------------------------------------------------------------------ #
+# Negative tests — CONT frame errors                                  #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_cont_before_init(backend):
+    """CONT frame without a preceding INIT must return ERROR_INVALID_STATE (0x6B01)."""
+    client = CommandSender(backend)
+    # No INIT sent — state is TX_PLT_INITIAL, so CONT is rejected.
+    resp = client.sign_plt_cont(_CBOR_SMALL)
+    assert resp.status == 0x6B01  # ERROR_INVALID_STATE
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_cont_overflow(backend):
+    """CONT frame carrying more bytes than the declared cbor_total_length must fail."""
+    client = CommandSender(backend)
+
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(_CBOR_SMALL + b"\x00")  # one byte over the declared total
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_empty_cont_chunk(backend):
+    """CONT frame with zero-length data must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    client = CommandSender(backend)
+
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    resp = client.sign_plt_cont(b"")
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_p1_invalid(backend):
+    """P1=0x02 on a fresh session must return ERROR_INVALID_PARAM (0x6B03)."""
+    from application_client.command_sender import CLA, InsType
+    from ragger.error import ExceptionRAPDU
+
+    try:
+        resp = backend.exchange(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x02, p2=0x00,
+            data=b"\x01\x00",  # minimal data so lc > 0
+        )
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B03  # ERROR_INVALID_PARAM
+    else:
+        assert resp.status == 0x6B03  # ERROR_INVALID_PARAM
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_cont_split_three_ways(backend):
+    """512 raw bytes split into three CONT frames (255+255+2) accumulate correctly."""
+    client = CommandSender(backend)
+
+    # 512 zero bytes (= APP_PLT_CBOR_MAX) — not CIS-7, so the final frame returns 0x6B0D.
+    cbor_512 = bytes(512)
+
+    resp = client.sign_plt_init(_PATH, _HEADER_60, _TOKEN_ID_MIN, len(cbor_512))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+    # Chunk 1: 255 bytes — intermediate.
+    resp = client.sign_plt_cont(cbor_512[:255])
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert resp.data == b""
+
+    # Chunk 2: 255 bytes — still intermediate.
+    resp = client.sign_plt_cont(cbor_512[255:510])
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert resp.data == b""
+
+    # Chunk 3: final 2 bytes — raw bytes fail CIS-7 parse.
+    resp = client.sign_plt_cont(cbor_512[510:])
+    assert resp.status == 0x6B0D  # ERROR_PLT_CBOR_ERROR
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_trailing_byte_in_init(backend):
+    """Extra byte after cbor_total_length in INIT must return SWO_INCORRECT_DATA (0x6A80)."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
+
+    # Build a valid INIT payload and append one trailing zero byte.
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B])             # PLT kind
+    data += bytes([len(_TOKEN_ID_MIN)])
+    data += _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
+    data += b"\x00"                   # trailing byte — must be rejected
+
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x00, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6A80  # SWO_INCORRECT_DATA
+    else:
+        assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_wrong_p2(backend):
+    """INIT P2 outside {0x00, 0x01} must return SWO_WRONG_P1_P2 (0x6B00). Tests P2=0x02."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
+
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x02, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6B00  # SWO_WRONG_P1_P2
+    else:
+        assert resp.status == 0x6B00  # SWO_WRONG_P1_P2
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_accepted(backend):
+    """INIT with P2=0x01 and an 8-byte µCCD fee suffix must succeed (0x9000)."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(
+        _PATH, _HEADER_60, _TOKEN_ID_MIN, len(_CBOR_SMALL),
+        display_fee_microccd=726_675,
+    )
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_fee_display_wrong_length(backend):
+    """INIT with P2=0x01 but wrong fee length (4 bytes instead of 8) → SWO_INCORRECT_DATA."""
+    from application_client.command_sender import CLA, InsType, pack_derivation_path
+    from ragger.error import ExceptionRAPDU
+
+    data = pack_derivation_path(_PATH)
+    data += _HEADER_60
+    data += bytes([0x1B, len(_TOKEN_ID_MIN)]) + _TOKEN_ID_MIN
+    data += len(_CBOR_SMALL).to_bytes(4, byteorder="big")
+    data += b"\x00\x00\x00\x04"  # only 4 bytes, need exactly 8
+    try:
+        resp = backend.exchange(cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=0x01, data=data)
+    except ExceptionRAPDU as e:
+        assert e.status == 0x6A80  # SWO_INCORRECT_DATA
+    else:
+        assert resp.status == 0x6A80  # SWO_INCORRECT_DATA
+
+
+# ------------------------------------------------------------------ #
+# Token-ID length boundary                                            #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_token_id_max_length_accepted(backend):
+    """128-byte token ID (PLT_TOKEN_ID_MAX) fits in the INIT APDU and is accepted."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, b"A" * 128, len(_CBOR_SMALL))
+    assert resp.status == StatusWords.SWO_SUCCESS
+
+
+# ------------------------------------------------------------------ #
+# Required-field validation (security: prevents stale-display attack) #
+# ------------------------------------------------------------------ #
+
+
+def _plt_cont(backend, token_id: bytes, cbor: bytes) -> int:
+    """INIT + single CONT; returns the CONT status word."""
+    client = CommandSender(backend)
+    resp = client.sign_plt_init(_PATH, _HEADER_60, token_id, len(cbor))
+    assert resp.status == StatusWords.SWO_SUCCESS, f"INIT failed: {resp.status:#06x}"
+    resp = client.sign_plt_cont(cbor)
+    return resp.status
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_transfer_missing_amount(backend):
+    """transfer without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_transfer_missing_recipient(backend):
+    """transfer without 'recipient' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_mint_missing_amount(backend):
+    """mint without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("mint"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_burn_missing_amount(backend):
+    """burn without 'amount' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("burn"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_add_allow_list_missing_target(backend):
+    """addAllowList without 'target' field must return ERROR_PLT_CBOR_ERROR (0x6B0D)."""
+    cbor = _array([_map([(_tstr("addAllowList"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_unknown_field_rejected(backend):
+    """An unrecognised field in an op map must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Its bytes are hashed, so skipping it would sign a field no screen ever showed.
+    """
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+        (_tstr("anythingElse"), _uint(1)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_overlong_field_name_rejected(backend):
+    """A field name longer than the parser's buffer is refused, not skipped (0x6B0D)."""
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+        (_tstr("a" * 64), _uint(1)),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
+# Amount-exponent floors: -18 accepted, -19..-128 → 0x6B11, < -128 → 0x6B0D #
+# ------------------------------------------------------------------ #
+
+
+def _transfer_with_exponent(exp: int) -> bytes:
+    """transfer CBOR with the given tag-4 exponent and significand=1."""
+    exp_enc = _negint(exp) if exp < 0 else _uint(exp)
+    amount = _tag(4, _array([exp_enc, _uint(1)]))
+    return _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_19_decimals_rejected(backend):
+    """Exponent -19 (19 decimals) must return ERROR_PLT_UNSUPPORTED_DECIMALS (0x6B11).
+
+    The chain permits 0-255 decimals; the app caps at 18.  The check must happen at
+    parse time so the host gets a dedicated SW rather than the generic 0x6B04.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-19)) == 0x6B11
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_int8_floor_still_decimals_error(backend):
+    """Exponent -128 is the last value the parser can hold, and is still 0x6B11.
+
+    The old name said "255 decimals" and the body used -127; neither matched the code.
+    -128 is the real structural floor: a CBOR negative integer with raw value R encodes
+    -(R+1), and the exponent is an int8_t, so R <= 127. It is representable, so the
+    display cap is what rejects it, not the parser.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-128)) == 0x6B11
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_below_int8_floor_is_cbor_error(backend):
+    """Exponent -129 does not fit an int8_t, so it fails structurally with 0x6B0D.
+
+    One past the test above, and a different status word: the two floors are distinct.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _transfer_with_exponent(-129)) == 0x6B0D
+
+
+# The accepting side of the boundary (-18) is pinned in unit-tests/test_sign_plt.c: a valid
+# payload reaches the review and never answers synchronously, so it cannot be asserted here.
+
+
+# ------------------------------------------------------------------ #
+# Containers must use definite-length encoding                        #
+# ------------------------------------------------------------------ #
+
+
+def _indef_array(items) -> bytes:
+    """Indefinite-length array: 0x9F <items> 0xFF."""
+    return bytes([0x9F]) + b"".join(items) + bytes([0xFF])
+
+
+def _indef_map(pairs) -> bytes:
+    """Indefinite-length map: 0xBF <pairs> 0xFF."""
+    return bytes([0xBF]) + b"".join(k + v for k, v in pairs) + bytes([0xFF])
+
+
+def _pause_op() -> bytes:
+    return _map([(_tstr("pause"), _map([]))])
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_outer_array(backend):
+    """A well-formed indefinite-length outer array must return 0x6B0D.
+
+    test_plt_malformed_cbor only sends a bare 0x9F with no break byte, so the
+    accepted case was never exercised.  Two encodings of one operation must not
+    both be signable — the same rule the parser already applies to strings.
+    """
+    assert _plt_cont(backend, _TOKEN_ID_MIN, _indef_array([_pause_op()])) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_op_map(backend):
+    """An indefinite-length operation map must return 0x6B0D."""
+    cbor = _array([_indef_map([(_tstr("pause"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_field_map(backend):
+    """An indefinite-length field map must return 0x6B0D."""
+    fields = _indef_map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ])
+    cbor = _array([_map([(_tstr("transfer"), fields)])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_address_map(backend):
+    """An indefinite-length tag-40307 address map must return 0x6B0D."""
+    addr = _tag(40307, _indef_map([(_uint(3), _bstr(bytes(32)))]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), addr),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_indefinite_amount_array(backend):
+    """An indefinite-length tag-4 amount array must return 0x6B0D."""
+    amount = _tag(4, _indef_array([_negint(-6), _uint(100)]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
+# Single operation per transaction                                    #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_op_map_two_keys(backend):
+    """A two-key operation map must return ERROR_PLT_MULTI_OP (0x6B10).
+
+    Only the first key reaches the screen; the second would be signed unseen.
+    """
+    transfer = _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ])
+    burn = _map([(_tstr("amount"), _cis7_amount(-6, 999))])
+    cbor = _array([_map([(_tstr("transfer"), transfer), (_tstr("burn"), burn)])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B10
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_outer_array_two_operations(backend):
+    """Two elements in the outer array must return ERROR_PLT_MULTI_OP (0x6B10)."""
+    transfer = _map([(_tstr("transfer"), _map([
+        (_tstr("amount"), _cis7_amount(-6, 100)),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])
+    cbor = _array([transfer, _map([(_tstr("pause"), _map([]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B10
+
+
+# ------------------------------------------------------------------ #
+# Amount structure (tag 4 holds exactly [exponent, significand])      #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_amount_array_three_items(backend):
+    """tag 4([-6, 1500000, 99]) must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Only the first two items reach the screen; a third would be hashed unseen.
+    """
+    amount = _tag(4, _array([_negint(-6), _uint(1_500_000), _uint(99)]))
+    cbor = _array([_map([(_tstr("transfer"), _map([
+        (_tstr("amount"), amount),
+        (_tstr("recipient"), _cis7_addr()),
+    ]))])])
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D
+
+
+# ------------------------------------------------------------------ #
+# Payload must be consumed in full (bytes past the array are hashed)  #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.active_test_scope
+def test_sign_plt_trailing_bytes_after_outer_array(backend):
+    """Junk after the outer array must return ERROR_PLT_CBOR_ERROR (0x6B0D).
+
+    Every CONT byte is hashed into the transaction, so bytes the parser never reaches
+    would be signed while the review shows only the operation.
+    """
+    cbor = _plt_pause() + b"\x00"
+    assert _plt_cont(backend, _TOKEN_ID_MIN, cbor) == 0x6B0D

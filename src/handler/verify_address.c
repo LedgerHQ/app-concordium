@@ -165,21 +165,33 @@ static uint16_t parse_key_path(uint8_t *cdata,
 /**
  * PKI lane: prove the signed descriptor describes exactly the account being reviewed.
  *
- * Three independent bindings, all required. The descriptor's PKI signature is trusted, so none of
- * these can be forged; what they add is that a *valid* descriptor cannot be presented against a
- * different account than the one it was issued for.
+ * The descriptor's PKI signature is trusted, so none of these can be forged; what they add is that
+ * a *valid* descriptor cannot be presented against a different account than the one it was issued
+ * for. Always required:
  *
  *  - tag 0x23 (chain id) must match the network of the reviewed path, so a testnet descriptor
  *    cannot be shown for a mainnet address or vice versa;
- *  - tag 0x22 must be the Ed25519 public key of the reviewed path, which is the pre-existing
- *    owner-key binding, but is identity-level and shared by every credential counter;
- *  - tag 0x20 must equal the base58 account address this device derived for the reviewed
- *    credential counter, which is what makes the binding account-specific.
+ *  - tag 0x22 must be the Ed25519 public key of the reviewed path.
  *
+ * What pins the descriptor to a single account then depends on which path the host sent, because
+ * tag 0x22 is the key of whatever path is under review:
+ *
+ *  - a full path *of the signing shape* m/44'/coin'/idp'/identity'/0'/credCounter' puts the
+ *    credential counter at node 5, so tag 0x22 already differs per account. Nothing further is
+ *    needed and the review shows the certified address. The shape is checked by
+ *    full_path_names_one_account; a full path of any other shape is refused, because the host
+ *    picks P1 and the variant alone proves nothing about what it sent.
+ *  - the compact formats review the identity-level PRF path, whose key every credential counter
+ *    shares. There the derived address is the only value that tells them apart, so tag 0x20 has to
+ *    equal it.
+ *
+ * @param bind_derived_address  Require tag 0x20 to equal ctx->address. When false, tag 0x20 is
+ *                              copied into ctx->address for the review instead.
  * @return SWO_SUCCESS, or the status word the command must be refused with.
  */
 static uint16_t pki_bind_descriptor(const uint8_t *derived_ed25519_pub,
-                                    derivation_path_network_t network) {
+                                    derivation_path_network_t network,
+                                    bool bind_derived_address) {
     uint64_t expected_chain_id;
     switch (network) {
         case DERIVATION_PATH_NETWORK_MAINNET:
@@ -206,12 +218,19 @@ static uint16_t pki_bind_descriptor(const uint8_t *derived_ed25519_pub,
         PRINTF("Descriptor tag 0x22 is not the owner key of the reviewed path\n");
         return ERROR_TRUSTED_NAME_MISMATCH;
     }
-    /* Both are NUL-terminated: g_trusted_name by SET_TRUSTED_NAME, ctx->address by
-     * bls_compute_address, which has already run for this credential counter. */
-    if (strncmp(g_trusted_name, ctx->address, sizeof(ctx->address)) != 0) {
-        PRINTF("Descriptor tag 0x20 is not the address derived for this credential counter\n");
-        return ERROR_TRUSTED_NAME_MISMATCH;
+    if (bind_derived_address) {
+        /* Both are NUL-terminated: g_trusted_name by SET_TRUSTED_NAME, ctx->address by
+         * bls_compute_address, which has already run for this credential counter. */
+        if (strncmp(g_trusted_name, ctx->address, sizeof(ctx->address)) != 0) {
+            PRINTF("Descriptor tag 0x20 is not the address derived for this credential counter\n");
+            return ERROR_TRUSTED_NAME_MISMATCH;
+        }
+        return SWO_SUCCESS;
     }
+
+    _Static_assert(sizeof(((verifyAddressContext_t *) 0)->address) == sizeof(g_trusted_name),
+                   "Certified name must fit the reviewed address buffer");
+    memmove(ctx->address, g_trusted_name, sizeof(ctx->address));
     return SWO_SUCCESS;
 }
 
@@ -260,6 +279,33 @@ static void bls_compute_address(uint32_t cred_counter) {
                        (unsigned char *) ctx->address,
                        &addressLength);
     ctx->address[BASE58_ADDRESS_LENGTH] = '\0';
+}
+
+/* Shape of the account signing path m/44'/coin'/idp'/identity'/0'/credCounter'.
+ * Node 4 is the key-role selector, 0' being the signing role; node 5 is the credential counter. */
+#define SIGNING_PATH_LEN            6
+#define SIGNING_PATH_INDEX_PURPOSE  0
+#define SIGNING_PATH_INDEX_KEY_ROLE 4
+#define SIGNING_PATH_KEY_ROLE_SIGN  0
+
+/*
+ * Does this full path have the shape that lets tag 0x22 name a single account?
+ *
+ * parse_derivation_path_from_buffer stamps every full path DERIVATION_PATH_VARIANT_FULL without
+ * inspecting it (derivation_path.c:33), so the variant on its own means only that the host chose
+ * P1 = 0x02. The argument for trusting the descriptor's address holds for the signing path and
+ * nothing else: send the 5-node PRF path under P1_FULL_PATH instead and tag 0x22 becomes the
+ * identity-level key that every credential counter shares, so a descriptor issued for counter 0
+ * would match while the address on screen is the host's, never derived and never checked.
+ *
+ * Called after harden_derivation_path, hence the masks. The coin-type node needs no check here:
+ * an unknown one leaves the path with no network, which pki_bind_descriptor already refuses.
+ */
+static bool full_path_names_one_account(const derivation_path_t *derivation_path) {
+    return derivation_path->len == SIGNING_PATH_LEN &&
+           (derivation_path->nodes[SIGNING_PATH_INDEX_PURPOSE] & ~HARDENED_BIT) == NEW_PURPOSE &&
+           (derivation_path->nodes[SIGNING_PATH_INDEX_KEY_ROLE] & ~HARDENED_BIT) ==
+               SIGNING_PATH_KEY_ROLE_SIGN;
 }
 
 void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
@@ -320,15 +366,36 @@ void handle_verify_address(const command_t *cmd, volatile unsigned int *flags) {
     /* get_bls_private_key / get_public_key expect hardened path; parsers output unhardened */
     harden_derivation_path(derivation_path);
 
-    /* Always derive the address on device, including in the trusted-name lane: it is the only
-     * value that depends on the credential counter, and it is what the descriptor is checked
-     * against instead of being allowed to replace. */
-    bls_compute_address(cred_counter);
+    /* A full path reaches key derivation as sent, so tag 0x22 binds the descriptor to that exact
+     * path -- for the signing path hosts use, m/44'/coin'/idp'/identity'/0'/credCounter', that
+     * already names one credential counter. Deriving an address here would have to treat a signing
+     * path as a PRF path, which is a different key and belongs to no account. The compact formats
+     * instead review the PRF path, whose key every counter shares, so there the derived address is
+     * what tells them apart and it is the review. */
+    bool descriptor_names_account =
+        g_trusted_name_valid && derivation_path->variant == DERIVATION_PATH_VARIANT_FULL;
+
+    /* The shape has to be checked, not assumed, and a full path that fails the check has to be
+     * refused rather than fall through to the derive-and-compare lane: that lane would run
+     * get_bls_private_key over a path that is not a PRF path, with cred_counter fixed at 0 --
+     * producing counter 0's address for a PRF path sent here (so a counter-0 descriptor would
+     * match) and a meaningless address for anything else. Neither is something to show. */
+    if (descriptor_names_account && !full_path_names_one_account(derivation_path)) {
+        PRINTF("Full path is not an account signing path; descriptor cannot name an account\n");
+        clear_trusted_name_binding();
+        explicit_bzero(ctx->address, sizeof(ctx->address));
+        send_rejection(ERROR_TRUSTED_NAME_MISMATCH);
+        return;
+    }
+
+    if (!descriptor_names_account) {
+        bls_compute_address(cred_counter);
+    }
 
     if (g_trusted_name_valid) {
         uint8_t derived_ed25519_pub[KEY_LENGTH];
         get_public_key(&global_derivation_path, derived_ed25519_pub);
-        sw = pki_bind_descriptor(derived_ed25519_pub, network);
+        sw = pki_bind_descriptor(derived_ed25519_pub, network, !descriptor_names_account);
         explicit_bzero(derived_ed25519_pub, sizeof(derived_ed25519_pub));
         /* Single-use either way: a descriptor refused against this path must not stay available
          * for the host to retry against another one. */

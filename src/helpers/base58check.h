@@ -2,8 +2,10 @@
 
 #include <stddef.h>
 
-/** Raw account address size (bytes before base58check). */
-#define ADDRESS_LENGTH 32
+/* ADDRESS_LENGTH lives in app_sizes.h: instruction_context.h sizes buffers with it and cannot
+ * reach this header. Included here so this header stays self-contained for its own users. */
+#include "app_sizes.h"
+
 /** Display size for base58check account address string (incl. nul in app buffers). */
 #define BASE58_ADDRESS_LENGTH 55
 

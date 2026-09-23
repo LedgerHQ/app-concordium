@@ -1,5 +1,4 @@
 #include "cbor_data_blob.h"
-
 #include "globals.h"
 
 #include <stdbool.h>
@@ -7,26 +6,31 @@
 #include <string.h>
 
 #include <os.h>
-#include <cx.h>
-#include <io.h>
 #include <status_words.h>
 
-#include "concordium_crypto.h"
+#include "cbor.h"
 #include "display_text.h"
 #include "numberHelpers.h"
 
 #define UINT64_MAX_DECIMAL_DIGITS 20
 
-// CBOR encoding constants
-#define CBOR_SHORT_COUNT_MAX   23  // Values below this are direct length
-#define CBOR_ONE_BYTE_LENGTH   24  // Uses 1 additional byte for length
-#define CBOR_TWO_BYTE_LENGTH   25  // Uses 2 additional bytes for length
-#define CBOR_FOUR_BYTE_LENGTH  26  // Uses 4 additional bytes for length
-#define CBOR_EIGHT_BYTE_LENGTH 27  // Uses 8 additional bytes for length
-#define CBOR_INDEFINITE_LENGTH 31  // Indicates indefinite length encoding (unsupported)
+// Short-count encodings of the CBOR argument (RFC 8949 section 3). tinycbor decodes these for
+// us, but it does not police *which* width was used, so the raw header byte is still needed to
+// enforce the shortest form below.
+#define CBOR_SHORT_COUNT_MASK  0x1F
+#define CBOR_SHORT_COUNT_MAX   23
+#define CBOR_ONE_BYTE_LENGTH   24
+#define CBOR_TWO_BYTE_LENGTH   25
+#define CBOR_FOUR_BYTE_LENGTH  26
+#define CBOR_EIGHT_BYTE_LENGTH 27
 
-// Mask and bit shifts
-#define CBOR_SHORT_COUNT_MASK 0x1F  // 5 lower bits
+_Static_assert(MAX_CBOR_STRING_SIZE <= UINT8_MAX,
+               "MAX_CBOR_STRING_SIZE exceeds UINT8_MAX: widen cborContext_t.displayLen");
+
+// A single APDU chunk is at most 255 bytes (uint8_t limit); the buffer must be larger so
+// accumulation across chunks can never overflow on the very first chunk alone.
+_Static_assert(MAX_CBOR_BLOB_SIZE > 255,
+               "MAX_CBOR_BLOB_SIZE must exceed 255 to safely accumulate multi-chunk payloads");
 
 static cborContext_t *ctx = &global.withDataBlob.cborContext;
 
@@ -46,169 +50,190 @@ static void cbor_set_type_label(const char *label) {
 }
 
 /**
- * True when `length` is encoded in the shortest width CBOR allows for it.
+ * True when the accumulated item's argument is encoded in the shortest width CBOR allows.
  *
  * A short count of 0-23 carries the value inline and is canonical by construction; the wider
- * forms are only canonical when the value does not fit in every smaller one.
+ * forms are only canonical when the value does not fit in every smaller one. tinycbor accepts
+ * every width, so this reads the short count back off the header byte of the buffer it parsed.
  */
-static bool cbor_argument_is_canonical(uint8_t shortCount, uint64_t length) {
+static bool cbor_argument_is_canonical(uint64_t argument) {
+    uint8_t shortCount = ctx->cborBuf[0] & CBOR_SHORT_COUNT_MASK;
     switch (shortCount) {
         case CBOR_ONE_BYTE_LENGTH:
-            return length > CBOR_SHORT_COUNT_MAX;
+            return argument > CBOR_SHORT_COUNT_MAX;
         case CBOR_TWO_BYTE_LENGTH:
-            return length > UINT8_MAX;
+            return argument > UINT8_MAX;
         case CBOR_FOUR_BYTE_LENGTH:
-            return length > UINT16_MAX;
+            return argument > UINT16_MAX;
         case CBOR_EIGHT_BYTE_LENGTH:
-            return length > UINT32_MAX;
+            return argument > UINT32_MAX;
         default:
-            // 0-23 inline, or a short count this parser already refuses elsewhere.
+            // 0-23 inline, or a short count tinycbor already refused.
             return true;
     }
 }
 
-uint16_t readCborInitial(uint8_t *cdata, uint8_t dataLength) {
-    uint8_t remainingDataLength = dataLength;
-    /* remainingDataLength guards the physical APDU buffer; cborLength guards the
-     * protocol-declared stream total (set from a prior APDU) — both must have
-     * at least one byte before consuming the CBOR header. */
-    if (remainingDataLength < 1 || ctx->cborLength < 1) {
-        THROW(SWO_INCORRECT_DATA);
+/**
+ * Parse the fully-accumulated cborBuf and populate ctx->display / displayLen / typeLabel.
+ * Supports major types 0 (unsigned), 1 (negative) and 3 (text string).
+ *
+ * @return SWO_SUCCESS, or the status word to refuse the transaction with.
+ */
+static uint16_t parse_complete_cbor(void) {
+    CborParser parser;
+    CborValue value;
+    const uint8_t *end = ctx->cborBuf + ctx->cborBufLen;
+
+    CborError err = cbor_parser_init(ctx->cborBuf, ctx->cborBufLen, 0, &parser, &value);
+    if (err != CborNoError) {
+        return ERROR_INVALID_TRANSACTION;
     }
-    uint8_t header = cdata[0];
-    cdata += 1;
-    remainingDataLength -= 1;
-    ctx->cborLength -= 1;
-    // the first byte of an cbor encoding contains the type (3 high bits) and the shortCount (5
-    // lower bits);
-    ctx->majorType = header >> 5;
-    uint8_t shortCount = header & CBOR_SHORT_COUNT_MASK;
 
-    // Calculate length of cbor payload
-    // sizeLength: number of bytes (beside the header) used to indicate the payload length
-    uint8_t sizeLength = 0;
-    // length: payload byte size.
-    uint64_t length = 0;
+    ctx->displayLen = 0;
 
-    ctx->displayUsed = 0;
+    // After advance_fixed, cbor_value_get_next_byte returns source.ptr positioned just past
+    // the item's encoded bytes. Comparing it to the buffer end detects trailing bytes: an
+    // integer is complete once its argument is read, so no byte may follow it. Without this a
+    // host could append bytes that stayed in the transaction hash while the review showed
+    // just the integer. (cbor_value_at_end checks remaining==0, which is always true for a
+    // top-level item, so it cannot serve here.)
+    if (cbor_value_is_unsigned_integer(&value)) {
+        uint64_t n;
+        err = cbor_value_get_uint64(&value, &n);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        err = cbor_value_advance_fixed(&value);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        if (cbor_value_get_next_byte(&value) != end) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        if (!cbor_argument_is_canonical(n)) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        cbor_set_type_label("Unsigned integer");
+        bin_to_dec(ctx->display, sizeof(ctx->display), n);
 
-    if (shortCount <= CBOR_SHORT_COUNT_MAX) {
-        // shortCount is the length, no extra bytes are used.
-        length = shortCount;
-    } else if (shortCount == CBOR_ONE_BYTE_LENGTH) {
-        if (remainingDataLength < 1) {
-            THROW(SWO_INCORRECT_DATA);
+    } else if (cbor_value_is_negative_integer(&value)) {
+        // The encoded argument is n, and the value it denotes is -1 - n.
+        uint64_t n;
+        err = cbor_value_get_raw_integer(&value, &n);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
         }
-        length = cdata[0];
-        sizeLength = 1;
-    } else if (shortCount == CBOR_TWO_BYTE_LENGTH) {
-        if (remainingDataLength < 2) {
-            THROW(SWO_INCORRECT_DATA);
+        err = cbor_value_advance_fixed(&value);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
         }
-        length = U2BE(cdata, 0);
-        sizeLength = 2;
-    } else if (shortCount == CBOR_FOUR_BYTE_LENGTH) {
-        if (remainingDataLength < 4) {
-            THROW(SWO_INCORRECT_DATA);
+        if (cbor_value_get_next_byte(&value) != end) {
+            return ERROR_INVALID_TRANSACTION;
         }
-        length = U4BE(cdata, 0);
-        sizeLength = 4;
-    } else if (shortCount == CBOR_EIGHT_BYTE_LENGTH) {
-        if (remainingDataLength < 8) {
-            THROW(SWO_INCORRECT_DATA);
+        if (!cbor_argument_is_canonical(n)) {
+            return ERROR_INVALID_TRANSACTION;
         }
-        length = U8BE(cdata, 0);
-        sizeLength = 8;
-    } else if (shortCount == CBOR_INDEFINITE_LENGTH) {
-        THROW(ERROR_UNSUPPORTED_CBOR);
+        cbor_set_type_label("Negative integer");
+        ctx->display[0] = '-';
+        if (n == UINT64_MAX) {
+            // -(UINT64_MAX+1) overflows uint64; render as "-18446744073709551615 - 1".
+            bin_to_dec(ctx->display + 1, sizeof(ctx->display) - 1, n);
+            memmove(ctx->display + 1 + UINT64_MAX_DECIMAL_DIGITS, " - 1", 4);
+            ctx->display[1 + UINT64_MAX_DECIMAL_DIGITS + 4] = '\0';
+        } else {
+            bin_to_dec(ctx->display + 1, sizeof(ctx->display) - 1, n + 1);
+        }
+
+    } else if (cbor_value_is_text_string(&value)) {
+        // An indefinite-length string is a sequence of chunks with no single canonical form,
+        // so the review could not name one byte string the user is authorising.
+        if (!cbor_value_is_length_known(&value)) {
+            return ERROR_UNSUPPORTED_CBOR;
+        }
+
+        err = cbor_value_begin_string_iteration(&value);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+
+        const char *ptr;
+        size_t len;
+        CborValue next;
+        err = cbor_value_get_text_string_chunk(&value, &ptr, &len, &next);
+        if (err != CborNoError) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        // next.source.ptr is positioned just past the string bytes; compare to buffer end.
+        if (cbor_value_get_next_byte(&next) != end) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        if (!cbor_argument_is_canonical(len)) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        // Refused rather than trimmed: the blob is hashed in full, so showing a prefix would
+        // have the user approve bytes the screen never rendered. Unreachable while callers cap
+        // the blob at MAX_CBOR_BLOB_SIZE, kept for callers that do not.
+        if (len > MAX_CBOR_STRING_SIZE) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        // The text is hashed in full but shown as a C string, so bytes that cannot be
+        // rendered are refused instead of being signed unseen.
+        if (!is_displayable_text((const uint8_t *) ptr, len)) {
+            return ERROR_INVALID_TRANSACTION;
+        }
+        cbor_set_type_label("Text");
+        if (len > 0) {
+            memmove(ctx->display, ptr, len);
+        }
+        ctx->display[len] = '\0';
+        ctx->displayLen = (uint8_t) len;
+
     } else {
-        THROW(ERROR_INVALID_PARAM);
+        return ERROR_UNSUPPORTED_CBOR;
     }
-    cdata += sizeLength;
-    if (ctx->cborLength < sizeLength) {
+
+    return SWO_SUCCESS;
+}
+
+uint16_t readCborInitial(uint8_t *cdata, uint8_t dataLength) {
+    /* dataLength guards the physical APDU buffer; cborLength guards the protocol-declared
+     * stream total (set from a prior APDU) - both must have at least one byte, and the chunk
+     * must not claim more than the stream declared. */
+    if (dataLength < 1 || ctx->cborLength < 1) {
         THROW(SWO_INCORRECT_DATA);
     }
-    ctx->cborLength -= sizeLength;
-
-    // Deterministic CBOR requires the argument in its shortest form. Without this, 1 could
-    // arrive as 01, 1801, 190001, 1a00000001 or 1b0000000000000001 - five distinct byte
-    // strings that are all signed but review identically, so the screen cannot tell the user
-    // which one they are authorising.
-    if (!cbor_argument_is_canonical(shortCount, length)) {
-        return ERROR_INVALID_TRANSACTION;
-    }
-    // An integer is complete once its argument is read, so no APDU byte may follow it. Only the
-    // protocol-declared counter was checked before, letting a host append bytes that stayed in
-    // the transaction hash while the review showed just the integer.
-    bool integerType = (ctx->majorType == 0 || ctx->majorType == 1);
-    if (integerType && remainingDataLength != sizeLength) {
-        return ERROR_INVALID_TRANSACTION;
+    if (dataLength > ctx->cborLength) {
+        THROW(SWO_INCORRECT_DATA);
     }
 
-    switch (ctx->majorType) {
-        case 0:
-            // non-negative integer
-            cbor_set_type_label("Unsigned integer");
-            bin_to_dec(ctx->display, sizeof(ctx->display), length);
-            if (ctx->cborLength != 0) {
-                THROW(ERROR_INVALID_STATE);
-            }
-            break;
-        case 1:
-            // negative integer
-            cbor_set_type_label("Negative integer");
-            memmove(ctx->display, "-", 1);
-            if (length == UINT64_MAX) {
-                bin_to_dec(ctx->display + 1, sizeof(ctx->display) - 1, length);
-                memmove(ctx->display + 1 + UINT64_MAX_DECIMAL_DIGITS, " - 1", 4);
-            } else {
-                bin_to_dec(ctx->display + 1, sizeof(ctx->display) - 1, 1 + length);
-            }
-            if (ctx->cborLength != 0) {
-                THROW(ERROR_INVALID_STATE);
-            }
-            break;
-        case 3:
-            // utf-8 string
-            cbor_set_type_label("Text");
-            if (ctx->cborLength != length) {
-                THROW(ERROR_INVALID_STATE);
-            }
-            return readCborContent(cdata, dataLength - 1 - sizeLength);
-        default:
-            THROW(ERROR_UNSUPPORTED_CBOR);
+    ctx->cborBufLen = 0;
+    memmove(ctx->cborBuf, cdata, dataLength);
+    ctx->cborBufLen = dataLength;
+    ctx->cborLength -= dataLength;
+
+    if (ctx->cborLength == 0) {
+        return parse_complete_cbor();
     }
     return SWO_SUCCESS;
 }
 
 uint16_t readCborContent(uint8_t *cdata, uint8_t contentLength) {
-    if (ctx->cborLength < contentLength) {
+    if (contentLength > ctx->cborLength) {
         THROW(SWO_INCORRECT_DATA);
     }
+    // Defence-in-depth: callers already verify cborLength <= MAX_CBOR_BLOB_SIZE before
+    // calling readCborInitial, so this guard is not reachable in current flows, but it
+    // protects against future callers that omit the upfront length check.
+    if (ctx->cborBufLen + contentLength > MAX_CBOR_BLOB_SIZE) {
+        THROW(SWO_INCORRECT_DATA);
+    }
+
+    memmove(ctx->cborBuf + ctx->cborBufLen, cdata, contentLength);
+    ctx->cborBufLen += contentLength;
     ctx->cborLength -= contentLength;
-    switch (ctx->majorType) {
-        case 3:
-            // Reserve space for NUL terminator
-            if (ctx->displayUsed + contentLength >= sizeof(ctx->display)) {
-                THROW(ERROR_BUFFER_OVERFLOW);
-            }
-            // The memo is hashed in full but shown as a C string, so bytes that cannot be
-            // rendered are refused instead of being signed unseen.
-            if (!is_displayable_text(cdata, contentLength)) {
-                return ERROR_INVALID_TRANSACTION;
-            }
-            memmove(ctx->display + ctx->displayUsed, cdata, contentLength);
-            ctx->displayUsed += contentLength;
-            ctx->display[ctx->displayUsed] = '\0';
-            break;
-        case 0:
-        case 1:
-            // Type 0 and 1 fails, because we don't support integers that can't fit in the initial
-            // payload.
-            THROW(ERROR_UNSUPPORTED_CBOR);
-            break;
-        default:
-            THROW(ERROR_INVALID_STATE);
+
+    if (ctx->cborLength == 0) {
+        return parse_complete_cbor();
     }
     return SWO_SUCCESS;
 }

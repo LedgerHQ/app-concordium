@@ -67,8 +67,4 @@ scripts_local/
 tmp/
 .claude/
 
-# Local checkout, not a submodule. Committing it as a gitlink without a matching .gitmodules
-# entry breaks every CI job that clones with --recursive.
-deps/
-
 build-dy

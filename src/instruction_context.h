@@ -83,10 +83,11 @@ typedef struct {
 } signRegisterData_t;
 
 typedef struct {
-    uint32_t cborLength;
-    uint32_t displayUsed;
-    uint8_t display[COMMON_DISPLAY_SIZE];
-    uint8_t majorType;
+    uint16_t cborLength;                        // remaining bytes to receive (counts down)
+    uint8_t cborBuf[MAX_CBOR_BLOB_SIZE];        // raw CBOR accumulation buffer
+    uint16_t cborBufLen;                        // bytes written into cborBuf so far
+    uint8_t displayLen;                         // decoded text length; 0 for integer types
+    uint8_t display[MAX_CBOR_STRING_SIZE + 1];  // decoded text or NUL-terminated decimal
     /** Major type in words, so a numeric value and a text value cannot review identically. */
     char typeLabel[CBOR_TYPE_LABEL_SIZE];
 } cborContext_t;
@@ -248,8 +249,10 @@ typedef struct {
     /** Network the reviewed path commits to. Host-chosen (P2, or the coin-type node of a full
      * path) and it changes the derived key, so it is part of the review. */
     uint8_t network[NETWORK_DISPLAY_SIZE];
-    /** Base58 account address derived on-device from the reviewed path and credential counter. A
-     * trusted-name descriptor never replaces it; it must match it (see pki_bind_descriptor). */
+    /** Base58 account address shown on the review. Derived on-device from the reviewed path and
+     * credential counter, except in the full-path trusted-name lane, where the signing path's own
+     * key binds the descriptor to the account and the certified address is shown instead (see
+     * pki_bind_descriptor). */
     char address[TRUSTED_NAME_MAX_LEN + 1];
 } verifyAddressContext_t;
 
@@ -445,6 +448,50 @@ typedef struct {
     bool hasDelegationTarget;
 } signConfigureDelegationContext_t;
 
+/* ----- PLT (Protocol Level Token) signing context (INS 0x27) ----- */
+
+typedef enum {
+    TX_PLT_INITIAL = 80,
+    TX_PLT_CBOR = 81,
+} pltState_t;
+
+/* CIS-7 §4 operation kinds (single-op per transaction enforced by the app). */
+typedef enum {
+    PLT_OP_TRANSFER = 0,
+    PLT_OP_MINT = 1,
+    PLT_OP_BURN = 2,
+    PLT_OP_ADD_ALLOW_LIST = 3,
+    PLT_OP_REM_ALLOW_LIST = 4,
+    PLT_OP_ADD_DENY_LIST = 5,
+    PLT_OP_REM_DENY_LIST = 6,
+    PLT_OP_PAUSE = 7,
+    PLT_OP_UNPAUSE = 8,
+} pltOpType_t;
+
+typedef struct {
+    pltState_t state;
+    uint32_t cborTotalLength;
+    uint32_t cborReceived;
+    uint8_t tokenId[PLT_TOKEN_ID_MAX + 1]; /* +1 for NUL terminator, used directly in display */
+    uint8_t tokenIdLength;
+    uint8_t cborBuf[APP_PLT_CBOR_MAX];
+
+    /* Parsed from CBOR — valid after cborReceived == cborTotalLength: */
+    pltOpType_t opType;
+    uint64_t amountSignificand;      /* tag-4 significand; used for transfer/mint/burn */
+    int8_t amountExponent;           /* tag-4 exponent (≤ 0); absolute value = decimal places */
+    uint8_t address[ADDRESS_LENGTH]; /* recipient (transfer) or target (allow/deny list ops) */
+    bool hasMemo;                    /* transfer only */
+
+    /* Formatted display strings (NUL-terminated, filled by format_plt_display): */
+    char displayOp[PLT_OP_LABEL_SIZE];           /* e.g. "Transfer", "Add to allow list" */
+    char displayAmount[PLT_AMOUNT_DISPLAY_SIZE]; /* e.g. "1.500000 UPEU" */
+    char displayAddress[COMMON_ADDRESS_SIZE];    /* base58check, 55 chars + NUL */
+    char displayMemo[PLT_MEMO_DISPLAY_SIZE];     /* decoded tag-24 CBOR text, NUL-terminated */
+    char displayFee[COMMON_AMOUNT_DISPLAY_SIZE]; /* µCCD fee, e.g. "0.001 CCD"; empty if absent */
+    bool hasFeeDisplay;                          /* true if host sent a fee suffix in INIT */
+} signPltContext_t;
+
 typedef struct trustedNameMultiHashCtx_s {
     cx_sha256_t sha256;
     cx_sha3_t sha3_256;
@@ -495,6 +542,18 @@ _Static_assert(sizeof(transferWithScheduleState_t) == 1,
 _Static_assert(sizeof(protocolState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
 _Static_assert(sizeof(configureBakerState_t) == 1,
                "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(initContractState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateContractState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(publicInfoForIpState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateCredentialState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(transferToPublicState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(pltState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+/* Not a state enum, but stored in signPltContext_t, so it moves offsets the same way. */
+_Static_assert(sizeof(pltOpType_t) == 1, "state enums must be byte-sized (-fshort-enums)");
 _Static_assert((char) 0xFF > 0, "char must be unsigned (-funsigned-char)");
 
 /* ----- Union ----- */
@@ -515,6 +574,7 @@ typedef union {
     updateContract_t updateContract;
     transactionWithDataBlob_t withDataBlob;
     trustedNamePkiContext_t trustedNamePki;
+    signPltContext_t signPlt;
 } instructionContext;
 
 /** Instruction-scoped union; storage in `globals.c`. */

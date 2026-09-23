@@ -1,0 +1,384 @@
+/*
+ * Unit tests for src/handler/sign_plt.c — PLT (Protocol Level Token) signing handler.
+ *
+ * Tests the APDU state machine: token-id length validation, cbor_total_length
+ * boundary conditions, CONT accumulation arithmetic, and state machine transitions.
+ * CBOR parsing correctness (all 9 op types) is covered by the ragger Python tests.
+ *
+ * Build: see unit-tests/CMakeLists.txt (test_sign_plt target).
+ * Run:   ctest -R test_sign_plt   or  ./unit-tests/build/test_sign_plt
+ */
+
+#include <stdarg.h>
+#include <setjmp.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <cmocka.h>
+
+#include "ledger/exceptions.h"
+#include "ledger/status_words.h"
+#include "ledger/parser.h"
+
+#include "globals.h"
+#include "instruction_context.h"
+#include "helpers/app_sizes.h"
+#include "handler/sign_plt.h"
+#include "stub_probes.h"
+
+/* ── Constants ────────────────────────────────────────────────────────────── */
+
+/*
+ * Path m/1105/0/0/0/0/2/0/0 in wire format (depth byte + 8 × 4-byte components).
+ * Matches the path used in the ragger tests.
+ */
+static const uint8_t VALID_PATH[33] = {
+    0x08,
+    0x00, 0x00, 0x04, 0x51, /* 1105 */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+    0x00, 0x00, 0x00, 0x02, /* 2    */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+    0x00, 0x00, 0x00, 0x00, /* 0    */
+};
+
+/* 60-byte account transaction header (all zeros). */
+static const uint8_t VALID_HEADER[60] = {0};
+
+/*
+ * Minimal valid CBOR for [{"pause":{}}] — 9 bytes.
+ * Used for the CONT arithmetic tests where the CBOR must parse successfully.
+ *   0x81  array(1)
+ *   0xa1  map(1)
+ *   0x65  text(5)
+ *   "pause"
+ *   0xa0  map(0) = {}
+ */
+static const uint8_t CBOR_PAUSE[9] = {
+    0x81, 0xa1, 0x65, 0x70, 0x61, 0x75, 0x73, 0x65, 0xa0
+};
+
+/*
+ * [{"mint":{"amount":4([<exp>, 1])}}] with the exponent as a 1-byte-argument negative int.
+ *
+ *   0x81              array(1)
+ *   0xa1              map(1)
+ *   0x64 "mint"       text(4)
+ *   0xa1              map(1)
+ *   0x66 "amount"     text(6)
+ *   0xc4              tag(4)          decimal fraction
+ *   0x82              array(2)
+ *   0x38 <raw>        negative(raw)   encodes the value -(raw+1)
+ *   0x01              unsigned(1)     significand
+ *
+ * mint is used rather than transfer because it needs no recipient, keeping the fixture short.
+ */
+static uint8_t g_cbor_mint_exp[20] = {
+    0x81, 0xa1, 0x64, 'm', 'i', 'n', 't',  0xa1, 0x66, 'a',
+    'm',  'o',  'u',  'n', 't', 0xc4, 0x82, 0x38, 0x00, 0x01
+};
+#define CBOR_MINT_EXP_RAW_INDEX 18
+
+/* Payload for exponent -(raw+1). Returns a buffer valid until the next call. */
+static const uint8_t *cbor_mint_with_exponent_raw(uint8_t raw) {
+    g_cbor_mint_exp[CBOR_MINT_EXP_RAW_INDEX] = raw;
+    return g_cbor_mint_exp;
+}
+
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
+
+static int per_test_setup(void **state) {
+    (void)state;
+    memset(&global, 0, sizeof(global));
+    memset(&global_tx_state, 0, sizeof(global_tx_state));
+    return 0;
+}
+
+/*
+ * Run the handler and report how it refused, whichever way it refused.
+ *
+ * Every refusal now answers with io_send_sw() and returns; none throw. The setjmp stays because
+ * the handler still calls helpers that throw on their own (parse_derivation_path and
+ * hashAccountTransactionHeaderAndKind), and because a non-throwing refusal is otherwise
+ * indistinguishable from success - which is what made test_cont_empty_chunk and
+ * test_cont_overflow_by_one fail against a handler that was behaving correctly.
+ *
+ * g_try_context is cleared for the same reason throw_harness.h clears it: a previous statement
+ * that threw past an open TRY leaves it pointing at a frame that has since returned.
+ */
+static int run_handler(command_t *cmd, bool isInitialCall) {
+    volatile unsigned int flags = 0;
+
+    g_try_context = NULL;
+    stub_probes_reset();
+
+    int rc = setjmp(g_fuzzer_jmp_buf);
+    if (rc == 0) {
+        handle_sign_plt(cmd, &flags, isInitialCall);
+        if (g_stub_send_sw_called) {
+            rc = (int) g_stub_last_sw;
+        }
+    }
+    return rc;
+}
+
+/*
+ * Build a PLT INIT APDU and call handle_sign_plt with isInitialCall=true.
+ *
+ * The token_id_len_byte is placed literally in the APDU (may be 0 or > 128 to
+ * test boundary conditions).  actual_token_id_bytes controls how many bytes are
+ * actually appended after the length byte (must equal token_id_len_byte for
+ * success cases; may be 0 for error-path tests where the handler throws before
+ * reading the token data).
+ *
+ * Returns the status word the handler refused with, or 0 if it returned normally.
+ */
+static int call_init_token(uint8_t token_id_len_byte,
+                           const uint8_t *token_id,
+                           uint8_t actual_token_id_bytes,
+                           uint32_t cbor_total) {
+    /* Max buffer: path(33) + header(60) + kind(1) + len(1) + token(128) + cbor_total(4) */
+    uint8_t buf[33 + 60 + 1 + 1 + 128 + 4];
+    size_t off = 0;
+
+    memcpy(buf + off, VALID_PATH, sizeof(VALID_PATH));
+    off += sizeof(VALID_PATH);
+
+    memcpy(buf + off, VALID_HEADER, sizeof(VALID_HEADER));
+    off += sizeof(VALID_HEADER);
+
+    buf[off++] = 0x1B; /* PLT transaction kind */
+    buf[off++] = token_id_len_byte;
+
+    memcpy(buf + off, token_id, actual_token_id_bytes);
+    off += actual_token_id_bytes;
+
+    buf[off++] = (uint8_t)((cbor_total >> 24) & 0xFF);
+    buf[off++] = (uint8_t)((cbor_total >> 16) & 0xFF);
+    buf[off++] = (uint8_t)((cbor_total >> 8) & 0xFF);
+    buf[off++] = (uint8_t)(cbor_total & 0xFF);
+
+    command_t cmd;
+    cmd.p1   = 0x00; /* PLT_P1_INIT */
+    cmd.p2   = 0x00;
+    cmd.lc   = (uint8_t)off;
+    cmd.data = buf;
+
+    return run_handler(&cmd, /*isInitialCall=*/true);
+}
+
+/* Same, with the token_id bytes filled with a recognisable displayable pattern. */
+static int call_init(uint8_t token_id_len_byte,
+                     uint8_t actual_token_id_bytes,
+                     uint32_t cbor_total) {
+    uint8_t token_id[128];
+    assert_true(actual_token_id_bytes <= sizeof(token_id));
+    memset(token_id, 'T', actual_token_id_bytes);
+    return call_init_token(token_id_len_byte, token_id, actual_token_id_bytes, cbor_total);
+}
+
+/* Send one CONT frame (P1=0x01) with the given data; returns the status word, or 0 on success. */
+static int call_cont(const uint8_t *data, uint8_t lc, bool is_initial) {
+    command_t cmd;
+    cmd.p1   = 0x01; /* PLT_P1_CONT */
+    cmd.p2   = 0x00;
+    cmd.lc   = lc;
+    cmd.data = (uint8_t *)data;
+
+    return run_handler(&cmd, is_initial);
+}
+
+/* ── Token-ID length boundary tests ──────────────────────────────────────── */
+
+static void test_token_id_len_zero(void **state) {
+    (void)state;
+    assert_int_equal(call_init(0, 0, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_len_one(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, 4), 0); /* accepted */
+}
+
+static void test_token_id_len_128(void **state) {
+    (void)state;
+    assert_int_equal(call_init(128, 128, 4), 0); /* accepted (max allowed) */
+}
+
+static void test_token_id_len_129(void **state) {
+    (void)state;
+    assert_int_equal(call_init(129, 0, 4), ERROR_PLT_DATA_ERROR);
+}
+
+/* ── Token-ID content tests ──────────────────────────────────────────────── */
+
+/* The id is hashed in full but displayed as a C string, so a NUL would show "A"
+ * on screen while the signature covers all three bytes. */
+static void test_token_id_embedded_nul(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x00, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_control_byte(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x1B, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_del_byte(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'A', 0x7F, 'B'};
+    assert_int_equal(call_init_token(3, token_id, 3, 4), ERROR_PLT_DATA_ERROR);
+}
+
+static void test_token_id_printable_accepted(void **state) {
+    (void)state;
+    const uint8_t token_id[] = {'E', 'U', 'R', '.', 'e'};
+    assert_int_equal(call_init_token(5, token_id, 5, 4), 0); /* accepted */
+}
+
+/* ── Amount-exponent boundary tests ──────────────────────────────────────── */
+
+/*
+ * Two floors, two status words. A CBOR negative integer with raw value R encodes -(R+1):
+ *
+ *   raw 17  -> exponent  -18   last accepted
+ *   raw 18  -> exponent  -19   ERROR_PLT_UNSUPPORTED_DECIMALS (display cap)
+ *   raw 127 -> exponent -128   still the display cap -- representable in int8_t
+ *   raw 128 -> exponent -129   ERROR_PLT_CBOR_ERROR -- does not fit int8_t at all
+ */
+static int run_mint_with_exponent_raw(uint8_t raw) {
+    const uint8_t *cbor = cbor_mint_with_exponent_raw(raw);
+    assert_int_equal(call_init(1, 1, sizeof(g_cbor_mint_exp)), 0);
+    return call_cont(cbor, (uint8_t) sizeof(g_cbor_mint_exp), false);
+}
+
+static void test_amount_exponent_18_accepted(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(17), 0); /* -18, last accepted */
+}
+
+static void test_amount_exponent_19_decimals_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(18), ERROR_PLT_UNSUPPORTED_DECIMALS);
+}
+
+static void test_amount_exponent_int8_floor_decimals_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(127), ERROR_PLT_UNSUPPORTED_DECIMALS);
+}
+
+static void test_amount_exponent_below_int8_floor_cbor_error(void **state) {
+    (void)state;
+    assert_int_equal(run_mint_with_exponent_raw(128), ERROR_PLT_CBOR_ERROR);
+}
+
+/* ── CBOR total-length boundary tests ────────────────────────────────────── */
+
+static void test_cbor_total_zero(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, 0), ERROR_PLT_BUFFER_ERROR);
+}
+
+static void test_cbor_total_one(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, 1), 0); /* accepted */
+}
+
+static void test_cbor_total_512(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, APP_PLT_CBOR_MAX), 0); /* accepted (max) */
+}
+
+static void test_cbor_total_513(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, APP_PLT_CBOR_MAX + 1), ERROR_PLT_BUFFER_ERROR);
+}
+
+/* ── CONT accumulation arithmetic tests ──────────────────────────────────── */
+
+static void test_cont_exact_split(void **state) {
+    (void)state;
+    /* INIT with cbor_total = sizeof(CBOR_PAUSE) = 9 bytes. */
+    assert_int_equal(call_init(1, 1, sizeof(CBOR_PAUSE)), 0);
+
+    /* First chunk: 5 bytes — intermediate, no error. */
+    assert_int_equal(call_cont(CBOR_PAUSE, 5, false), 0);
+
+    /* Second chunk: remaining 4 bytes — triggers parse_plt_cbor() on valid CBOR → success. */
+    assert_int_equal(call_cont(CBOR_PAUSE + 5, (uint8_t)(sizeof(CBOR_PAUSE) - 5), false), 0);
+}
+
+static void test_cont_empty_chunk(void **state) {
+    (void)state;
+    assert_int_equal(call_init(1, 1, 4), 0);
+    /* lc=0 is rejected before the arithmetic check. */
+    assert_int_equal(call_cont(CBOR_PAUSE, 0, false), ERROR_PLT_CBOR_ERROR);
+}
+
+static void test_cont_overflow_by_one(void **state) {
+    (void)state;
+    /* INIT declares cbor_total=4; CONT sends 5 bytes. */
+    assert_int_equal(call_init(1, 1, 4), 0);
+
+    uint8_t extra[5] = {0};
+    assert_int_equal(call_cont(extra, 5, false), ERROR_PLT_CBOR_ERROR);
+}
+
+/* ── State machine tests ──────────────────────────────────────────────────── */
+
+static void test_state_cont_before_init(void **state) {
+    (void)state;
+    /* isInitialCall=true resets state to TX_PLT_INITIAL; then P1=CONT sees wrong state. */
+    assert_int_equal(call_cont(CBOR_PAUSE, 4, /*isInitialCall=*/true), ERROR_INVALID_STATE);
+}
+
+static void test_state_double_init_resets(void **state) {
+    (void)state;
+    /* First INIT succeeds and moves state to TX_PLT_CBOR. */
+    assert_int_equal(call_init(1, 1, 4), 0);
+
+    /* Second INIT with isInitialCall=true resets state and is accepted again. */
+    assert_int_equal(call_init(1, 1, 4), 0);
+}
+
+static void test_state_p1_invalid(void **state) {
+    (void)state;
+    uint8_t dummy = 0x00;
+    command_t cmd = {.p1 = 0x02, .p2 = 0x00, .lc = 1, .data = &dummy};
+
+    assert_int_equal(run_handler(&cmd, /*isInitialCall=*/true), ERROR_INVALID_PARAM);
+}
+
+/* ── Entry point ──────────────────────────────────────────────────────────── */
+
+int main(void) {
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test_setup(test_token_id_len_zero,       per_test_setup),
+        cmocka_unit_test_setup(test_token_id_len_one,        per_test_setup),
+        cmocka_unit_test_setup(test_token_id_len_128,        per_test_setup),
+        cmocka_unit_test_setup(test_token_id_len_129,        per_test_setup),
+        cmocka_unit_test_setup(test_token_id_embedded_nul,   per_test_setup),
+        cmocka_unit_test_setup(test_token_id_control_byte,   per_test_setup),
+        cmocka_unit_test_setup(test_token_id_del_byte,       per_test_setup),
+        cmocka_unit_test_setup(test_token_id_printable_accepted, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_18_accepted,      per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_19_decimals_error, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_int8_floor_decimals_error, per_test_setup),
+        cmocka_unit_test_setup(test_amount_exponent_below_int8_floor_cbor_error, per_test_setup),
+        cmocka_unit_test_setup(test_cbor_total_zero,         per_test_setup),
+        cmocka_unit_test_setup(test_cbor_total_one,          per_test_setup),
+        cmocka_unit_test_setup(test_cbor_total_512,          per_test_setup),
+        cmocka_unit_test_setup(test_cbor_total_513,          per_test_setup),
+        cmocka_unit_test_setup(test_cont_exact_split,        per_test_setup),
+        cmocka_unit_test_setup(test_cont_empty_chunk,        per_test_setup),
+        cmocka_unit_test_setup(test_cont_overflow_by_one,    per_test_setup),
+        cmocka_unit_test_setup(test_state_cont_before_init,  per_test_setup),
+        cmocka_unit_test_setup(test_state_double_init_resets, per_test_setup),
+        cmocka_unit_test_setup(test_state_p1_invalid,        per_test_setup),
+    };
+    return cmocka_run_group_tests(tests, NULL, NULL);
+}

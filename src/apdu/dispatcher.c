@@ -29,6 +29,7 @@
 #include "sign_transfer_with_memo.h"
 #include "sign_transfer_with_schedule.h"
 #include "sign_transfer_with_schedule_and_memo.h"
+#include "sign_plt.h"
 #include "sign_update_credential.h"
 #include "update_contract.h"
 #include "verify_address.h"
@@ -220,6 +221,18 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
             }
             handle_update_contract(cmd, isInitialCall);
+            break;
+        /* PLT (Protocol Level Token) clear-signing flow: INIT then one or more CONT chunks.
+         * The whole CIS-7 payload is decoded and shown before the signature is produced
+         * (doc/ins_sign_plt.md), so this is not blind signing and the settings flag
+         * EMBEDDED.instructions.md requires for that does not apply.
+         * CONT (P1=0x01) with Lc=0 is allowed through so the handler can return the
+         * protocol-correct ERROR_PLT_CBOR_ERROR; only INIT (P1=0x00) requires data. */
+        case INS_SIGN_PLT:
+            if (!cmd->data && cmd->p1 != 0x01) {
+                return io_send_sw(SWO_WRONG_DATA_LENGTH);
+            }
+            handle_sign_plt(cmd, flags, isInitialCall);
             break;
         case INS_APP_VERSION:
             if (cmd->data != NULL) {

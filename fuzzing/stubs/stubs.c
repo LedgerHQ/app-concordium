@@ -563,6 +563,10 @@ void uiUpdateContractDisplay(void)                        { fuzz_park(FUZZ_UI_SI
 
 void uiVerifyAddress(volatile unsigned int *flags)        { (void)flags; fuzz_park(FUZZ_UI_CONFIRM_ONLY); }
 
+/* PLT ends on the shared sign/decline step (ux_sign_flow_shared_sign / review_choice_sign),
+ * so it parks as an ordinary signing review and resumes via buildAndSignTransactionHash. */
+void startPltDisplay(volatile unsigned int *flags)        { (void)flags; fuzz_park(FUZZ_UI_SIGN_TRANSACTION); }
+
 /* ──────────────────────────────────────────────────────────────────────
  * Answering a parked review screen (finding V-102)
  *

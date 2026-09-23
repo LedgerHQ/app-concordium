@@ -23,18 +23,15 @@ jobs:
     steps:
       - name: Clone
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
-
-      - name: Clone SDK
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
-          repository: ledgerHQ/ledger-secure-sdk
-          path: sdk
+          # deps/tinycbor is a submodule and cbor_data_blob.c parses through it, so a checkout
+          # without it fails CMake outright. actions/checkout defaults to submodules: false.
+          submodules: true
 
       - name: Build unit tests
         run: |
           cd unit-tests/
-          export BOLOS_SDK=../sdk
-          cmake -Bbuild -H. && make -C build && make -C build test
+          cmake -Bbuild -H. && make -C build && CTEST_OUTPUT_ON_FAILURE=1 make -C build test
 
       - name: Generate code coverage
         run: |

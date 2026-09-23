@@ -119,6 +119,7 @@ class InsType(IntEnum):
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
     REGISTER_DATA = 0x35
     EXPORT_PRIVATE_KEY_NEW = 0x37
+    SIGN_PLT = 0x27
     GET_APP_VERSION = 0x40
 
 
@@ -362,6 +363,20 @@ class CommandSender:
             p1=P1.P1_INITIAL_SCHEDULED_TRANSFER_WITH_MEMO,
             p2=p2,
             data=data,
+        )
+
+    def sign_tx_with_schedule_and_memo_memo_chunk(self, memo_chunk: bytes) -> RAPDU:
+        """One memo frame, synchronously.
+
+        Only the frame that completes the memo opens the review; an earlier one answers
+        0x9000 straight away, so it cannot go through the async part_2 below.
+        """
+        return self.backend.exchange(
+            cla=CLA,
+            ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
+            p1=P1.P1_MEMO_SCHEDULED_TRANSFER,
+            p2=P2.P2_NONE,
+            data=memo_chunk,
         )
 
     @contextmanager
@@ -1345,6 +1360,101 @@ class CommandSender:
             p1=P1.P1_REGISTER_DATA_PAYLOAD,
             p2=P2.P2_NONE,
             data=last_chunk,
+        ) as response:
+            yield response
+
+    def sign_plt_init(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_total_length: int,
+        kind: int = 0x1B,
+        display_fee_microccd: Optional[int] = None,
+    ) -> RAPDU:
+        """Send PLT INIT frame (P1=0x00).
+
+        If display_fee_microccd is given, P2=0x01 is used and the fee is appended as an
+        8-byte big-endian uint64 suffix (not hashed). Pass FEE_OMIT (0xFFFFFFFFFFFFFFFF)
+        to suppress the fee line while still using P2=0x01.
+        Returns raw RAPDU (caller checks status).
+        """
+        data = pack_derivation_path(path)
+        data += header_60
+        data += bytes([kind])
+        data += len(token_id).to_bytes(1, byteorder="big")
+        data += token_id
+        data += cbor_total_length.to_bytes(4, byteorder="big")
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=p2, data=data
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt_cont(self, chunk: bytes) -> RAPDU:
+        """Send one PLT CONT frame (P1=0x01). Returns raw RAPDU (caller checks status)."""
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
+    ) -> RAPDU:
+        """Full PLT signing flow: INIT + one or more CONT frames.
+
+        Returns the RAPDU from the last CONT frame, which carries the 64-byte signature.
+        Raises ExceptionRAPDU if any intermediate frame returns a non-success status.
+        """
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        return resp
+
+    @contextmanager
+    def sign_plt_with_ui(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
+    ) -> Generator[None, None, None]:
+        """PLT signing flow for UI tests: INIT + intermediate CONTs synchronous,
+        final CONT via exchange_async (caller navigates inside the with-block)."""
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks[:-1]:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        with self.backend.exchange_async(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunks[-1]
         ) as response:
             yield response
 

@@ -1524,4 +1524,73 @@ void uiInitContractDisplay(void) {
                        review_choice_sign);
 }
 
+/* PLT (Protocol Level Token) signing — INS 0x27 */
+
+void startPltDisplay(volatile unsigned int *flags) {
+    signPltContext_t *plt = &global.signPlt;
+    uint8_t n = 0;
+
+    /* PLT is an account transaction (kind 27), so it opens with the same header rows as every
+     * other one: sender, the signed energy ceiling and the network. This used to write the
+     * sender row by hand and show only the host's "Max fees" estimate, which sits outside the
+     * transaction hash - so the one cost bound the signature commits to was never displayed
+     * (V-001, V-084), and neither was the network, which the identically-encoded mainnet and
+     * testnet addresses on screen cannot convey (V-057, V-093, V-095). */
+    n = addAccountHeaderPairs(n, "Sender");
+
+    pairs[n].item = "Token";
+    pairs[n].value = (char *) plt->tokenId;
+    n++;
+
+    pairs[n].item = "Operation";
+    pairs[n].value = plt->displayOp;
+    n++;
+
+    if (plt->opType == PLT_OP_TRANSFER || plt->opType == PLT_OP_MINT ||
+        plt->opType == PLT_OP_BURN) {
+        pairs[n].item = "Amount";
+        pairs[n].value = plt->displayAmount;
+        n++;
+    }
+
+    if (plt->opType == PLT_OP_TRANSFER) {
+        pairs[n].item = "Recipient";
+        pairs[n].value = plt->displayAddress;
+        n++;
+        if (plt->hasMemo) {
+            pairs[n].item = "Memo";
+            pairs[n].value = plt->displayMemo;
+            n++;
+        }
+    } else if (plt->opType == PLT_OP_ADD_ALLOW_LIST || plt->opType == PLT_OP_REM_ALLOW_LIST ||
+               plt->opType == PLT_OP_ADD_DENY_LIST || plt->opType == PLT_OP_REM_DENY_LIST) {
+        pairs[n].item = "Target";
+        pairs[n].value = plt->displayAddress;
+        n++;
+    }
+
+    if (plt->hasFeeDisplay) {
+        pairs[n].item = "Max fees (est.)";
+        pairs[n].value = plt->displayFee;
+        n++;
+    }
+
+    static nbgl_contentTagValueList_t content;
+    content.nbPairs = n;
+    content.pairs = pairs;
+    content.smallCaseForValue = false;
+    content.nbMaxLinesForValue = 0;
+    content.startIndex = 0;
+    content.wrapping = false;
+
+    nbgl_useCaseReview(TYPE_TRANSACTION,
+                       &content,
+                       &ICON_APP_HOME,
+                       "Review PLT transaction",
+                       NULL,
+                       "Sign PLT transaction",
+                       review_choice_sign);
+    *flags |= IO_ASYNCH_REPLY;
+}
+
 #endif

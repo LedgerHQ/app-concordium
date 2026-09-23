@@ -60,11 +60,16 @@ endif()
 #           set_trusted_name.c (stubbed), apdu_response.c (stubbed),
 #           display_bagl.c / display_nbgl.c (stubbed).
 # ---------------------------------------------------------------------------
+set(TINYCBOR_SRC ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src/cborparser.c)
+# cborparser.c uses intentional fall-throughs; suppress only for this file.
+set_source_files_properties(${TINYCBOR_SRC} PROPERTIES COMPILE_FLAGS "-Wno-implicit-fallthrough")
+
 set(SHARED_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs/stubs.c
     ${LEDGER_SDK}/lib_standard_app/format.c
     ${APP_SRC}/helpers/base58check.c
     ${APP_SRC}/helpers/cbor_data_blob.c
+    ${TINYCBOR_SRC}
     ${APP_SRC}/helpers/derivation_path.c
     ${APP_SRC}/helpers/display_text.c
     ${APP_SRC}/helpers/fee_display.c
@@ -89,6 +94,7 @@ set(FUZZ_INCLUDE_DIRS
     ${APP_SRC}/apdu
     ${APP_SRC}/ui
     ${LEDGER_SDK}/lib_standard_app
+    ${CMAKE_CURRENT_SOURCE_DIR}/../deps/tinycbor/src
 )
 
 # ---------------------------------------------------------------------------
@@ -180,6 +186,10 @@ add_fuzz_target(standalone_init_contract_fuzzer
 add_fuzz_target(standalone_update_contract_fuzzer
     ${APP_SRC}/handler/update_contract.c)
 
+# base58check.c, derivation_path.c and tx_hash.c are already in SHARED_SOURCES.
+add_fuzz_target(standalone_sign_plt_fuzzer
+    ${APP_SRC}/handler/sign_plt.c)
+
 # ---------------------------------------------------------------------------
 # Raw-APDU target: the SDK's real parser plus the app's real dispatcher (finding V-096).
 #
@@ -204,6 +214,7 @@ add_fuzz_target(standalone_apdu_dispatch_fuzzer
     ${APP_SRC}/handler/sign_configure_baker.c
     ${APP_SRC}/handler/sign_configure_delegation.c
     ${APP_SRC}/handler/sign_credential_deployment.c
+    ${APP_SRC}/handler/sign_plt.c
     ${APP_SRC}/handler/sign_public_information_for_ip.c
     ${APP_SRC}/handler/sign_register_data.c
     ${APP_SRC}/handler/sign_transfer.c
