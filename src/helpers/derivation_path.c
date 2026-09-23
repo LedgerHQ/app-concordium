@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "numberHelpers.h"
 
+#include <assert.h>  // _Static_assert
 #include <stddef.h>
 #include <string.h>
 #include <exceptions.h>
@@ -51,8 +52,14 @@ void parse_derivation_path_new(uint8_t lc,
     size_t offset = 0;
     uint32_t identity_provider = 0;
     offset = read_u32_be(cdata, offset, &identity_provider);
+    if ((identity_provider & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     uint32_t identity = 0;
     offset = read_u32_be(cdata, offset, &identity);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset = read_u32_be(cdata, offset, cred_counter_out);
     check_lc(lc, offset);
 
@@ -77,6 +84,9 @@ void parse_derivation_path_legacy(uint8_t lc,
     size_t offset = 0;
     uint32_t identity;
     offset = read_u32_be(cdata, offset, &identity);
+    if ((identity & HARDENED_BIT) != 0) {
+        THROW(ERROR_INVALID_PATH);
+    }
     offset = read_u32_be(cdata, offset, cred_counter_out);
     check_lc(lc, offset);
 
@@ -107,6 +117,86 @@ void detect_derivation_path_variant(derivation_path_t *derivation_path) {
     }
 }
 
+derivation_path_network_t derivation_path_network(const derivation_path_t *derivation_path) {
+    if (derivation_path->len == 0) {
+        return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+    uint32_t purpose = derivation_path->nodes[0] & ~HARDENED_BIT;
+    if (purpose == LEGACY_PURPOSE) {
+        return DERIVATION_PATH_NETWORK_LEGACY;
+    }
+    /* Only the BIP-44 subtree carries a network node, and it is node 1. */
+    if (purpose != NEW_PURPOSE || derivation_path->len < 2) {
+        return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+    switch (derivation_path->nodes[1] & ~HARDENED_BIT) {
+        case NEW_MAINNET_COIN_TYPE:
+            return DERIVATION_PATH_NETWORK_MAINNET;
+        case NEW_TESTNET_COIN_TYPE:
+            return DERIVATION_PATH_NETWORK_TESTNET;
+        default:
+            return DERIVATION_PATH_NETWORK_UNKNOWN;
+    }
+}
+
+void path_display_network(uint8_t *dst,
+                          size_t dstLength,
+                          const derivation_path_t *derivation_path) {
+    _Static_assert(sizeof(NETWORK_DISPLAY_MAINNET) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_TESTNET) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_LEGACY) <= NETWORK_DISPLAY_SIZE &&
+                       sizeof(NETWORK_DISPLAY_UNKNOWN) <= NETWORK_DISPLAY_SIZE,
+                   "Every network label must fit NETWORK_DISPLAY_SIZE");
+    if (dstLength == 0) {
+        return;
+    }
+    const char *label;
+    switch (derivation_path_network(derivation_path)) {
+        case DERIVATION_PATH_NETWORK_MAINNET:
+            label = NETWORK_DISPLAY_MAINNET;
+            break;
+        case DERIVATION_PATH_NETWORK_TESTNET:
+            label = NETWORK_DISPLAY_TESTNET;
+            break;
+        case DERIVATION_PATH_NETWORK_LEGACY:
+            label = NETWORK_DISPLAY_LEGACY;
+            break;
+        default:
+            label = NETWORK_DISPLAY_UNKNOWN;
+            break;
+    }
+    size_t length = strlen(label);
+    if (length >= dstLength) {
+        /* Unreachable while every label fits NETWORK_DISPLAY_SIZE (asserted above); truncate
+         * rather than overflow if a label or a buffer is ever resized. */
+        length = dstLength - 1;
+    }
+    explicit_bzero(dst, dstLength);
+    memmove(dst, label, length);
+    dst[length] = '\0';
+}
+
+/**
+ * Reject the one path shape whose raw Ed25519 private key is exportable to the host.
+ *
+ * INS_EXPORT_PRIVATE_KEY_NEW returns the raw extended Ed25519 key for commitment randomness at
+ * m/44'/coin'/idp'/identity'/5'/account'. Signing with that same path would make the exported key
+ * a usable signing key, so this shape must never reach a signing or public-key sink.
+ *
+ * Deliberately narrow: node 4 of a five-node new-format path is the account index, not a key role,
+ * so accounts 2-5 are legitimate signing paths and are not rejected here. The other export roles
+ * (2/3/4) are exported as BLS keys derived one-way from the Ed25519 key, which does not disclose
+ * the signing key.
+ */
+static void reject_exportable_signing_path(const derivation_path_t *dp) {
+    if (dp->variant != DERIVATION_PATH_VARIANT_NEW || dp->len != DERIVATION_PATH_NEW_LEN + 1) {
+        return;
+    }
+    if ((dp->nodes[PATH_INDEX_ACCOUNT_NEW] & ~HARDENED_BIT) == NEW_COMMITMENT_RANDOMNESS) {
+        THROW(ERROR_INVALID_PATH);
+    }
+}
+
 size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength) {
     derivation_path_t *dp = &global_derivation_path;
     init_derivation_path(dp);
@@ -117,6 +207,7 @@ size_t parse_derivation_path(uint8_t *cdata, uint8_t dataLength) {
     /* All nodes are hardened for crypto; UI that needs indices must unharden_derivation_path first.
      */
     harden_derivation_path(dp);
+    reject_exportable_signing_path(dp);
     return consumed;
 }
 
@@ -131,6 +222,37 @@ void path_display_legacy(uint8_t *dst,
     memmove(dst + offset, "/", 1);
     offset += 1;
     bin_to_dec(dst + offset, dstLength - offset, accountIndex);
+}
+
+void path_display_full(uint8_t *dst, size_t dstLength, const derivation_path_t *derivation_path) {
+    if (dstLength == 0) {
+        return;
+    }
+    explicit_bzero(dst, dstLength);
+
+    /* Worst case is DERIVATION_PATH_NODES_MAX nodes of "4294967295'" plus a separator each, so
+     * VERIFY_ADDRESS_PATH_DISPLAY_SIZE always fits; the bounds checks below only keep a smaller
+     * caller buffer from overflowing. */
+    size_t offset = 0;
+    for (size_t i = 0; i < derivation_path->len; i++) {
+        if (i > 0) {
+            if (offset + 1 >= dstLength) {
+                return;
+            }
+            dst[offset] = '/';
+            offset += 1;
+        }
+        /* Every node is hardened before key derivation, so every node is shown hardened. */
+        offset += number_to_text(dst + offset,
+                                 dstLength - offset,
+                                 derivation_path->nodes[i] & ~HARDENED_BIT);
+        if (offset + 1 >= dstLength) {
+            return;
+        }
+        dst[offset] = '\'';
+        offset += 1;
+    }
+    dst[offset] = '\0';
 }
 
 void path_display_new(uint8_t *dst,

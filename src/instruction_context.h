@@ -23,7 +23,7 @@
 
 #define MAX_KEYS_TO_EXPORT 3
 
-#define LENGTH_AND_PRIVATE_KEY_SIZE 33  // 1 byte for length, 32 bytes for private key
+#define LENGTH_AND_PRIVATE_KEY_SIZE 65  // 1 byte for length, up to 64 bytes for exported key data
 
 #define ACCOUNT_SUBTREE 0
 #define NORMAL_ACCOUNTS 0
@@ -43,7 +43,9 @@
 #define P2_MAINNET 0x00
 #define P2_TESTNET 0x01
 
-#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       41
+// Holds "<operation> <verb>" / "<action>\n<verb>" composed at display time, so it must fit the
+// longest operation string plus a separator plus the longest verb plus a terminator.
+#define EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN       48
 #define EXPORT_PRIVATE_KEY_REVIEW_OPERATION_LEN 17
 #define EXPORT_PRIVATE_KEY_SIGN_OPERATION_LEN   15
 #define EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN     15
@@ -81,14 +83,18 @@ typedef struct {
 } signRegisterData_t;
 
 typedef struct {
-    uint32_t cborLength;
-    uint32_t displayUsed;
-    uint8_t display[COMMON_DISPLAY_SIZE];
-    uint8_t majorType;
+    uint16_t cborLength;                        // remaining bytes to receive (counts down)
+    uint8_t cborBuf[MAX_CBOR_BLOB_SIZE];        // raw CBOR accumulation buffer
+    uint16_t cborBufLen;                        // bytes written into cborBuf so far
+    uint8_t displayLen;                         // decoded text length; 0 for integer types
+    uint8_t display[MAX_CBOR_STRING_SIZE + 1];  // decoded text or NUL-terminated decimal
+    /** Major type in words, so a numeric value and a text value cannot review identically. */
+    char typeLabel[CBOR_TYPE_LABEL_SIZE];
 } cborContext_t;
 
 typedef enum {
     TX_TRANSFER_WITH_SCHEDULE_INITIAL = 28,
+    TX_TRANSFER_WITH_SCHEDULE_AWAITING_INITIAL_CONFIRM = 30,
     TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS = 29,
     TX_TRANSFER_WITH_SCHEDULE_MEMO_START = 55,
     TX_TRANSFER_WITH_SCHEDULE_MEMO = 56,
@@ -131,6 +137,9 @@ typedef struct {
     uint8_t sourceHash[COMMON_HASH_SIZE];
     char sourceHashDisplay[COMMON_HASH_SIZE * 2 + 1];
     char versionDisplay[11];
+    /** Digest of the module source as it streams, so the code being deployed is represented on
+     * the signing screen instead of only its length. */
+    cx_sha256_t sourceHashCtx;
 } deployModule_t;
 
 typedef enum {
@@ -151,6 +160,16 @@ typedef struct {
     uint32_t remainingNameLength;
     uint32_t paramsLength;
     uint32_t remainingParamsLength;
+    /** Contract name and a digest of the parameters. Both are hashed into the signed
+     * transaction, so both must be represented on the approval screen. Parameters are arbitrary
+     * binary of up to 64 KiB, so only a digest can honestly represent them. */
+    char nameDisplay[CONTRACT_NAME_SIZE];
+    /** Name bytes retained in `nameDisplay` so far. Counted rather than recovered with strlen:
+     * the two agree only while the text holds no NUL, and a name carrying one is exactly the
+     * case that must not silently rewind the write cursor. */
+    uint32_t nameDisplayUsed;
+    char paramsHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t paramsHashCtx;
     initContractState_t state;
 } initContract_t;
 
@@ -173,6 +192,16 @@ typedef struct {
     uint32_t remainingNameLength;
     uint32_t paramsLength;
     uint32_t remainingParamsLength;
+    /** Contract name and a digest of the parameters. Both are hashed into the signed
+     * transaction, so both must be represented on the approval screen. Parameters are arbitrary
+     * binary of up to 64 KiB, so only a digest can honestly represent them. */
+    char nameDisplay[CONTRACT_NAME_SIZE];
+    /** Name bytes retained in `nameDisplay` so far. Counted rather than recovered with strlen:
+     * the two agree only while the text holds no NUL, and a name carrying one is exactly the
+     * case that must not silently rewind the write cursor. */
+    uint32_t nameDisplayUsed;
+    char paramsHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t paramsHashCtx;
     updateContractState_t state;
 } updateContract_t;
 
@@ -189,17 +218,41 @@ typedef struct {
     uint8_t display_credid_title[EXPORT_PRIVATE_KEY_CREDID_TITLE_LEN];
     uint8_t display_credid[EXPORT_PRIVATE_KEY_CREDID_LEN];
     uint8_t display_sign[EXPORT_PRIVATE_KEY_TITLE_BUFF_LEN];
+    /** The P2-selected detail the user must see before secrets leave the device: the network for
+     * INS 0x37, the key format for INS 0x05. */
+    uint8_t display_detail_title[EXPORT_DETAIL_TITLE_SIZE];
+    uint8_t display_detail[EXPORT_DETAIL_SIZE];
+    /** Which key types the selected purpose releases, so consent is informed. */
+    uint8_t display_key_types[EXPORT_KEY_TYPES_SIZE];
     bool exportBoth;
     bool exportSeed;
     bool isNewPath;
+    /** Non-secret INS 0x37 request parameters, retained so that the private material is only
+     * derived in the approval callback and never exists in RAM during the review. */
+    uint8_t newPathPurpose;
+    uint8_t newPathNetwork;
+    uint32_t newPathIdentityProvider;
+    uint32_t newPathIdentity;
+    uint32_t newPathAccount;
     uint8_t outputPrivateKeys[MAX_KEYS_TO_EXPORT * LENGTH_AND_PRIVATE_KEY_SIZE];
     uint8_t privateKeysLength;
 } exportPrivateKeyContext_t;
 
 typedef struct {
-    uint8_t display[21];
-    /** Without trusted descriptor: path-derived base58. With PKI descriptor: tag 0x20 UTF-8 (cert).
-     */
+    /** Row label for `display`: "Identity" for the compact P1 formats, "Derivation path" for the
+     * full-path format, whose review shows the path itself. */
+    uint8_t display_label[VERIFY_ADDRESS_LABEL_SIZE];
+    /** Compact formats: "idp/identity/counter". Full-path format: every node of the path, because
+     * every node feeds key derivation and a hidden suffix would otherwise change the address
+     * behind an unchanged label. */
+    uint8_t display[VERIFY_ADDRESS_PATH_DISPLAY_SIZE];
+    /** Network the reviewed path commits to. Host-chosen (P2, or the coin-type node of a full
+     * path) and it changes the derived key, so it is part of the review. */
+    uint8_t network[NETWORK_DISPLAY_SIZE];
+    /** Base58 account address shown on the review. Derived on-device from the reviewed path and
+     * credential counter, except in the full-path trusted-name lane, where the signing path's own
+     * key binds the descriptor to the account and the certified address is shown instead (see
+     * pki_bind_descriptor). */
     char address[TRUSTED_NAME_MAX_LEN + 1];
 } verifyAddressContext_t;
 
@@ -232,7 +285,13 @@ typedef enum {
     TX_CREDENTIAL_DEPLOYMENT_ATTRIBUTE_VALUE = 11,
     TX_CREDENTIAL_DEPLOYMENT_LENGTH_OF_PROOFS = 12,
     TX_CREDENTIAL_DEPLOYMENT_PROOFS = 13,
-    TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING = 14
+    TX_CREDENTIAL_DEPLOYMENT_NEW_OR_EXISTING = 14,
+    /**
+     * A verification key is on screen and the user has not accepted it yet. No key packet is
+     * accepted in this state, so a further key cannot overwrite the one being reviewed; only
+     * the approval callback leaves it.
+     */
+    TX_CREDENTIAL_DEPLOYMENT_AWAITING_VERIFICATION_KEY_CONFIRM = 15
 } protocolState_t;
 
 typedef enum {
@@ -264,6 +323,15 @@ typedef struct {
     char identityProviderIndex[4 * 2 + 1];
     char arIdentity[4 * 2 + 1];
     char encIdCredPubShare[96 * 2 + 1];
+    /**
+     * Digest of the whole anonymity-revoker list, in the order it was received.
+     *
+     * Each AR packet overwrites arIdentity/encIdCredPubShare above, so a list longer than one
+     * entry left the review showing only the last pair while the signature covered them all.
+     * The review shows this digest instead; the count is already on the "AR threshold" row.
+     */
+    char arListHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t arListHashCtx;
 
     uint8_t validTo[COMMON_TIMESTAMP_SIZE];
     uint8_t createdAt[COMMON_TIMESTAMP_SIZE];
@@ -272,6 +340,11 @@ typedef struct {
 
     cx_sha256_t attributeHash;
     uint8_t attributeValueLength;
+    /** Revealed identity attribute currently under review. The value length is host-supplied as a
+     * uint8, so the buffer holds the largest possible value plus a NUL terminator and never
+     * truncates. */
+    char attributeName[ATTRIBUTE_NAME_SIZE];
+    char attributeValue[ATTRIBUTE_VALUE_SIZE];
 
     uint32_t proofLength;
     uint8_t accountAddress[57];
@@ -301,7 +374,14 @@ typedef enum {
     CONFIGURE_BAKER_URL = 64,
     CONFIGURE_BAKER_COMMISSION_RATES = 65,
     CONFIGURE_BAKER_SUSPENDED = 66,
-    CONFIGURE_BAKER_END = 67
+    CONFIGURE_BAKER_END = 67,
+    /**
+     * A stage of this transaction is on screen and the user has not accepted it yet. No packet
+     * matches this state, so a host cannot push a later stage into the transaction while an
+     * earlier one is still being reviewed; only the approval callback leaves it, resuming at
+     * `pendingState`.
+     */
+    CONFIGURE_BAKER_AWAITING_CONFIRM = 68
 } configureBakerState_t;
 
 typedef struct {
@@ -341,7 +421,21 @@ typedef struct {
         uint8_t suspended[18];
     };
 
+    /**
+     * Digest of the three validator verification keys, which are hashed into the signed
+     * transaction but are 160 bytes in total and so cannot be compared on-device as raw hex.
+     * Kept outside the union above: it is shown on the same screen as the capital fields.
+     *
+     * Covers only the keys, not their proofs. The proofs carry fresh randomness per
+     * transaction, so including them would change the digest on every attempt and leave the
+     * user nothing stable to compare against their validator credentials.
+     */
+    char keysHashDisplay[HASH_DISPLAY_SIZE];
+    cx_sha256_t keysHashCtx;
+
     configureBakerState_t state;
+    /** Stage to resume at once the review parked by CONFIGURE_BAKER_AWAITING_CONFIRM is taken. */
+    configureBakerState_t pendingState;
 } signConfigureBaker_t;
 
 typedef struct {
@@ -353,6 +447,50 @@ typedef struct {
     bool hasRestakeEarnings;
     bool hasDelegationTarget;
 } signConfigureDelegationContext_t;
+
+/* ----- PLT (Protocol Level Token) signing context (INS 0x27) ----- */
+
+typedef enum {
+    TX_PLT_INITIAL = 80,
+    TX_PLT_CBOR = 81,
+} pltState_t;
+
+/* CIS-7 §4 operation kinds (single-op per transaction enforced by the app). */
+typedef enum {
+    PLT_OP_TRANSFER = 0,
+    PLT_OP_MINT = 1,
+    PLT_OP_BURN = 2,
+    PLT_OP_ADD_ALLOW_LIST = 3,
+    PLT_OP_REM_ALLOW_LIST = 4,
+    PLT_OP_ADD_DENY_LIST = 5,
+    PLT_OP_REM_DENY_LIST = 6,
+    PLT_OP_PAUSE = 7,
+    PLT_OP_UNPAUSE = 8,
+} pltOpType_t;
+
+typedef struct {
+    pltState_t state;
+    uint32_t cborTotalLength;
+    uint32_t cborReceived;
+    uint8_t tokenId[PLT_TOKEN_ID_MAX + 1]; /* +1 for NUL terminator, used directly in display */
+    uint8_t tokenIdLength;
+    uint8_t cborBuf[APP_PLT_CBOR_MAX];
+
+    /* Parsed from CBOR — valid after cborReceived == cborTotalLength: */
+    pltOpType_t opType;
+    uint64_t amountSignificand;      /* tag-4 significand; used for transfer/mint/burn */
+    int8_t amountExponent;           /* tag-4 exponent (≤ 0); absolute value = decimal places */
+    uint8_t address[ADDRESS_LENGTH]; /* recipient (transfer) or target (allow/deny list ops) */
+    bool hasMemo;                    /* transfer only */
+
+    /* Formatted display strings (NUL-terminated, filled by format_plt_display): */
+    char displayOp[PLT_OP_LABEL_SIZE];           /* e.g. "Transfer", "Add to allow list" */
+    char displayAmount[PLT_AMOUNT_DISPLAY_SIZE]; /* e.g. "1.500000 UPEU" */
+    char displayAddress[COMMON_ADDRESS_SIZE];    /* base58check, 55 chars + NUL */
+    char displayMemo[PLT_MEMO_DISPLAY_SIZE];     /* decoded tag-24 CBOR text, NUL-terminated */
+    char displayFee[COMMON_AMOUNT_DISPLAY_SIZE]; /* µCCD fee, e.g. "0.001 CCD"; empty if absent */
+    bool hasFeeDisplay;                          /* true if host sent a fee suffix in INIT */
+} signPltContext_t;
 
 typedef struct trustedNameMultiHashCtx_s {
     cx_sha256_t sha256;
@@ -373,6 +511,11 @@ typedef struct trustedNameTlvExtracted_s {
     buffer_t address;
     uint64_t chain_id;
     uint64_t challenge;
+    /** Tag 0x10 semver cutoff: the app version after which the backend revokes the descriptor.
+     * Meaningful only when CCD_TAG_NOT_VALID_AFTER is in `received_tags`. */
+    uint8_t not_valid_after_major;
+    uint8_t not_valid_after_minor;
+    uint16_t not_valid_after_patch;
     uint16_t signer_key_id;
     uint8_t signer_algo;
     buffer_t signature;
@@ -382,6 +525,36 @@ typedef struct trustedNamePkiContext_s {
     trustedNameMultiHashCtx_t hash_ctx;
     trustedNameTlvExtracted_t tlv;
 } trustedNamePkiContext_t;
+
+/* ----- ABI guards -----
+ *
+ * The device build compiles with -fshort-enums and -funsigned-char (SDK Makefile.defines), so
+ * every state enum below is one byte there. The host fuzz build has to use the same flags: a
+ * four-byte enum shifts every offset inside `global`, changes the union's size and padding, and
+ * leaves the fuzzers exercising a layout the device never runs. These assertions fail the build
+ * if either side loses the flags.
+ */
+_Static_assert(sizeof(simpleTransferState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(registerDataState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(transferWithScheduleState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(protocolState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(configureBakerState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(initContractState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateContractState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(publicInfoForIpState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(updateCredentialState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(transferToPublicState_t) == 1,
+               "state enums must be byte-sized (-fshort-enums)");
+_Static_assert(sizeof(pltState_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+/* Not a state enum, but stored in signPltContext_t, so it moves offsets the same way. */
+_Static_assert(sizeof(pltOpType_t) == 1, "state enums must be byte-sized (-fshort-enums)");
+_Static_assert((char) 0xFF > 0, "char must be unsigned (-funsigned-char)");
 
 /* ----- Union ----- */
 
@@ -401,6 +574,7 @@ typedef union {
     updateContract_t updateContract;
     transactionWithDataBlob_t withDataBlob;
     trustedNamePkiContext_t trustedNamePki;
+    signPltContext_t signPlt;
 } instructionContext;
 
 /** Instruction-scoped union; storage in `globals.c`. */

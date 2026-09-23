@@ -21,7 +21,7 @@ def test_export_standard_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -42,7 +42,7 @@ def test_export_recovery_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -65,7 +65,7 @@ def test_export_prfkey_and_idcredsed_private_key_legacy_path(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -91,7 +91,7 @@ def test_export_identity_credential_creation_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -115,7 +115,7 @@ def test_export_identity_credential_creation_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -139,16 +139,16 @@ def test_export_account_creation_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 3
+    assert len(result.data) == 33 * 2 + 65
     assert result.data == bytes.fromhex(
-        "200dd6831a46dd093b21fe43bdd01b7ede216d5689ff12143d7d4ceb77d16041bb2020348347485688f67ce7256353549ae2bd986b8b9306f8ed78732fb5426c5e8920d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e00"
+        "200dd6831a46dd093b21fe43bdd01b7ede216d5689ff12143d7d4ceb77d16041bb2020348347485688f67ce7256353549ae2bd986b8b9306f8ed78732fb5426c5e8940d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e0061eeb73df1acfee68b10d26e655e1a563ea4919e4b69a6e2ec255483d1e9826e"
     )
 
 
@@ -163,16 +163,16 @@ def test_export_account_creation_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 3
+    assert len(result.data) == 33 * 2 + 65
     assert result.data == bytes.fromhex(
-        "20336bfcd76a6e0756ee5b0f4a6d3434092d68eb38921aac96c85e0a4d4b6d9b592053db453318231b1a43497551677cf23652ff306fc1d2e1f1cb5cd42ff680b126206b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce"
+        "20336bfcd76a6e0756ee5b0f4a6d3434092d68eb38921aac96c85e0a4d4b6d9b592053db453318231b1a43497551677cf23652ff306fc1d2e1f1cb5cd42ff680b126406b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce6afaca787b11f89dee5958945450760d0753a7428ed5c656bed22e98d6b23610"
     )
 
 
@@ -187,7 +187,7 @@ def test_export_id_recovery_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -211,7 +211,7 @@ def test_export_id_recovery_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -235,7 +235,7 @@ def test_export_account_credential_discovery_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -259,7 +259,7 @@ def test_export_account_credential_discovery_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
@@ -287,16 +287,16 @@ def test_export_creation_of_zk_proof_private_key_new_path_mainnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 1
+    assert len(result.data) == 65 * 1
     assert result.data == bytes.fromhex(
-        "20d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e00"
+        "40d9d1f46a11fe0ed8279e1406ab5b9f49584996c8112be5884ddd8adebe7b3e0061eeb73df1acfee68b10d26e655e1a563ea4919e4b69a6e2ec255483d1e9826e"
     )
 
 
@@ -315,14 +315,14 @@ def test_export_creation_of_zk_proof_private_key_new_path_testnet(
         navigate_until_text_and_compare(
             backend,
             navigator,
-            "Sign operation",
+            "Approve export",
             default_screenshot_path,
             test_name,
             screen_change_before_first_instruction=True,
             screen_change_after_last_instruction=True,
         )
     result = client.get_async_response()
-    assert len(result.data) == 33 * 1
+    assert len(result.data) == 65 * 1
     assert result.data == bytes.fromhex(
-        "206b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce"
+        "406b0e171c79a0572999170fbd8593723911005d06d2aaabb8ebc7ec130a4cd5ce6afaca787b11f89dee5958945450760d0753a7428ed5c656bed22e98d6b23610"
     )

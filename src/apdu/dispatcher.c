@@ -8,6 +8,8 @@
 #include <parser.h>
 #include <status_words.h>
 
+#include "apdu/apdu_response.h"
+
 #include "deploy_module.h"
 #include "export_private_key_legacy_path.h"
 #include "export_private_key_new_path.h"
@@ -27,6 +29,7 @@
 #include "sign_transfer_with_memo.h"
 #include "sign_transfer_with_schedule.h"
 #include "sign_transfer_with_schedule_and_memo.h"
+#include "sign_plt.h"
 #include "sign_update_credential.h"
 #include "update_contract.h"
 #include "verify_address.h"
@@ -219,6 +222,18 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             }
             handle_update_contract(cmd, isInitialCall);
             break;
+        /* PLT (Protocol Level Token) clear-signing flow: INIT then one or more CONT chunks.
+         * The whole CIS-7 payload is decoded and shown before the signature is produced
+         * (doc/ins_sign_plt.md), so this is not blind signing and the settings flag
+         * EMBEDDED.instructions.md requires for that does not apply.
+         * CONT (P1=0x01) with Lc=0 is allowed through so the handler can return the
+         * protocol-correct ERROR_PLT_CBOR_ERROR; only INIT (P1=0x00) requires data. */
+        case INS_SIGN_PLT:
+            if (!cmd->data && cmd->p1 != 0x01) {
+                return io_send_sw(SWO_WRONG_DATA_LENGTH);
+            }
+            handle_sign_plt(cmd, flags, isInitialCall);
+            break;
         case INS_APP_VERSION:
             if (cmd->data != NULL) {
                 return io_send_sw(SWO_WRONG_DATA_LENGTH);
@@ -231,7 +246,13 @@ int apdu_dispatcher(const command_t *cmd, volatile unsigned int *flags, bool isI
             global_tx_state.currentInstruction = INSTRUCTION_NONE;
             break;
         default:
-            THROW(SWO_INVALID_INS);
+            /*
+             * app_main() claims currentInstruction from cmd->ins before dispatching, so an
+             * unknown instruction has already opened a flow that no handler will ever close.
+             * send_rejection() releases it along with replying, which a bare THROW did not:
+             * the next legitimate APDU would otherwise be refused by the switching guard above.
+             */
+            send_rejection(SWO_INVALID_INS);
             break;
     }
     return 0;

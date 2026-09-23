@@ -26,23 +26,41 @@ from trusted_name_helper import (
     PKI_KEY_USAGE_TRUSTED_NAME,
     TrustedNameTlvBuilder,
     get_pki_certificate,
+    CCD_SPEC_VERSION,
+    CCD_NAME_TYPE_CONTEXT_ADDRESS,
+    CCD_NAME_SOURCE_DYNAMIC_RESOLVER,
+    CCD_CHAIN_ID_MAINNET,
+    CCD_CHAIN_ID_TESTNET,
 )
+
+SW_INVALID_PATH = 0x6B02
+SW_TRUSTED_NAME_MISMATCH = 0x6B0C
 
 # ── Real Ledger API descriptor sample ─────────────────────────────────────────
 # Source: https://nft.api.live.ledger-test.com/v2/concordium/owner/.../...?network=testnet
 # The signedDescriptor from the API cannot be sent as-is in tests (production signature +
-# fixed challenge). We reuse tag 0x20 display text and TLV metadata; tag 0x22 is the
-# device-derived Ed25519 key for the chosen path, re-signed with the Speculos test PKI key.
+# fixed challenge). We reuse its TLV metadata (version / name type / name source); tag 0x22 is the
+# device-derived Ed25519 key for the chosen path and tag 0x20 the device-derived account address,
+# re-signed with the Speculos test PKI key.
 #
 # The flow uses mainnet derivation (44'/919'/…) and chain_id=0: Speculos GET_PUBLIC_KEY
 # fails with 0x6B07 on testnet coin type 1' for this path (OS/crypto stack), while 919' works.
-REAL_API_DESCRIPTOR_DISPLAY_ADDRESS = (
-    "3g8qKNTvKE5m2Zt7jmS5Fi8ParWiaSzzn5xPhyT31TGTomQPuV"
+REAL_DESCRIPTOR_TLV_VERSION = CCD_SPEC_VERSION
+REAL_DESCRIPTOR_NAME_TYPE = CCD_NAME_TYPE_CONTEXT_ADDRESS  # ccd_context_address
+REAL_DESCRIPTOR_NAME_SOURCE = CCD_NAME_SOURCE_DYNAMIC_RESOLVER  # dynamic_resolver
+REAL_DESCRIPTOR_CHAIN_ID_MAINNET = CCD_CHAIN_ID_MAINNET
+
+# Account address the device derives for m/44'/919'/0'/0'/3' with credential counter 0 on the
+# Speculos default seed. VERIFY_ADDRESS now requires a trusted-name descriptor's tag 0x20 to be
+# exactly this string, so a descriptor issued for another credential counter cannot be shown
+# against this one. To refresh it, run a plain VERIFY_ADDRESS for the same path and read the
+# "Address" row off the review.
+DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0 = (
+    "3E7XtabVDd3XFxpsNh6AQkNao2oB18LyycJPfVZwdyCzDeeRTr"
 )
-REAL_DESCRIPTOR_TLV_VERSION = 0x03
-REAL_DESCRIPTOR_NAME_TYPE = 0x07  # ccd_context_address
-REAL_DESCRIPTOR_NAME_SOURCE = 0x06  # dynamic_resolver
-REAL_DESCRIPTOR_CHAIN_ID_MAINNET = 0
+# Any other syntactically valid Concordium account address; used to show that a descriptor for a
+# different account is refused even though it is correctly signed.
+OTHER_ACCOUNT_ADDRESS = "3g8qKNTvKE5m2Zt7jmS5Fi8ParWiaSzzn5xPhyT31TGTomQPuV"
 
 
 def _concordium_new_account_path_cdata(
@@ -205,7 +223,7 @@ def test_verify_address_trusted_name_full_flow_accepted(
     challenge = int.from_bytes(resp.data, "big")
 
     builder = TrustedNameTlvBuilder(
-        name=REAL_API_DESCRIPTOR_DISPLAY_ADDRESS,
+        name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0,
         address=pubkey,
         chain_id=REAL_DESCRIPTOR_CHAIN_ID_MAINNET,
         challenge=challenge,
@@ -224,3 +242,262 @@ def test_verify_address_trusted_name_full_flow_accepted(
         scenario_navigator.address_review_approve()
 
     assert client.get_async_response().status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_trusted_name_full_path_accepted(
+    backend,
+    scenario_navigator: NavigateWithScenario,
+    test_name: str,
+    default_screenshot_path: str,
+):
+    """PKI → GET_PUBLIC_KEY → GET_CHALLENGE → SET_TRUSTED_NAME → VERIFY_ADDRESS (full path).
+
+    This is the lane Ledger Live actually uses: it addresses an account by its 6-node signing path
+    m/44'/coin'/idp'/identity'/0'/credCounter' rather than the compact idp/identity/counter form.
+    Tag 0x22 is the key of that signing path, so it already names one credential counter and the
+    review shows the certified tag 0x20 address -- no PRF-derived address is involved, which is why
+    the name below is deliberately not an address this device would derive.
+
+    Regression test: the two halves of this flow were each covered (a full path with no descriptor,
+    and a descriptor on a new path) but never together, and the combination always failed 0x6B0C.
+
+    GET_PUBLIC_KEY must run *before* GET_CHALLENGE, for the reason given in
+    test_verify_address_trusted_name_full_flow_accepted.
+    """
+    _requires_speculos_pki(backend)
+    client = CommandSender(backend)
+
+    _load_pki_certificate_only(backend, client)
+
+    HARDENED = 0x80000000
+    # m/44'/919'/0'/0'/0'/0': idp 0, identity 0, account-credential role 0', credential counter 0.
+    # Mainnet coin type because Speculos fails on 1' for these paths (see module header).
+    path_nodes = [
+        HARDENED | 44,
+        HARDENED | 919,
+        HARDENED | 0,
+        HARDENED | 0,
+        HARDENED | 0,
+        HARDENED | 0,
+    ]
+    path_cdata = bytes([len(path_nodes)]) + b"".join(
+        n.to_bytes(4, "big") for n in path_nodes
+    )
+    pubkey = _get_ed25519_pubkey_32(client, path_cdata)
+
+    resp = client.get_challenge()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    assert len(resp.data) == 8
+    challenge = int.from_bytes(resp.data, "big")
+
+    builder = TrustedNameTlvBuilder(
+        name=OTHER_ACCOUNT_ADDRESS,
+        address=pubkey,
+        chain_id=REAL_DESCRIPTOR_CHAIN_ID_MAINNET,
+        challenge=challenge,
+        name_type=REAL_DESCRIPTOR_NAME_TYPE,
+        name_source=REAL_DESCRIPTOR_NAME_SOURCE,
+        version=REAL_DESCRIPTOR_TLV_VERSION,
+    )
+    rapdu = client.set_trusted_name(builder.build_signed())
+    assert rapdu.status == StatusWords.SWO_SUCCESS
+
+    with client.verify_address_full_path(path_nodes):
+        scenario_navigator.address_review_approve()
+
+    assert client.get_async_response().status == StatusWords.SWO_SUCCESS
+
+
+# ── Binding the descriptor to the account under review ───────────────────────
+
+
+def _verify_address_new_path_sw(
+    client: CommandSender,
+    *,
+    idp_index: int,
+    identity_index: int,
+    credential_counter: int,
+    mainnet: bool = True,
+) -> int:
+    """Synchronous VERIFY_ADDRESS (new path); returns the status word without any UI."""
+    data = (
+        idp_index.to_bytes(4, "big")
+        + identity_index.to_bytes(4, "big")
+        + credential_counter.to_bytes(4, "big")
+    )
+    try:
+        rapdu = client.backend.exchange(
+            cla=CLA,
+            ins=InsType.VERIFY_ADDRESS,
+            p1=P1.P1_VERIFY_ADDRESS_NEW_PATH,
+            p2=P2.P2_MAINNET if mainnet else P2.P2_TESTNET,
+            data=data,
+        )
+    except ExceptionRAPDU as e:
+        return e.status
+    return rapdu.status
+
+
+def _verify_address_full_path_sw(client: CommandSender, path_nodes: list[int]) -> int:
+    """Synchronous VERIFY_ADDRESS (full path); returns the status word without any UI."""
+    data = bytes([len(path_nodes)]) + b"".join(n.to_bytes(4, "big") for n in path_nodes)
+    try:
+        rapdu = client.backend.exchange(
+            cla=CLA,
+            ins=InsType.VERIFY_ADDRESS,
+            p1=P1.P1_VERIFY_ADDRESS_FULL_PATH,
+            p2=P2.P2_MAINNET,
+            data=data,
+        )
+    except ExceptionRAPDU as e:
+        return e.status
+    return rapdu.status
+
+
+def _set_trusted_name_for_mainnet_path(
+    backend, client: CommandSender, *, name: str, chain_id: int = CCD_CHAIN_ID_MAINNET
+) -> None:
+    """PKI + GET_PUBLIC_KEY + GET_CHALLENGE + SET_TRUSTED_NAME for m/44'/919'/0'/0'/3'."""
+    _load_pki_certificate_only(backend, client)
+    pubkey = _get_ed25519_pubkey_32(
+        client, _concordium_new_account_path_cdata(0, 0, mainnet=True)
+    )
+    resp = client.get_challenge()
+    assert resp.status == StatusWords.SWO_SUCCESS
+    builder = TrustedNameTlvBuilder(
+        name=name,
+        address=pubkey,
+        chain_id=chain_id,
+        challenge=int.from_bytes(resp.data, "big"),
+        name_type=CCD_NAME_TYPE_CONTEXT_ADDRESS,
+        name_source=CCD_NAME_SOURCE_DYNAMIC_RESOLVER,
+        version=CCD_SPEC_VERSION,
+    )
+    rapdu = client.set_trusted_name(builder.build_signed())
+    assert rapdu.status == StatusWords.SWO_SUCCESS
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_non_signing_full_path_with_descriptor(backend):
+    """A full path must have the signing shape before the descriptor's address is trusted.
+
+    P1 = 0x02 is the host's choice: parse_derivation_path_from_buffer stamps every full path
+    DERIVATION_PATH_VARIANT_FULL without inspecting it. So the 5-node PRF path can be sent down
+    the full-path lane, where the device used to skip bls_compute_address entirely. Tag 0x22
+    then matches -- it is the key of the path under review, and at identity level every
+    credential counter shares it -- and the host's tag 0x20 address would be shown as certified
+    without ever being derived.
+
+    This is the same hole the compact lane refuses in
+    test_verify_address_rejects_descriptor_for_another_credential_counter; the descriptor here is
+    genuine and correctly signed for this very path, which is precisely why only the path shape
+    can catch it.
+    """
+    client = CommandSender(backend)
+    # Descriptor is built over m/44'/919'/0'/0'/3' -- the PRF path, 5 nodes, key role 3'.
+    _set_trusted_name_for_mainnet_path(
+        backend, client, name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0
+    )
+
+    hardened = 0x80000000
+    prf_path_nodes = [
+        hardened | 44,
+        hardened | 919,
+        hardened | 0,
+        hardened | 0,
+        hardened | 3,
+    ]
+    sw = _verify_address_full_path_sw(client, prf_path_nodes)
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_wrong_key_role_full_path_with_descriptor(backend):
+    """Six nodes are not enough: node 4 must be the signing role 0'.
+
+    m/44'/919'/0'/0'/2'/0' has the right length and purpose but selects idCredSec, not the
+    account signing key. Without the node-4 check it would take the trusted lane too.
+    """
+    client = CommandSender(backend)
+    _set_trusted_name_for_mainnet_path(
+        backend, client, name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0
+    )
+
+    hardened = 0x80000000
+    wrong_role_nodes = [
+        hardened | 44,
+        hardened | 919,
+        hardened | 0,
+        hardened | 0,
+        hardened | 2,  # idCredSec role, not the signing role 0'
+        hardened | 0,
+    ]
+    sw = _verify_address_full_path_sw(client, wrong_role_nodes)
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_descriptor_for_another_credential_counter(backend):
+    """Tag 0x22 is identity-level, so it matches every counter under one identity.
+
+    The descriptor is signed for account address A; VERIFY_ADDRESS is then asked to review
+    credential counter 1, whose address is not A. Without the address binding the device would
+    have paired counter 1's path label with counter 0's certified address.
+    """
+    client = CommandSender(backend)
+    _set_trusted_name_for_mainnet_path(
+        backend, client, name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0
+    )
+
+    sw = _verify_address_new_path_sw(
+        client, idp_index=0, identity_index=0, credential_counter=1
+    )
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_descriptor_for_another_account(backend):
+    """A correctly signed descriptor naming a different account address is refused."""
+    client = CommandSender(backend)
+    _set_trusted_name_for_mainnet_path(backend, client, name=OTHER_ACCOUNT_ADDRESS)
+
+    sw = _verify_address_new_path_sw(
+        client, idp_index=0, identity_index=0, credential_counter=0
+    )
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_descriptor_signed_for_other_network(backend):
+    """A descriptor signed for testnet must not be shown against a mainnet path."""
+    client = CommandSender(backend)
+    _set_trusted_name_for_mainnet_path(
+        backend,
+        client,
+        name=DEVICE_ADDRESS_MAINNET_IDP0_ID0_COUNTER0,
+        chain_id=CCD_CHAIN_ID_TESTNET,
+    )
+
+    sw = _verify_address_new_path_sw(
+        client, idp_index=0, identity_index=0, credential_counter=0
+    )
+    assert sw == SW_TRUSTED_NAME_MISMATCH, f"SW=0x{sw:04X}"
+
+
+@pytest.mark.active_test_scope
+def test_verify_address_rejects_empty_full_path(backend):
+    """A zero-node path would derive from the master key and review as an empty label."""
+    client = CommandSender(backend)
+    try:
+        rapdu = client.backend.exchange(
+            cla=CLA,
+            ins=InsType.VERIFY_ADDRESS,
+            p1=P1.P1_VERIFY_ADDRESS_FULL_PATH,
+            p2=P2.P2_MAINNET,
+            data=bytes([0]),
+        )
+        sw = rapdu.status
+    except ExceptionRAPDU as e:
+        sw = e.status
+    assert sw == SW_INVALID_PATH, f"SW=0x{sw:04X}"

@@ -36,12 +36,29 @@ TAG_ADDRESS             = 0x22
 TAG_CHAIN_ID            = 0x23
 TAG_TRUSTED_NAME_TYPE   = 0x70
 TAG_TRUSTED_NAME_SOURCE = 0x71
+TAG_NFT_ID              = 0x72
+TAG_SOURCE_CONTRACT     = 0x73
 
 STRUCTURE_TYPE_TRUSTED_NAME = 0x03
 SIGNER_KEY_ID_TEST = 0x0000
 SIGNER_ALGO_ECDSA_SHA256 = 0x01
 
 PKI_KEY_USAGE_TRUSTED_NAME = 0x04
+
+# ── Values the firmware requires (see verify_fields in src/handler/set_trusted_name.c) ──
+# A PKI signature only proves the backend issued the descriptor; the app additionally requires it
+# to be a Concordium account address from the dynamic resolver on a network it derives keys for.
+# These are the values observed in live descriptors from the Ledger trusted-name API.
+CCD_SPEC_VERSION = 0x03
+CCD_NAME_TYPE_CONTEXT_ADDRESS = 0x07
+CCD_NAME_SOURCE_DYNAMIC_RESOLVER = 0x06
+CCD_CHAIN_ID_MAINNET = 0
+CCD_CHAIN_ID_TESTNET = 1
+
+
+def semver(major: int, minor: int, patch: int) -> bytes:
+    """Encode tag 0x10 as the trusted-name format's four-byte semver."""
+    return bytes([major, minor]) + patch.to_bytes(2, "big")
 
 
 def _tlv(tag: int, value: bytes) -> bytes:
@@ -107,13 +124,16 @@ class TrustedNameTlvBuilder:
         *,
         name: str = "test-name",
         address: bytes = b"\x00" * 32,
-        chain_id: int = 1,
+        chain_id: int = CCD_CHAIN_ID_TESTNET,
         challenge: int = 0,
-        name_type: int = 0x05,
-        name_source: int = 0x01,
-        version: int = 0x01,
+        name_type: int = CCD_NAME_TYPE_CONTEXT_ADDRESS,
+        name_source: int = CCD_NAME_SOURCE_DYNAMIC_RESOLVER,
+        version: int = CCD_SPEC_VERSION,
         signer_key_id: int = SIGNER_KEY_ID_TEST,
         signer_algo: int = SIGNER_ALGO_ECDSA_SHA256,
+        not_valid_after: Optional[bytes] = None,
+        nft_id: Optional[bytes] = None,
+        source_contract: Optional[bytes] = None,
     ):
         self.name = name
         self.address = address
@@ -124,6 +144,12 @@ class TrustedNameTlvBuilder:
         self.version = version
         self.signer_key_id = signer_key_id
         self.signer_algo = signer_algo
+        # Raw tag 0x10 bytes: major(1) || minor(1) || patch(2, big-endian). Passed raw so tests
+        # can also send a malformed width.
+        self.not_valid_after = not_valid_after
+        # Optional NFT-descriptor tags; the app refuses a descriptor that carries either.
+        self.nft_id = nft_id
+        self.source_contract = source_contract
 
     def _encode_uint(self, val: int, min_bytes: int = 1) -> bytes:
         """Encode an unsigned integer in big-endian with minimum byte width."""
@@ -142,7 +168,15 @@ class TrustedNameTlvBuilder:
             _tlv(TAG_TRUSTED_NAME, self.name.encode("utf-8")),
             _tlv(TAG_CHAIN_ID, self._encode_uint(self.chain_id)),
             _tlv(TAG_ADDRESS, self.address),
-            _tlv(TAG_CHALLENGE, self._encode_uint(self.challenge, min_bytes=8)),
+        ]
+        if self.nft_id is not None:
+            parts.append(_tlv(TAG_NFT_ID, self.nft_id))
+        if self.source_contract is not None:
+            parts.append(_tlv(TAG_SOURCE_CONTRACT, self.source_contract))
+        parts.append(_tlv(TAG_CHALLENGE, self._encode_uint(self.challenge, min_bytes=8)))
+        if self.not_valid_after is not None:
+            parts.append(_tlv(TAG_NOT_VALID_AFTER, self.not_valid_after))
+        parts += [
             _tlv(TAG_SIGNER_KEY_ID, self._encode_uint(self.signer_key_id, min_bytes=1)),
             _tlv(TAG_SIGNER_ALGORITHM, bytes([self.signer_algo])),
         ]

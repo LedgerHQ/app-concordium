@@ -53,6 +53,11 @@ static const nbgl_contentInfoList_t infoList = {
 // home page definition
 void ui_menu_main(void) {
     tx_state->currentInstruction = INSTRUCTION_NONE;
+    // Back at the idle screen nothing is awaiting approval, so release any
+    // GET_PUBLIC_KEY review claim. This is the path a rejection takes
+    // (send_user_rejection -> ui_menu_main); an accepted one is released in
+    // send_public_key().
+    global_public_key_review_pending = false;
 
     nbgl_useCaseHomeAndSettings(APPNAME,
                                 &ICON_APP_HOME,

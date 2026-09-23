@@ -119,6 +119,7 @@ class InsType(IntEnum):
     SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO = 0x34
     REGISTER_DATA = 0x35
     EXPORT_PRIVATE_KEY_NEW = 0x37
+    SIGN_PLT = 0x27
     GET_APP_VERSION = 0x40
 
 
@@ -362,6 +363,20 @@ class CommandSender:
             p1=P1.P1_INITIAL_SCHEDULED_TRANSFER_WITH_MEMO,
             p2=p2,
             data=data,
+        )
+
+    def sign_tx_with_schedule_and_memo_memo_chunk(self, memo_chunk: bytes) -> RAPDU:
+        """One memo frame, synchronously.
+
+        Only the frame that completes the memo opens the review; an earlier one answers
+        0x9000 straight away, so it cannot go through the async part_2 below.
+        """
+        return self.backend.exchange(
+            cla=CLA,
+            ins=InsType.SIGN_TRANSFER_WITH_SCHEDULE_AND_MEMO,
+            p1=P1.P1_MEMO_SCHEDULED_TRANSFER,
+            p2=P2.P2_NONE,
+            data=memo_chunk,
         )
 
     @contextmanager
@@ -750,9 +765,12 @@ class CommandSender:
         credential_dates: bytes,
         attribute_tag: bytes,
         attribute_value: bytes,
-        proofs: bytes,
-        transaction: bytes,
     ) -> Generator[None, None, None]:
+        """Send the last key through to the revealed attribute value.
+
+        Yields on the attribute-value packet, where the device opens the mandatory review of
+        that attribute. Only a single revealed attribute is sent, matching the fixtures.
+        """
         ## send last key (display ?)
 
         data = (0).to_bytes(1, byteorder="big") + last_key
@@ -806,16 +824,25 @@ class CommandSender:
         )
         if temp_response.status != StatusWords.SWO_SUCCESS:
             raise ExceptionRAPDU(temp_response.status)
-        # send attribute value
-        temp_response = self.backend.exchange(
+        # Send attribute value. This opens the mandatory review of the revealed attribute, so it
+        # must be sent asynchronously and navigated by the caller before the proofs follow via
+        # credential_deployment_part_4.
+        with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.CREDENTIAL_DEPLOYMENT,
             p1=P1.P1_ATTRIBUTE_VALUE,
             p2=P2.P2_NONE,
             data=attribute_value,
-        )
-        if temp_response.status != StatusWords.SWO_SUCCESS:
-            raise ExceptionRAPDU(temp_response.status)
+        ) as response:
+            yield response
+
+    @contextmanager
+    def credential_deployment_part_4(
+        self,
+        proofs: bytes,
+        transaction: bytes,
+    ) -> Generator[None, None, None]:
+        """Send the proof length, proof bytes and the new-or-existing packet."""
         # send length of proofs
         data = len(proofs).to_bytes(4, byteorder="big")
         temp_response = self.backend.exchange(
@@ -898,17 +925,21 @@ class CommandSender:
             yield response
 
     @contextmanager
-    def sign_update_credential_part_3(
+    def sign_update_credential_credential_details(
         self,
         signature_threshold: bytes,
         ar_identity: bytes,
         credential_dates: bytes,
         attribute_tag: bytes,
         attribute_value: bytes,
-        proof_length: bytes,
-        proofs: bytes,
-        credential_id_list: List[bytes],
     ) -> Generator[None, None, None]:
+        """Send one added credential's details, up to and including its revealed attribute.
+
+        Yields on the attribute-value packet, which is where the device opens the mandatory
+        review of that revealed attribute. The caller must navigate it before the proofs are
+        sent via :meth:`sign_update_credential_credential_proofs`. Only a single revealed
+        attribute is sent, matching the current fixtures.
+        """
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_UPDATE_CREDENTIAL,
@@ -948,8 +979,21 @@ class CommandSender:
             p1=P1.P1_ATTRIBUTE_VALUE,
             p2=P2.P2_CREDENTIAL_CREDENTIAL,
             data=attribute_value,
-        ):
-            pass
+        ) as response:
+            yield response
+
+    @contextmanager
+    def sign_update_credential_credential_proofs(
+        self,
+        proof_length: bytes,
+        proofs: bytes,
+    ) -> Generator[None, None, None]:
+        """Send one added credential's proof length and proof bytes.
+
+        Yields on the final proofs packet, which is where the device opens the mandatory
+        added-credential review. The caller must navigate that review before the credential-ID
+        packets are sent via :meth:`sign_update_credential_credential_ids`.
+        """
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_UPDATE_CREDENTIAL,
@@ -966,8 +1010,16 @@ class CommandSender:
                 p1=P1.P1_PROOFS,
                 p2=P2.P2_CREDENTIAL_CREDENTIAL,
                 data=chunk,
-            ):
-                pass
+            ) as response:
+                if i == len(proof_chunks) - 1:
+                    yield response
+
+    @contextmanager
+    def sign_update_credential_credential_ids(
+        self,
+        credential_id_list: List[bytes],
+    ) -> Generator[None, None, None]:
+        """Send the credential-ID count and each credential ID of an update-credential tx."""
         with self.backend.exchange_async(
             cla=CLA,
             ins=InsType.SIGN_UPDATE_CREDENTIAL,
@@ -1308,6 +1360,101 @@ class CommandSender:
             p1=P1.P1_REGISTER_DATA_PAYLOAD,
             p2=P2.P2_NONE,
             data=last_chunk,
+        ) as response:
+            yield response
+
+    def sign_plt_init(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_total_length: int,
+        kind: int = 0x1B,
+        display_fee_microccd: Optional[int] = None,
+    ) -> RAPDU:
+        """Send PLT INIT frame (P1=0x00).
+
+        If display_fee_microccd is given, P2=0x01 is used and the fee is appended as an
+        8-byte big-endian uint64 suffix (not hashed). Pass FEE_OMIT (0xFFFFFFFFFFFFFFFF)
+        to suppress the fee line while still using P2=0x01.
+        Returns raw RAPDU (caller checks status).
+        """
+        data = pack_derivation_path(path)
+        data += header_60
+        data += bytes([kind])
+        data += len(token_id).to_bytes(1, byteorder="big")
+        data += token_id
+        data += cbor_total_length.to_bytes(4, byteorder="big")
+        p2 = P2.P2_NONE
+        if display_fee_microccd is not None:
+            p2 = P2.P2_TX_FEE_DISPLAY
+            data += display_fee_microccd.to_bytes(8, byteorder="big")
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x00, p2=p2, data=data
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt_cont(self, chunk: bytes) -> RAPDU:
+        """Send one PLT CONT frame (P1=0x01). Returns raw RAPDU (caller checks status)."""
+        try:
+            return self.backend.exchange(
+                cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunk
+            )
+        except ExceptionRAPDU as e:
+            return RAPDU(e.status, e.data)
+
+    def sign_plt(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
+    ) -> RAPDU:
+        """Full PLT signing flow: INIT + one or more CONT frames.
+
+        Returns the RAPDU from the last CONT frame, which carries the 64-byte signature.
+        Raises ExceptionRAPDU if any intermediate frame returns a non-success status.
+        """
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        return resp
+
+    @contextmanager
+    def sign_plt_with_ui(
+        self,
+        path: str,
+        header_60: bytes,
+        token_id: bytes,
+        cbor_payload: bytes,
+        display_fee_microccd: Optional[int] = None,
+    ) -> Generator[None, None, None]:
+        """PLT signing flow for UI tests: INIT + intermediate CONTs synchronous,
+        final CONT via exchange_async (caller navigates inside the with-block)."""
+        resp = self.sign_plt_init(
+            path, header_60, token_id, len(cbor_payload),
+            display_fee_microccd=display_fee_microccd
+        )
+        if resp.status != StatusWords.SWO_SUCCESS:
+            raise ExceptionRAPDU(resp.status)
+        chunks = split_message(cbor_payload, MAX_APDU_LEN)
+        for chunk in chunks[:-1]:
+            resp = self.sign_plt_cont(chunk)
+            if resp.status != StatusWords.SWO_SUCCESS:
+                raise ExceptionRAPDU(resp.status)
+        with self.backend.exchange_async(
+            cla=CLA, ins=InsType.SIGN_PLT, p1=0x01, p2=0x00, data=chunks[-1]
         ) as response:
             yield response
 

@@ -81,6 +81,7 @@ typedef struct cx_sha512_s cx_sha512_t;
 typedef enum cx_curve_e {
     CX_CURVE_NONE          = 0,
     CX_CURVE_256K1         = 0x21,
+    CX_CURVE_SECP256K1     = 0x21,
     CX_CURVE_256R1         = 0x22,
     CX_CURVE_Ed25519       = 0x33,
     CX_CURVE_BLS12_381_G1  = 0x39,
@@ -120,8 +121,28 @@ typedef struct cx_ec_point_s cx_ecpoint_t;
         if (error) goto end;   \
     } while (0)
 
+/*
+ * CX_ASSERT aborts the device on a crypto error it treats as impossible. Evaluating the call
+ * and discarding the result keeps the side effects the app relies on while leaving the fuzz
+ * process alive, so a later failure is still reported by the sanitizer rather than masked by
+ * an early exit.
+ */
+#ifndef CX_ASSERT
+#define CX_ASSERT(call) ((void) (call))
+#endif
+
+/* ── digest sizes ─────────────────────────────────────────────────────── */
+#define CX_SHA3_256_SIZE   32
+#define CX_KECCAK_256_SIZE 32
+#define CX_RIPEMD160_SIZE  20
+#define CX_SHA512_SIZE     64
+
 /* ── hash function declarations ──────────────────────────────────────── */
 cx_err_t cx_sha256_init_no_throw(cx_sha256_t *hash);
+cx_err_t cx_sha3_init_no_throw(cx_sha3_t *hash, size_t size);
+cx_err_t cx_keccak_init_no_throw(cx_sha3_t *hash, size_t size);
+cx_err_t cx_ripemd160_init_no_throw(cx_ripemd160_t *hash);
+cx_err_t cx_sha512_init_no_throw(cx_sha512_t *hash);
 
 static inline int cx_sha256_init(cx_sha256_t *hash) {
     cx_sha256_init_no_throw(hash);

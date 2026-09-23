@@ -21,6 +21,7 @@ typedef enum {
     TRANSFER_WITH_SCHEDULE_WITH_MEMO = 24,
     CONFIGURE_BAKER = 25,
     CONFIGURE_DELEGATION = 26,
+    PLT = 27,
 } transactionKind_e;
 
 /** Byte offset of energy field in Concordium account transaction header. */

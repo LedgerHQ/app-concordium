@@ -15,11 +15,16 @@ unit-tests/coverage/
 unit-tests/coverage.info
 
 # Fuzzing
-fuzzing/build/
+fuzzing/build*/
 fuzzing/corpus/
 fuzzing/crashes/
 fuzzing/out/
 fuzzing/.cache/
+# Seeds and dictionaries are generated from tests/standalone/ by
+# fuzzing/tools/generate_seed_corpus.py, which both build.sh and run_local.sh invoke. The
+# generator is the tracked source of truth; the ~300 derived blobs are not.
+fuzzing/seeds/
+fuzzing/dictionaries/
 
 # Python
 *.pyc[cod]
@@ -43,12 +48,23 @@ doc/latex
 # Helpers
 diff
 
+# Captured build logs, e.g. `make -n > build_dry_run_output.txt` while chasing an SDK rule
+build_dry_run_output.txt
+*_output.txt
+
 # Vscode — track udev rules (Ledger app-boilerplate style); ignore local settings
 .vscode/*
 !.vscode/20-ledger.ledgerblue.rules
+
+# JetBrains IDEs (CLion, PyCharm) — per-developer project settings
+.idea/
 
 # clangd (language server index; may appear under fuzzing/ or repo root)
 .cache/
 
 # folder to store local helper scripts
 scripts_local/
+tmp/
+.claude/
+
+build-dy

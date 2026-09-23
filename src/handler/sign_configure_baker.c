@@ -1,5 +1,7 @@
 #include "globals.h"
 
+#include <assert.h>  // _Static_assert
+#include <stdint.h>  // UINT8_MAX
 #include <string.h>
 
 #include <os.h>
@@ -7,11 +9,13 @@
 #include <io.h>
 #include <parser.h>
 #include <status_words.h>
+#include <format.h>
 
 #include "apdu/apdu_response.h"
 #include "concordium_crypto.h"
 #include "derivation_path.h"
 #include "display.h"
+#include "display_text.h"
 #include "numberHelpers.h"
 #include "tx_hash.h"
 
@@ -32,6 +36,27 @@ bool hasCommissionRate(void) {
     return ctx_conf_baker->hasTransactionFeeCommission ||
            ctx_conf_baker->hasBakingRewardCommission ||
            ctx_conf_baker->hasFinalizationRewardCommission;
+}
+
+/**
+ * Park the flow while a review is on screen: remember the stage to resume at, then move to a
+ * state no packet matches.
+ *
+ * Each stage of this instruction used to advance the state before opening its review, so a host
+ * could push the following stages in while the user was still looking at an earlier screen. The
+ * transaction hash covers those fields either way, so the signature ended up over fields whose
+ * screens were skipped or replaced. Parking makes the review, not the packet, drive the flow.
+ */
+static void awaitConfigureBakerConfirm(configureBakerState_t next) {
+    ctx_conf_baker->pendingState = next;
+    ctx_conf_baker->state = CONFIGURE_BAKER_AWAITING_CONFIRM;
+}
+
+void confirmConfigureBakerStage(void) {
+    // Only path out of CONFIGURE_BAKER_AWAITING_CONFIRM: the user accepted the screen, so the
+    // stage that was parked may now be received.
+    ctx_conf_baker->state = ctx_conf_baker->pendingState;
+    send_success_no_idle();
 }
 
 static void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
@@ -77,12 +102,12 @@ static void handleCommissionRates(uint8_t *cdata, uint8_t dataLength) {
     }
 
     if (ctx_conf_baker->hasSuspended) {
-        ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
     } else {
         if (dataLength != 0) {
             THROW(SWO_INCORRECT_DATA);
         }
-        ctx_conf_baker->state = CONFIGURE_BAKER_END;
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
     }
 
     startConfigureBakerCommissionDisplay();
@@ -139,6 +164,13 @@ void handle_sign_configure_baker(const command_t *cmd,
         ctx_conf_baker->hasBakingRewardCommission = (bitmap >> 6) & 1;
         ctx_conf_baker->hasFinalizationRewardCommission = (bitmap >> 7) & 1;
         ctx_conf_baker->hasSuspended = (bitmap >> 8) & 1;
+
+        explicit_bzero(ctx_conf_baker->keysHashDisplay, sizeof(ctx_conf_baker->keysHashDisplay));
+        if (ctx_conf_baker->hasKeys) {
+            if (cx_sha256_init(&ctx_conf_baker->keysHashCtx) != CX_SHA256) {
+                THROW(ERROR_FAILED_CX_OPERATION);
+            }
+        }
 
         if (ctx_conf_baker->hasCapital || ctx_conf_baker->hasRestakeEarnings ||
             ctx_conf_baker->hasOpenForDelegation || ctx_conf_baker->hasKeys) {
@@ -224,11 +256,13 @@ void handle_sign_configure_baker(const command_t *cmd,
                 THROW(SWO_INCORRECT_DATA);
             }
 
-            // We do not display the verification keys to the user, as they are difficult
-            // for the user to verify. If need be, we can start showing them by parsing
-            // the values into hex strings here.
+            // The raw keys are too long to compare on a device screen, so each is also folded
+            // into keysHashCtx and the resulting digest is shown before signing. The proofs are
+            // hashed into the transaction but deliberately left out of that digest, as their
+            // per-transaction randomness would make the displayed value unreproducible.
             // Election verify key
             update_hash((cx_hash_t *) &tx_state->hash, cdata, 32);
+            update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 32);
             cdata += 32;
 
             // Election Proof
@@ -237,6 +271,7 @@ void handle_sign_configure_baker(const command_t *cmd,
 
             // Signature verify key
             update_hash((cx_hash_t *) &tx_state->hash, cdata, 32);
+            update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 32);
             cdata += 32;
 
             // Signature Proof
@@ -251,13 +286,13 @@ void handle_sign_configure_baker(const command_t *cmd,
             }
 
             if (ctx_conf_baker->hasMetadataUrl) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_URL_LENGTH;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL_LENGTH);
             } else if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerDisplay();
@@ -271,19 +306,35 @@ void handle_sign_configure_baker(const command_t *cmd,
 
         // Aggregation verify key
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 96);
+        update_hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx, cdata, 96);
         cdata += 96;
 
-        // Election Proof
+        // Aggregation Proof
         update_hash((cx_hash_t *) &tx_state->hash, cdata, 64);
 
+        // All three verification keys are in: turn them into the digest shown before signing.
+        uint8_t keysHash[COMMON_HASH_SIZE];
+        hash((cx_hash_t *) &ctx_conf_baker->keysHashCtx,
+             CX_LAST,
+             NULL,
+             0,
+             keysHash,
+             sizeof(keysHash));
+        if (format_hex(keysHash,
+                       sizeof(keysHash),
+                       ctx_conf_baker->keysHashDisplay,
+                       sizeof(ctx_conf_baker->keysHashDisplay)) == -1) {
+            THROW(ERROR_BUFFER_OVERFLOW);
+        }
+
         if (ctx_conf_baker->hasMetadataUrl) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_URL_LENGTH;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL_LENGTH);
         } else if (hasCommissionRate()) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
         } else if (ctx_conf_baker->hasSuspended) {
-            ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
         } else {
-            ctx_conf_baker->state = CONFIGURE_BAKER_END;
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
         }
 
         startConfigureBakerDisplay();
@@ -305,11 +356,11 @@ void handle_sign_configure_baker(const command_t *cmd,
         if (ctx_conf_baker->url.urlLength == 0) {
             // If the url has length zero, we don't wait for the url bytes.
             if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerUrlDisplay(true);
@@ -319,23 +370,42 @@ void handle_sign_configure_baker(const command_t *cmd,
             send_success_no_idle();
         }
     } else if (P1_URL == p1 && ctx_conf_baker->state == CONFIGURE_BAKER_URL) {
+        // dataLength is a uint8_t, so the display buffer must be able to hold the largest
+        // possible chunk plus the NUL terminator appended below.
+        _Static_assert(COMMON_URL_DISPLAY_SIZE >= (size_t) UINT8_MAX + 1,
+                       "urlDisplay must hold a max-length URL chunk plus a NUL terminator");
         if (ctx_conf_baker->url.urlLength > dataLength) {
+            // The URL is hashed in full but shown as a C string, so a chunk carrying bytes that
+            // cannot be rendered is refused rather than signed with a truncated review.
+            if (!is_displayable_text(cdata, dataLength)) {
+                send_rejection(ERROR_INVALID_TRANSACTION);
+                return;
+            }
             update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
             ctx_conf_baker->url.urlLength -= dataLength;
+            explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, dataLength);
+            ctx_conf_baker->url.urlDisplay[dataLength] = '\0';
+            // More URL bytes are still expected, so the stage to resume at is this same one.
+            awaitConfigureBakerConfirm(CONFIGURE_BAKER_URL);
             startConfigureBakerUrlDisplay(false);
             *flags |= IO_ASYNCH_REPLY;
         } else if (ctx_conf_baker->url.urlLength == dataLength) {
+            if (!is_displayable_text(cdata, ctx_conf_baker->url.urlLength)) {
+                send_rejection(ERROR_INVALID_TRANSACTION);
+                return;
+            }
+            explicit_bzero(ctx_conf_baker->url.urlDisplay, sizeof(ctx_conf_baker->url.urlDisplay));
             memmove(ctx_conf_baker->url.urlDisplay, cdata, ctx_conf_baker->url.urlLength);
-            memmove(ctx_conf_baker->url.urlDisplay + ctx_conf_baker->url.urlLength, "\0", 1);
+            ctx_conf_baker->url.urlDisplay[ctx_conf_baker->url.urlLength] = '\0';
             update_hash((cx_hash_t *) &tx_state->hash, cdata, ctx_conf_baker->url.urlLength);
 
             if (hasCommissionRate()) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_COMMISSION_RATES;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_COMMISSION_RATES);
             } else if (ctx_conf_baker->hasSuspended) {
-                ctx_conf_baker->state = CONFIGURE_BAKER_SUSPENDED;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_SUSPENDED);
             } else {
-                ctx_conf_baker->state = CONFIGURE_BAKER_END;
+                awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
             }
 
             startConfigureBakerUrlDisplay(true);
@@ -366,6 +436,9 @@ void handle_sign_configure_baker(const command_t *cmd,
         } else {
             THROW(ERROR_INVALID_TRANSACTION);
         }
+        // Last stage: nothing further is accepted, so a repeated suspended packet cannot hash a
+        // second byte into the transaction while this review is up.
+        awaitConfigureBakerConfirm(CONFIGURE_BAKER_END);
         startConfigureBakerSuspendedDisplay();
         *flags |= IO_ASYNCH_REPLY;
     } else {

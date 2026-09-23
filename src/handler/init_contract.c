@@ -1,5 +1,7 @@
 #include "globals.h"
 
+#include <string.h>
+
 #include <os.h>
 #include <cx.h>
 #include <io.h>
@@ -11,6 +13,7 @@
 #include "concordium_crypto.h"
 #include "derivation_path.h"
 #include "display.h"
+#include "display_text.h"
 #include "numberHelpers.h"
 #include "tx_hash.h"
 
@@ -72,11 +75,20 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
             THROW(ERROR_INVALID_MODULE_REF);
         }
         ctx_init_contract->state = INIT_CONTRACT_NAME_FIRST;
+        // The contract name and parameters are hashed into the signed transaction, so both have
+        // to reach the approval screen. Parameters are arbitrary binary, so they are digested.
+        explicit_bzero(ctx_init_contract->nameDisplay, sizeof(ctx_init_contract->nameDisplay));
+        explicit_bzero(ctx_init_contract->paramsHashDisplay,
+                       sizeof(ctx_init_contract->paramsHashDisplay));
+        if (cx_sha256_init(&ctx_init_contract->paramsHashCtx) != CX_SHA256) {
+            THROW(ERROR_FAILED_CX_OPERATION);
+        }
         send_success_no_idle();
     }
 
     else if (p1 == P1_NAME) {
         uint8_t lengthSize = 2;
+        uint8_t nameOffset = 0;
         if (ctx_init_contract->state == INIT_CONTRACT_NAME_FIRST) {
             // extract the name length
             if (lc < 2) {
@@ -90,22 +102,52 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
             }
             // set the state to the next state
             ctx_init_contract->state = INIT_CONTRACT_NAME_NEXT;
+            nameOffset = lengthSize;  // skip the length prefix when retaining the name
         } else if (ctx_init_contract->remainingNameLength < lc) {
             THROW(ERROR_INVALID_NAME_LENGTH);
         }
+        // The name is hashed in full but rendered as a C string, so a chunk carrying bytes that
+        // cannot be drawn is refused before any of it is hashed or displayed. Without this an
+        // embedded NUL would show "transfer" while the signature covered "transfer\0<more>".
+        if (lc > nameOffset && !is_displayable_text(cdata + nameOffset, lc - nameOffset)) {
+            send_rejection(ERROR_INVALID_TRANSACTION);
+            return;
+        }
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
+        // Digest the name alongside the parameters, so the signed name is always represented
+        // even when it is too long to render, and retain the text when it does fit.
+        if (lc > nameOffset) {
+            update_hash((cx_hash_t *) &ctx_init_contract->paramsHashCtx,
+                        cdata + nameOffset,
+                        lc - nameOffset);
+            if (ctx_init_contract->nameLength < sizeof(ctx_init_contract->nameDisplay)) {
+                size_t used = ctx_init_contract->nameDisplayUsed;
+                memmove(ctx_init_contract->nameDisplay + used, cdata + nameOffset, lc - nameOffset);
+                used += lc - nameOffset;
+                ctx_init_contract->nameDisplay[used] = '\0';
+                ctx_init_contract->nameDisplayUsed = used;
+            }
+        }
         // subtract the length of the chunk from the remaining name length
         ctx_init_contract->remainingNameLength -= lc;
         if (ctx_init_contract->remainingNameLength > 0) {
             send_success_no_idle();
         } else if (ctx_init_contract->remainingNameLength == 0) {
+            if (ctx_init_contract->nameLength >= sizeof(ctx_init_contract->nameDisplay)) {
+                // Replaced entirely, not truncated: a shortened entrypoint would let a host
+                // disguise the method. The digest below still covers the exact name bytes.
+                memmove(ctx_init_contract->nameDisplay,
+                        "(too long to display - see hash)",
+                        sizeof("(too long to display - see hash)"));
+            }
             ctx_init_contract->state = INIT_CONTRACT_PARAMS_FIRST;
             send_success_no_idle();
         }
 
     } else if (p1 == P1_PARAMS) {
         uint8_t lengthSize = 2;
+        uint8_t paramsOffset = 0;
         if (ctx_init_contract->state == INIT_CONTRACT_PARAMS_FIRST) {
             // extract the params length
             if (lc < 2) {
@@ -119,16 +161,35 @@ void handle_init_contract(const command_t *cmd, bool isInitialCall) {
             }
             // set the state to the next state
             ctx_init_contract->state = INIT_CONTRACT_PARAMS_NEXT;
+            paramsOffset = lengthSize;  // skip the length prefix when digesting the parameters
         } else if (ctx_init_contract->remainingParamsLength < lc) {
             THROW(ERROR_INVALID_PARAMS_LENGTH);
         }
         // hash the whole chunk
         update_hash((cx_hash_t *) &tx_state->hash, cdata, lc);
+        if (lc > paramsOffset) {
+            update_hash((cx_hash_t *) &ctx_init_contract->paramsHashCtx,
+                        cdata + paramsOffset,
+                        lc - paramsOffset);
+        }
         // subtract the length of the chunk from the remaining params length
         ctx_init_contract->remainingParamsLength -= lc;
         if (ctx_init_contract->remainingParamsLength > 0) {
             send_success_no_idle();
         } else if (ctx_init_contract->remainingParamsLength == 0) {
+            uint8_t paramsHash[COMMON_HASH_SIZE];
+            hash((cx_hash_t *) &ctx_init_contract->paramsHashCtx,
+                 CX_LAST,
+                 NULL,
+                 0,
+                 paramsHash,
+                 sizeof(paramsHash));
+            if (format_hex(paramsHash,
+                           sizeof(paramsHash),
+                           ctx_init_contract->paramsHashDisplay,
+                           sizeof(ctx_init_contract->paramsHashDisplay)) == -1) {
+                THROW(ERROR_BUFFER_OVERFLOW);
+            }
             uiInitContractDisplay();
         }
 

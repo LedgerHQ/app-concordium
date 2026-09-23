@@ -17,6 +17,7 @@
 char g_trusted_name[TRUSTED_NAME_MAX_LEN + 1];
 uint8_t g_trusted_address[TRUSTED_ADDRESS_MAX_SIZE];
 uint8_t g_trusted_address_len;
+uint64_t g_trusted_chain_id;
 bool g_trusted_name_valid;
 uint64_t g_stored_challenge;
 
@@ -121,6 +122,38 @@ static int finalize_multi_hash(trustedNameMultiHashCtx_t *h,
 
 #define STRUCTURE_TYPE_TRUSTED_NAME 0x03
 
+/* ── Semantic authorization of the signed descriptor ─────────────────────────
+ *
+ * A valid Ledger PKI signature only proves the descriptor was issued by the backend; it says
+ * nothing about which use case it was issued for. Any Ledger-signed trusted name (an Ethereum
+ * ENS name, an NFT collection, a wallet label) would otherwise be accepted here and shown by
+ * VERIFY_ADDRESS as the reviewed Concordium account. The constants below pin the descriptor to
+ * the single use case this app has: a canonical Concordium account address resolved by the
+ * backend's dynamic resolver, on a network this app derives keys for. */
+
+/** Descriptor serialization version this app understands (SDK CURRENT_TRUSTED_NAME_SPEC_VERSION).
+ */
+#define CCD_TRUSTED_NAME_SPEC_VERSION 0x03
+/** Trusted-name type: Concordium's canonical account ("context") address.
+ *
+ * Pinned to the single value ADR 001 specifies for this descriptor: tag 0x70 "Must be
+ * 0x07 ccd_context_address". The generic SDK enum in lib_tlv/use_cases stops at
+ * CONTEXT_ADDRESS 0x06 and has no Concordium entry, so it is not the authority here; 0x06 is
+ * some other chain's context address and is refused like every other type (EOA, smart contract,
+ * collection, token, wallet label), because VERIFY_ADDRESS only ever reviews a Concordium
+ * account address.
+ *
+ * Accepting a second value would let a Ledger-signed descriptor issued for another use case be
+ * shown as the reviewed Concordium account, so exactly one value is allowed. */
+#define CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS 0x07
+/** Only the backend's dynamic resolver may name a Concordium account address; the other source
+ * namespaces (local address book, CAL, ENS, Unstoppable Domains, Freename, DNS) belong to other
+ * chains or to host-side data. */
+#define CCD_TRUSTED_NAME_SOURCE_DYNAMIC_RESOLVER 0x06
+
+/** Trusted-name semver encoding of tag 0x10: major(1) || minor(1) || patch(2, big-endian). */
+#define CCD_SEMVER_SIZE 4
+
 #define DER_SIG_MIN 64
 #define DER_SIG_MAX 72
 
@@ -164,6 +197,25 @@ static bool h_challenge(const tlv_data_t *data, trustedNameTlvExtracted_t *ctx) 
     return get_uint64_t_from_tlv_data(data, &ctx->challenge);
 }
 
+/**
+ * Tag 0x10 (NOT_VALID_AFTER): the app version after which the backend revokes this descriptor.
+ *
+ * The value is authenticated but was previously parsed with a NULL handler, so a reached cutoff
+ * could not be enforced. Require the exact four-byte semver shape; verify_fields() compares it to
+ * this app's version.
+ */
+static bool h_not_valid_after(const tlv_data_t *data, trustedNameTlvExtracted_t *ctx) {
+    if (data->value.size != CCD_SEMVER_SIZE) {
+        PRINTF("Tag 0x10 must be %u bytes (semver)\n", CCD_SEMVER_SIZE);
+        return false;
+    }
+    ctx->not_valid_after_major = data->value.ptr[0];
+    ctx->not_valid_after_minor = data->value.ptr[1];
+    ctx->not_valid_after_patch =
+        (uint16_t) (((uint16_t) data->value.ptr[2] << 8) | (uint16_t) data->value.ptr[3]);
+    return true;
+}
+
 static bool h_signer_key_id(const tlv_data_t *data, trustedNameTlvExtracted_t *ctx) {
     return get_uint16_t_from_tlv_data(data, &ctx->signer_key_id);
 }
@@ -190,7 +242,7 @@ static bool h_common(const tlv_data_t *data, trustedNameTlvExtracted_t *ctx);
     X(0x72, CCD_TAG_NFT_ID,              NULL,             ENFORCE_UNIQUE_TAG)            \
     X(0x73, CCD_TAG_SOURCE_CONTRACT,     NULL,             ENFORCE_UNIQUE_TAG)            \
     X(0x12, CCD_TAG_CHALLENGE,           h_challenge,      ENFORCE_UNIQUE_TAG)            \
-    X(0x10, CCD_TAG_NOT_VALID_AFTER,     NULL,             ENFORCE_UNIQUE_TAG)            \
+    X(0x10, CCD_TAG_NOT_VALID_AFTER,     h_not_valid_after, ENFORCE_UNIQUE_TAG)           \
     X(0x13, CCD_TAG_SIGNER_KEY_ID,       h_signer_key_id,  ENFORCE_UNIQUE_TAG)            \
     X(0x14, CCD_TAG_SIGNER_ALGORITHM,    h_signer_algo,    ENFORCE_UNIQUE_TAG)            \
     X(0x15, CCD_TAG_DER_SIGNATURE,       h_der_signature,  ENFORCE_UNIQUE_TAG)
@@ -208,6 +260,22 @@ static bool h_common(const tlv_data_t *data, trustedNameTlvExtracted_t *ctx) {
 }
 
 /* ── Post-parse validation ───────────────────────────────────────────────── */
+
+/**
+ * True when this app version is past the descriptor's revocation cutoff.
+ *
+ * The cutoff is inclusive: a descriptor stamped "not valid after 5.6.4" is still honoured by app
+ * 5.6.4 and refused by 5.6.5.
+ */
+static bool app_version_is_after(uint8_t major, uint8_t minor, uint16_t patch) {
+    if ((unsigned int) MAJOR_VERSION != (unsigned int) major) {
+        return (unsigned int) MAJOR_VERSION > (unsigned int) major;
+    }
+    if ((unsigned int) MINOR_VERSION != (unsigned int) minor) {
+        return (unsigned int) MINOR_VERSION > (unsigned int) minor;
+    }
+    return (unsigned int) PATCH_VERSION > (unsigned int) patch;
+}
 
 static bool verify_fields(const trustedNameTlvExtracted_t *ctx) {
 #ifdef TRUSTED_NAME_TEST_KEY
@@ -244,6 +312,39 @@ static bool verify_fields(const trustedNameTlvExtracted_t *ctx) {
     }
     if (ctx->address.size != KEY_LENGTH) {
         PRINTF("Tag 0x22 must be %u bytes (Ed25519 public key)\n", KEY_LENGTH);
+        return false;
+    }
+
+    /* The signature authenticates the fields below but does not authorize them for this handler,
+     * so each is checked against the one use case VERIFY_ADDRESS supports. */
+    if (ctx->version != CCD_TRUSTED_NAME_SPEC_VERSION) {
+        PRINTF("Unsupported descriptor version %d\n", ctx->version);
+        return false;
+    }
+    if (ctx->trusted_name_type != CCD_TRUSTED_NAME_TYPE_CONTEXT_ADDRESS) {
+        PRINTF("Trusted-name type %d is not ccd_context_address\n", ctx->trusted_name_type);
+        return false;
+    }
+    if (ctx->trusted_name_source != CCD_TRUSTED_NAME_SOURCE_DYNAMIC_RESOLVER) {
+        PRINTF("Trusted-name source %d is not the dynamic resolver\n", ctx->trusted_name_source);
+        return false;
+    }
+    if (ctx->chain_id != CCD_CHAIN_ID_MAINNET && ctx->chain_id != CCD_CHAIN_ID_TESTNET) {
+        PRINTF("Chain id is neither Concordium mainnet nor testnet\n");
+        return false;
+    }
+    /* Both tags belong to NFT descriptors. Their presence means the descriptor describes something
+     * other than a plain account address, and this app cannot show what that something is. */
+    if (TLV_CHECK_RECEIVED_TAGS(ctx->received_tags, CCD_TAG_NFT_ID) ||
+        TLV_CHECK_RECEIVED_TAGS(ctx->received_tags, CCD_TAG_SOURCE_CONTRACT)) {
+        PRINTF("Descriptor carries NFT fields; not an account address\n");
+        return false;
+    }
+    if (TLV_CHECK_RECEIVED_TAGS(ctx->received_tags, CCD_TAG_NOT_VALID_AFTER) &&
+        app_version_is_after(ctx->not_valid_after_major,
+                             ctx->not_valid_after_minor,
+                             ctx->not_valid_after_patch)) {
+        PRINTF("Descriptor revoked for this app version\n");
         return false;
     }
     return true;
@@ -287,6 +388,10 @@ static bool verify_signature(const trustedNameTlvExtracted_t *ctx) {
 }
 
 void trusted_name_send_set_error(uint16_t sw) {
+    // Erase the nonce on every failure so a rejected SET_TRUSTED_NAME cannot be
+    // retried with the same challenge (g_stored_challenge is not in `global` and
+    // survives explicit_bzero(&global) in app_main.c).
+    erase_stored_challenge();
     global_tx_state.currentInstruction = INSTRUCTION_NONE;
     io_send_sw(sw);
 }
@@ -295,6 +400,7 @@ void clear_trusted_name_binding(void) {
     explicit_bzero(g_trusted_name, sizeof(g_trusted_name));
     explicit_bzero(g_trusted_address, sizeof(g_trusted_address));
     g_trusted_address_len = 0;
+    g_trusted_chain_id = 0;
     g_trusted_name_valid = false;
 }
 
@@ -358,6 +464,10 @@ void handle_set_trusted_name(const command_t *cmd) {
                            : TRUSTED_ADDRESS_MAX_SIZE;
     memmove(g_trusted_address, global.trustedNamePki.tlv.address.ptr, addr_len);
     g_trusted_address_len = addr_len;
+
+    /* The authenticated chain id outlives the union that parsed it: VERIFY_ADDRESS binds it to the
+     * network of the path under review before the descriptor may be used. */
+    g_trusted_chain_id = global.trustedNamePki.tlv.chain_id;
 
     g_trusted_name_valid = true;
     erase_stored_challenge();

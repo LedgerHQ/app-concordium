@@ -61,7 +61,7 @@ void handle_sign_transfer_with_schedule_and_memo(const command_t *cmd,
         cdata += 1;
 
         memo_ctx->cborLength = U2BE(cdata, 0);
-        if (memo_ctx->cborLength > MAX_MEMO_CBOR_SIZE) {
+        if (memo_ctx->cborLength > MAX_CBOR_BLOB_SIZE) {
             THROW(ERROR_INVALID_PARAM);
         }
 
@@ -82,7 +82,11 @@ void handle_sign_transfer_with_schedule_and_memo(const command_t *cmd,
         }
         update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
-        readCborInitial(cdata, dataLength);
+        uint16_t cborSw = readCborInitial(cdata, dataLength);
+        if (cborSw != SWO_SUCCESS) {
+            send_rejection(cborSw);
+            return;
+        }
 
         if (memo_ctx->cborLength == 0) {
             finish_memo_scheduled(flags);
@@ -96,13 +100,17 @@ void handle_sign_transfer_with_schedule_and_memo(const command_t *cmd,
         }
         update_hash((cx_hash_t *) &tx_state->hash, cdata, dataLength);
 
-        readCborContent(cdata, dataLength);
-
-        if (memo_ctx->cborLength != 0) {
-            THROW(ERROR_INVALID_STATE);
+        uint16_t cborSw = readCborContent(cdata, dataLength);
+        if (cborSw != SWO_SUCCESS) {
+            send_rejection(cborSw);
+            return;
         }
 
-        finish_memo_scheduled(flags);
+        if (memo_ctx->cborLength != 0) {
+            send_success_no_idle();
+        } else {
+            finish_memo_scheduled(flags);
+        }
     } else if (p1 == P1_SCHEDULED_TRANSFER_PAIRS &&
                ctx->state == TX_TRANSFER_WITH_SCHEDULE_TRANSFER_PAIRS) {
         if (cmd->p2 != P2_SIGN_TX_DEFAULT) {

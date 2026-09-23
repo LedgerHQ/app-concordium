@@ -15,6 +15,19 @@ extern tx_state_t global_tx_state;
 /** Sentinel for no active instruction (before first command) */
 #define INSTRUCTION_NONE -1
 
+/**
+ * Largest value a BOLOS system exception takes (errors.h: EXCEPTION .. EXCEPTION_CORRUPT are
+ * 0x01..0x14). Every status word this app throws is far above it - the ISO 6xxx range, plus
+ * ERROR_DEVICE_LOCKED at 0x530C - so the two are told apart by magnitude alone. A system
+ * exception is a genuine fault and must keep propagating; a status word is input validation and
+ * must not.
+ *
+ * Shared because every place that converts a thrown value into a reply has to make the same
+ * distinction: dispatch_guarded() in app_main.c for a dispatch, and
+ * exportNewPathPrivateKeysForPurpose() for the one derivation that runs from a UI callback.
+ */
+#define MAX_SYSTEM_EXCEPTION 0x00FF
+
 /*
  * Concordium-specific status words (0x6B01–0x6B0C, 0x530C). ISO7816 reserves 6Bxx for
  * proprietary use; Ledger's status_words.h only defines SWO_WRONG_P1_P2 (0x6B00) in that range.
@@ -32,5 +45,17 @@ extern tx_state_t global_tx_state;
 #define ERROR_INVALID_PARAMS_LENGTH 0x6B0B
 #define ERROR_INVALID_MODULE_REF    0x6B09
 #define ERROR_TRUSTED_NAME_MISMATCH 0x6B0C
+
+/* PLT-specific status words (part of host↔app contract for INS 0x27). */
+#define ERROR_PLT_CBOR_ERROR   0x6B0D
+#define ERROR_PLT_BUFFER_ERROR 0x6B0E
+#define ERROR_PLT_DATA_ERROR   0x6B0F
+#define ERROR_PLT_MULTI_OP \
+    0x6B10 /* payload has > 1 operation; rejected to prevent confirmation-blindness */
+#define ERROR_PLT_UNSUPPORTED_DECIMALS \
+    0x6B11 /* amount exponent magnitude exceeds the app's 18-decimal display limit */
+#define ERROR_PLT_UNSUPPORTED_MEMO                                                           \
+    0x6B12 /* memo is not a tag-24 byte string holding one definite-length CBOR text string, \
+            * or that text cannot be rendered — see parse_memo_value() */
 
 #define ERROR_DEVICE_LOCKED 0x530C

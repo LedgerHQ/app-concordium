@@ -43,6 +43,9 @@ static void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size
     do {
         error = cx_hash_sha256(salt, saltSize, salt, sizeof(salt));
         if (error == 0) {
+            explicit_bzero(sk, sizeof(sk));
+            explicit_bzero(prk, sizeof(prk));
+            explicit_bzero(ikm, sizeof(ikm));
             THROW(ERROR_FAILED_CX_OPERATION);
         }
         saltSize = sizeof(salt);
@@ -59,6 +62,10 @@ static void blsKeygen(const uint8_t *seed, size_t seedLength, uint8_t *dst, size
     } while (cx_math_is_zero(sk, sizeof(sk)));
 
     memmove(dst, sk + l_CONST - BLS_KEY_LENGTH, BLS_KEY_LENGTH);
+
+    explicit_bzero(sk, sizeof(sk));
+    explicit_bzero(prk, sizeof(prk));
+    explicit_bzero(ikm, sizeof(ikm));
 }
 
 void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *privateKey) {
@@ -86,13 +93,44 @@ void get_private_key(const derivation_path_t *path, cx_ecfp_private_key_t *priva
     END_TRY;
 }
 
-void get_public_key(uint8_t *publicKeyArray) {
+void get_extended_private_key(const derivation_path_t *path,
+                              uint8_t *privateKey,
+                              size_t privateKeySize,
+                              uint8_t *chainCode,
+                              size_t chainCodeSize) {
+    if (privateKeySize < KEY_LENGTH || chainCodeSize < KEY_LENGTH) {
+        THROW(ERROR_BUFFER_OVERFLOW);
+    }
+
+    BEGIN_TRY {
+        TRY {
+            ensureNoError(os_derive_bip32_with_seed_no_throw(HDW_ED25519_SLIP10,
+                                                             CX_CURVE_Ed25519,
+                                                             (uint32_t *) path->nodes,
+                                                             path->len,
+                                                             privateKey,
+                                                             chainCode,
+                                                             (unsigned char *) "ed25519 seed",
+                                                             ED25519_SEED_LENGTH));
+        }
+        CATCH_OTHER(e) {
+            explicit_bzero(privateKey, privateKeySize);
+            explicit_bzero(chainCode, chainCodeSize);
+            THROW(e);
+        }
+        FINALLY {
+        }
+    }
+    END_TRY;
+}
+
+void get_public_key(const derivation_path_t *path, uint8_t *publicKeyArray) {
     cx_ecfp_private_key_t privateKey;
     cx_ecfp_public_key_t publicKey;
 
     BEGIN_TRY {
         TRY {
-            get_private_key(&global_derivation_path, &privateKey);
+            get_private_key(path, &privateKey);
             ensureNoError(
                 cx_ecfp_generate_pair_no_throw(CX_CURVE_Ed25519, &publicKey, &privateKey, 1));
         }
@@ -110,12 +148,12 @@ void get_public_key(uint8_t *publicKeyArray) {
     }
 }
 
-void sign(uint8_t *input, uint8_t *signatureOnInput) {
+void sign(const derivation_path_t *path, uint8_t *input, uint8_t *signatureOnInput) {
     cx_ecfp_private_key_t privateKey;
 
     BEGIN_TRY {
         TRY {
-            get_private_key(&global_derivation_path, &privateKey);
+            get_private_key(path, &privateKey);
             ensureNoError(cx_eddsa_sign_no_throw(&privateKey,
                                                  CX_SHA512,
                                                  input,

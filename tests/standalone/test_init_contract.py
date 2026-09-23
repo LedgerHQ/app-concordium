@@ -83,3 +83,64 @@ def test_init_contract_long_name_and_params(
     assert response.data == bytes.fromhex(
         "9e67c936b7cfd593bf46f9f45f6695d972159aa6ec04549787c64bd0a96c7f861b55b3dc098f0a674f39547b3851eb79ac3942d499c39697ed3bff5fb5193200"
     )
+
+
+# The contract name is hashed into the signed transaction but rendered as a C string, exactly
+# like the baker metadata URL (test_sign_configure_baker_url_rejects_embedded_nul) and the CBOR
+# memo. is_displayable_text() is the shared gate; these cover it for init_contract.
+SW_INVALID_TRANSACTION = 0x6B04
+
+_NAME_TEST_PATH = "m/1105/0/0/0/0/2/0/0"
+_NAME_TEST_HEADER = bytes.fromhex(
+    "20a845815bd43a1999e90fbf971537a70392eb38f89e6bd32b3dd70e1a9551d7"
+    "000000000000000a0000000000000064000000290000000063de5da701"
+)
+_NAME_TEST_MODULE_REF = bytes.fromhex(
+    "a00000000000000000000000000000000000000000000000000000000000000a"
+)
+
+
+def _expect_init_contract_refused(client: CommandSender, name: bytes) -> None:
+    with pytest.raises(ExceptionRAPDU) as exc:
+        with client.init_contract(
+            path=_NAME_TEST_PATH,
+            header_and_type=_NAME_TEST_HEADER,
+            amount=1,
+            module_ref=_NAME_TEST_MODULE_REF,
+            name=name,
+            params=bytes.fromhex("0102"),
+        ):
+            pass
+    assert exc.value.status == SW_INVALID_TRANSACTION
+
+
+@pytest.mark.active_test_scope
+def test_init_contract_rejects_name_with_embedded_nul(backend):
+    """``init_transfer\\0<more>`` would review as ``init_transfer`` and sign the whole thing.
+
+    The name is accumulated into a fixed buffer and drawn as a C string, so the NUL ends the
+    display while update_hash() covers every byte. Refusing the chunk is the only way the
+    reviewed name and the signed name stay the same thing.
+    """
+    client = CommandSender(backend)
+    _expect_init_contract_refused(client, b"init_transfer\x00_drain_wallet")
+
+
+@pytest.mark.active_test_scope
+def test_init_contract_rejects_name_with_control_character(backend):
+    """C0 controls have no faithful rendering either, so they are refused, not drawn."""
+    client = CommandSender(backend)
+    _expect_init_contract_refused(client, b"init_transfer\x0b_drain_wallet")
+
+
+@pytest.mark.active_test_scope
+def test_init_contract_rejects_nul_in_a_later_name_chunk(backend):
+    """The multi-packet case, which is what a strlen() write cursor got wrong.
+
+    A name longer than one APDU arrives in chunks. With the cursor recovered by strlen() a NUL
+    in chunk two rewound it, so chunk three overwrote text the user had already been shown.
+    Every chunk is checked, so the flow is refused as soon as the bad one arrives.
+    """
+    client = CommandSender(backend)
+    name = b"init_" + b"a" * 250 + b"\x00" + b"b" * 50
+    _expect_init_contract_refused(client, name)

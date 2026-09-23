@@ -27,3 +27,13 @@ void send_success_result_no_idle(uint8_t tx);
  * Send success and return to main menu; tx is length of response body (status words appended).
  */
 void send_success(uint8_t tx);
+
+/**
+ * Refuse the command with `sw` and drop the multi-packet flow it belonged to.
+ *
+ * Use this instead of THROW for a rejection the host should see: nothing in the app catches a
+ * throw, so it unwinds past app_main and exits the application rather than answering. Clearing
+ * the active instruction lets the host start a new one instead of being stuck behind the
+ * abandoned flow.
+ */
+void send_rejection(uint16_t sw);
